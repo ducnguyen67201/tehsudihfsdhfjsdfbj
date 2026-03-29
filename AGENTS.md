@@ -119,6 +119,17 @@ Do not manually maintain parallel OpenAPI and TS contracts for the same payload.
 - Use explicit transactions for multi-step writes requiring atomicity.
 - Add indexes intentionally for new query paths.
 
+## UI Rules (Non-Negotiable)
+
+- Use **shadcn/ui** exclusively for all UI components. Do not use any other component library (MUI, Chakra, Ant Design, Radix primitives directly, etc.).
+- Install components via `npx shadcn@latest add <component>` — do not copy-paste or hand-roll equivalents.
+- Theme preset: `b5wjYaOsi` (Lyra style, Taupe base, Yellow primary, Violet charts, Geist Mono font, no radius).
+- All styling must use Tailwind utility classes and the shadcn CSS variable system defined in `globals.css`. Do not introduce separate CSS modules, styled-components, or inline style objects.
+- Break pages/features into small, focused components — one responsibility per component. Avoid monolithic page files.
+- Extract reusable logic into custom hooks (`use*.ts`). Keep components declarative; keep side effects and state logic in hooks.
+- Add concise comments in UI code: purpose of each component at the top, intent behind non-obvious prop patterns or layout decisions. This improves readability for both humans and AI agents.
+- See `docs/ui-conventions.md` for full details.
+
 ## API/Router Conventions
 
 - Keep procedure/business orchestration in `packages/rest`.
