@@ -1,3 +1,4 @@
+import { env } from "@shared/env";
 import type { TRPCContext } from "@shared/rest/context";
 import { hasRequiredRole } from "@shared/rest/security/rbac";
 import { assertCsrf } from "@shared/rest/security/session";
@@ -6,9 +7,42 @@ import { TRPCError } from "@trpc/server";
 import { initTRPC } from "@trpc/server";
 
 const t = initTRPC.context<TRPCContext>().create();
+const isTrpcDebugEnabled = env.NODE_ENV === "development" || env.TRUSTLOOP_DEBUG_TRPC === "1";
+
+function resolveProcedureWorkspaceId(ctx: TRPCContext): string | null {
+  const derived = ctx as TRPCContext & { workspaceId?: string };
+  return derived.workspaceId ?? ctx.activeWorkspaceId ?? ctx.apiKeyAuth?.workspaceId ?? null;
+}
+
+const trpcDebugMiddleware = t.middleware(async ({ ctx, next, path, type }) => {
+  if (!isTrpcDebugEnabled) {
+    return next();
+  }
+
+  const startedAt = performance.now();
+  try {
+    const result = await next();
+    const durationMs = Math.round((performance.now() - startedAt) * 100) / 100;
+    console.info(`[trpc:${type}] ${path} -> ${result.ok ? "ok" : "error"} (${durationMs}ms)`, {
+      userId: ctx.user?.id ?? null,
+      workspaceId: resolveProcedureWorkspaceId(ctx),
+    });
+
+    return result;
+  } catch (error) {
+    const durationMs = Math.round((performance.now() - startedAt) * 100) / 100;
+    console.error(`[trpc:${type}] ${path} -> exception (${durationMs}ms)`, {
+      userId: ctx.user?.id ?? null,
+      workspaceId: resolveProcedureWorkspaceId(ctx),
+      error: error instanceof Error ? error.message : String(error),
+    });
+
+    throw error;
+  }
+});
 
 export const router = t.router;
-export const publicProcedure = t.procedure;
+export const publicProcedure = t.procedure.use(trpcDebugMiddleware);
 
 const csrfMutationMiddleware = t.middleware(({ ctx, next, type }) => {
   if (type !== "mutation") {

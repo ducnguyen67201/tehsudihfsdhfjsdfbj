@@ -1,3 +1,5 @@
+import { isClientTrpcDebugEnabled } from "@/lib/debug-flags";
+
 const TRPC_BASE_PATH = "/api/trpc";
 const CSRF_STORAGE_KEY = "trustloop_csrf";
 
@@ -14,6 +16,22 @@ interface TrpcErrorPayload {
       message?: string;
     };
   };
+}
+
+function nowMs(): number {
+  if (typeof performance !== "undefined") {
+    return performance.now();
+  }
+
+  return Date.now();
+}
+
+function logTrpcHttp(message: string, metadata: Record<string, unknown>): void {
+  if (!isClientTrpcDebugEnabled || typeof window === "undefined") {
+    return;
+  }
+
+  console.info(`[trpc:http] ${message}`, metadata);
 }
 
 function resolveErrorMessage(payload: unknown, fallback: string): string {
@@ -58,6 +76,7 @@ export function setStoredCsrfToken(token: string | null): void {
 }
 
 export async function trpcQuery<TData>(path: string): Promise<TData> {
+  const startedAt = nowMs();
   const response = await fetch(`${TRPC_BASE_PATH}/${path}`, {
     method: "GET",
     credentials: "same-origin",
@@ -68,8 +87,20 @@ export async function trpcQuery<TData>(path: string): Promise<TData> {
   const data = resolveTrpcData(payload);
 
   if (!response.ok || data === undefined) {
-    throw new Error(resolveErrorMessage(payload, `Query failed for ${path}`));
+    const message = resolveErrorMessage(payload, `Query failed for ${path}`);
+    logTrpcHttp(`GET ${path} -> ${response.status}`, {
+      ok: false,
+      durationMs: Math.round((nowMs() - startedAt) * 100) / 100,
+      error: message,
+    });
+
+    throw new Error(message);
   }
+
+  logTrpcHttp(`GET ${path} -> ${response.status}`, {
+    ok: true,
+    durationMs: Math.round((nowMs() - startedAt) * 100) / 100,
+  });
 
   return data;
 }
@@ -79,6 +110,7 @@ export async function trpcMutation<TInput, TData>(
   input?: TInput,
   options?: { withCsrf?: boolean }
 ): Promise<TData> {
+  const startedAt = nowMs();
   const headers = new Headers({
     "content-type": "application/json",
   });
@@ -103,8 +135,20 @@ export async function trpcMutation<TInput, TData>(
   const data = resolveTrpcData(payload);
 
   if (!response.ok || data === undefined) {
-    throw new Error(resolveErrorMessage(payload, `Mutation failed for ${path}`));
+    const message = resolveErrorMessage(payload, `Mutation failed for ${path}`);
+    logTrpcHttp(`POST ${path} -> ${response.status}`, {
+      ok: false,
+      durationMs: Math.round((nowMs() - startedAt) * 100) / 100,
+      error: message,
+    });
+
+    throw new Error(message);
   }
+
+  logTrpcHttp(`POST ${path} -> ${response.status}`, {
+    ok: true,
+    durationMs: Math.round((nowMs() - startedAt) * 100) / 100,
+  });
 
   return data;
 }

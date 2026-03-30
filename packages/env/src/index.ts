@@ -19,6 +19,7 @@ const envSchema = z.object({
   TEMPORAL_NAMESPACE: z.string().default("default"),
   TEMPORAL_TASK_QUEUE: z.string().default("support-general"),
   CODEX_TASK_QUEUE: z.string().default("codex-intensive"),
+  TRUSTLOOP_DEBUG_TRPC: z.enum(["0", "1"]).default("0"),
 });
 
 const parsed = envSchema.safeParse(process.env);

@@ -12,6 +12,7 @@
     "build": "turbo run build",
     "dev": "turbo run dev --parallel",
     "dev:web": "npm --workspace @trustloop/web run dev",
+    "dev:web:debug": "TRUSTLOOP_DEBUG_TRPC=1 NEXT_PUBLIC_TRUSTLOOP_DEBUG_TRPC=1 npm --workspace @trustloop/web run dev",
     "dev:worker": "npm --workspace @trustloop/worker run dev",
     "dev:queue": "npm --workspace @apps/queue run dev",
     "check": "npm run type-check && npm run lint && npm run test && npm run build && npm run openapi:check && npm run db:generate",
