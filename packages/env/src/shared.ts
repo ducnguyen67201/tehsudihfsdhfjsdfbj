@@ -13,6 +13,7 @@ export const NODE_ENV = {
 export const serverSchemas = {
   NODE_ENV: z.enum([NODE_ENV.DEVELOPMENT, NODE_ENV.TEST, NODE_ENV.PRODUCTION]),
   APP_BASE_URL: z.url(),
+  APP_PUBLIC_URL: z.url().optional(),
 
   // Session
   SESSION_COOKIE_NAME: z.string().min(1),
@@ -32,6 +33,8 @@ export const serverSchemas = {
   CODEX_TASK_QUEUE: z.string().min(1),
 
   // Support / Slack
+  SLACK_CLIENT_ID: z.string().min(1).optional(),
+  SLACK_CLIENT_SECRET: z.string().min(1).optional(),
   SLACK_SIGNING_SECRET: z.string().min(16).optional(),
   SLACK_REPLAY_WINDOW_SECONDS: z.coerce.number().int().positive().optional().default(300),
   SLACK_BOT_TOKEN: z.string().min(1).optional(),

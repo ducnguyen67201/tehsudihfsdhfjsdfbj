@@ -20,6 +20,13 @@ export function workspaceSettingsPath(workspaceId: string): string {
 }
 
 /**
+ * Returns the workspace general settings path.
+ */
+export function workspaceGeneralPath(workspaceId: string): string {
+  return `${workspaceSettingsPath(workspaceId)}/workspace`;
+}
+
+/**
  * Returns the members settings path for a workspace.
  */
 export function workspaceMembersPath(workspaceId: string): string {
@@ -31,6 +38,13 @@ export function workspaceMembersPath(workspaceId: string): string {
  */
 export function workspaceApiKeysPath(workspaceId: string): string {
   return `${workspaceSettingsPath(workspaceId)}/api-keys`;
+}
+
+/**
+ * Returns the integrations settings path for a workspace.
+ */
+export function workspaceIntegrationsPath(workspaceId: string): string {
+  return `${workspaceSettingsPath(workspaceId)}/integrations`;
 }
 
 /**
