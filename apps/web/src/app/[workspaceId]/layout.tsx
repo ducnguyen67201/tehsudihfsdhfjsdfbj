@@ -18,6 +18,7 @@ import {
   SidebarRail,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { DarkModeToggle } from "@/components/workspace/dark-mode-toggle";
 import { useAuthSession } from "@/hooks/use-auth-session";
 import {
   workspaceApiKeysPath,
@@ -183,6 +184,7 @@ export default function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
         <SidebarFooter>
           <Separator className="bg-sidebar-border" />
           <SidebarMenu>
+            <DarkModeToggle />
             <SidebarMenuItem>
               <SidebarMenuButton
                 asChild
