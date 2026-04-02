@@ -1,11 +1,17 @@
 import { z } from "zod";
 
+export const NODE_ENV = {
+  DEVELOPMENT: "development",
+  TEST: "test",
+  PRODUCTION: "production",
+} as const;
+
 /**
  * Shared server-side env schemas. Used by both the core (worker/queue)
  * and Next.js (web) env configurations.
  */
 export const serverSchemas = {
-  NODE_ENV: z.enum(["development", "test", "production"]),
+  NODE_ENV: z.enum([NODE_ENV.DEVELOPMENT, NODE_ENV.TEST, NODE_ENV.PRODUCTION]),
   APP_BASE_URL: z.url(),
 
   // Session
@@ -26,16 +32,15 @@ export const serverSchemas = {
   CODEX_TASK_QUEUE: z.string().min(1),
 
   // Support / Slack
-  SUPPORT_INGEST_ENABLED: z.enum(["0", "1"]),
-  SLACK_SIGNING_SECRET: z.string().min(16),
-  SLACK_REPLAY_WINDOW_SECONDS: z.coerce.number().int().positive(),
-  SLACK_BOT_TOKEN: z.string().min(1),
+  SLACK_SIGNING_SECRET: z.string().min(16).optional(),
+  SLACK_REPLAY_WINDOW_SECONDS: z.coerce.number().int().positive().optional().default(300),
+  SLACK_BOT_TOKEN: z.string().min(1).optional(),
 
   // Debug
-  TRUSTLOOP_DEBUG_TRPC: z.enum(["0", "1"]),
+  TRUSTLOOP_DEBUG_TRPC: z.enum(["0", "1"]).optional().default("0"),
 };
 
 /** Client-side env schemas (NEXT_PUBLIC_* — inlined by Next.js at build time). */
 export const clientSchemas = {
-  NEXT_PUBLIC_TRUSTLOOP_DEBUG_TRPC: z.enum(["0", "1"]),
+  NEXT_PUBLIC_TRUSTLOOP_DEBUG_TRPC: z.enum(["0", "1"]).optional().default("0"),
 };

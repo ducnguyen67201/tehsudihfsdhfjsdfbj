@@ -1,6 +1,5 @@
 import { prisma } from "@shared/database";
 import type { Prisma } from "@shared/database";
-import { env } from "@shared/env";
 import { verifySlackRequestSignature } from "@shared/rest/services/support/slack-signature-service";
 import {
   type WorkflowDispatcher,
@@ -29,15 +28,7 @@ interface SlackEventAcceptedResult {
   ack: SupportIngressAckResponse;
 }
 
-interface SlackEventDisabledResult {
-  kind: "disabled";
-  reason: string;
-}
-
-export type SlackWebhookResult =
-  | SlackChallengeResult
-  | SlackEventAcceptedResult
-  | SlackEventDisabledResult;
+export type SlackWebhookResult = SlackChallengeResult | SlackEventAcceptedResult;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -109,13 +100,6 @@ export async function processSlackWebhook(
     return {
       kind: "challenge",
       challenge,
-    };
-  }
-
-  if (env.SUPPORT_INGEST_ENABLED !== "1") {
-    return {
-      kind: "disabled",
-      reason: "support_ingest_disabled",
     };
   }
 

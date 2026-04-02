@@ -1,5 +1,5 @@
 import { createEnv } from "@t3-oss/env-core";
-import { serverSchemas } from "./shared.js";
+import { serverSchemas } from "./shared";
 
 /**
  * Server-side env for non-Next.js runtimes (worker, queue, shared packages).

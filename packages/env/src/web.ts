@@ -1,5 +1,5 @@
 import { createEnv } from "@t3-oss/env-nextjs";
-import { clientSchemas, serverSchemas } from "./shared.js";
+import { clientSchemas, serverSchemas } from "./shared";
 
 /**
  * Next.js env — validates server + client (NEXT_PUBLIC_*) vars.
@@ -21,7 +21,6 @@ export const env = createEnv({
     TEMPORAL_NAMESPACE: process.env.TEMPORAL_NAMESPACE,
     TEMPORAL_TASK_QUEUE: process.env.TEMPORAL_TASK_QUEUE,
     CODEX_TASK_QUEUE: process.env.CODEX_TASK_QUEUE,
-    SUPPORT_INGEST_ENABLED: process.env.SUPPORT_INGEST_ENABLED,
     SLACK_SIGNING_SECRET: process.env.SLACK_SIGNING_SECRET,
     SLACK_REPLAY_WINDOW_SECONDS: process.env.SLACK_REPLAY_WINDOW_SECONDS,
     SLACK_BOT_TOKEN: process.env.SLACK_BOT_TOKEN,

@@ -36,7 +36,12 @@ function resolveSlackBotToken(installationMetadata: unknown): string {
     }
   }
 
-  return env.SLACK_BOT_TOKEN;
+  const fallbackBotToken = env.SLACK_BOT_TOKEN;
+  if (!fallbackBotToken) {
+    throw new PermanentExternalError("Slack bot token is not configured");
+  }
+
+  return fallbackBotToken;
 }
 
 function formatAttachmentLines(attachments: SupportAttachment[]): string[] {

@@ -76,7 +76,7 @@
 
 ### On-Call Runbook Pack for Ingestion Controls
 
-**What:** Publish operator runbooks for `SUPPORT_INGEST_ENABLED` kill switch, dead-letter triage, replay execution, and customer-notification recovery checklist.
+**What:** Publish operator runbooks for Slack ingress pause/resume procedures, dead-letter triage, replay execution, and customer-notification recovery checklist.
 
 **Why:** Ensure incidents can be handled quickly and consistently under pressure, including after-hours support.
 
@@ -84,7 +84,7 @@
 
 **Effort:** S
 **Priority:** P1
-**Depends on:** Kill switch wiring + dead-letter/replay command surface implemented.
+**Depends on:** Operational pause/resume controls + dead-letter/replay command surface implemented.
 
 ## Design System
 

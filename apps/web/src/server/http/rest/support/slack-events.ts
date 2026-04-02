@@ -18,16 +18,6 @@ export async function handleSlackEventsWebhook(request: Request): Promise<NextRe
       return NextResponse.json({ challenge: result.challenge });
     }
 
-    if (result.kind === "disabled") {
-      return NextResponse.json(
-        {
-          accepted: false,
-          reason: result.reason,
-        },
-        { status: 200 }
-      );
-    }
-
     return NextResponse.json(result.ack, { status: 202 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Slack webhook processing failed";

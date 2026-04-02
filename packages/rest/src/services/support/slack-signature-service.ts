@@ -10,8 +10,17 @@ function buildSlackBaseString(timestamp: string, rawBody: string): string {
   return `v0:${timestamp}:${rawBody}`;
 }
 
+function getSlackSigningSecret(): string {
+  const signingSecret = env.SLACK_SIGNING_SECRET;
+  if (!signingSecret) {
+    throw new ValidationError("Slack signing secret is not configured");
+  }
+
+  return signingSecret;
+}
+
 function computeSlackSignature(timestamp: string, rawBody: string): string {
-  const digest = createHmac("sha256", env.SLACK_SIGNING_SECRET)
+  const digest = createHmac("sha256", getSlackSigningSecret())
     .update(buildSlackBaseString(timestamp, rawBody))
     .digest("hex");
 
