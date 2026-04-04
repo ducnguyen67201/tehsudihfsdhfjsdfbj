@@ -10,6 +10,7 @@ import {
 } from "@shared/rest";
 import { ConflictError } from "@shared/types";
 import { revalidatePath } from "next/cache";
+import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { redirect } from "next/navigation";
 import { ZodError } from "zod";
 
@@ -62,6 +63,7 @@ export async function connectGithubAction(formData: FormData): Promise<never> {
     revalidatePath(githubSettingsPath(workspaceId));
     redirect(buildReturnPath(workspaceId, { flash: "GitHub connected.", tone: "success" }));
   } catch (error) {
+    if (isRedirectError(error)) throw error;
     redirect(
       buildReturnPath(workspaceId, { flash: getActionErrorMessage(error), tone: "error" })
     );
@@ -92,6 +94,7 @@ export async function toggleRepositorySelectionAction(formData: FormData): Promi
       })
     );
   } catch (error) {
+    if (isRedirectError(error)) throw error;
     redirect(
       buildReturnPath(workspaceId, {
         repositoryId,
@@ -125,6 +128,7 @@ export async function syncRepositoryAction(formData: FormData): Promise<never> {
       })
     );
   } catch (error) {
+    if (isRedirectError(error)) throw error;
     redirect(
       buildReturnPath(workspaceId, {
         repositoryId,
@@ -162,6 +166,7 @@ export async function searchEvidenceAction(formData: FormData): Promise<never> {
       })
     );
   } catch (error) {
+    if (isRedirectError(error)) throw error;
     redirect(
       buildReturnPath(workspaceId, {
         repositoryId,
@@ -202,6 +207,7 @@ export async function submitFeedbackAction(formData: FormData): Promise<never> {
       })
     );
   } catch (error) {
+    if (isRedirectError(error)) throw error;
     redirect(
       buildReturnPath(workspaceId, {
         repositoryId,
@@ -250,6 +256,7 @@ export async function preparePrIntentAction(formData: FormData): Promise<never> 
       })
     );
   } catch (error) {
+    if (isRedirectError(error)) throw error;
     redirect(
       buildReturnPath(workspaceId, {
         repositoryId,
