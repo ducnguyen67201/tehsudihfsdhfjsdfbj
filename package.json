@@ -5,15 +5,19 @@
   "type": "module",
   "packageManager": "npm@11.6.2",
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=24.0.0"
   },
   "workspaces": ["apps/*", "packages/*"],
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev --parallel",
     "dev:web": "npm --workspace @trustloop/web run dev",
+    "dev:web:debug": "TRUSTLOOP_DEBUG_TRPC=1 NEXT_PUBLIC_TRUSTLOOP_DEBUG_TRPC=1 npm --workspace @trustloop/web run dev",
     "dev:worker": "npm --workspace @trustloop/worker run dev",
     "dev:queue": "npm --workspace @apps/queue run dev",
+    "doppler:dev": "doppler run -- turbo run dev --parallel",
+    "doppler:dev:web": "doppler run -- npm --workspace @trustloop/web run dev",
+    "doppler:dev:worker": "doppler run -- npm --workspace @trustloop/worker run dev",
     "check": "npm run type-check && npm run lint && npm run test && npm run build && npm run openapi:check && npm run db:generate",
     "check:clean": "npm run check && npm run clean:artifacts",
     "type-check": "turbo run type-check",
@@ -21,6 +25,7 @@
     "test": "turbo run test",
     "db:generate": "npm --workspace @shared/database run db:generate && npm --workspace @shared/types run prisma:sync",
     "db:migrate": "npm --workspace @shared/database run db:migrate",
+    "db:new-workspace": "npm --workspace @shared/database run db:new-workspace --",
     "openapi:generate": "npm --workspace @shared/rest run openapi:generate",
     "openapi:check": "npm --workspace @shared/rest run openapi:check",
     "clean:artifacts": "rm -rf .turbo apps/*/.turbo packages/*/.turbo apps/*/dist packages/*/dist apps/web/.next coverage && find . -name '*.tsbuildinfo' -type f -delete"

@@ -7,6 +7,7 @@ import {
   searchRepositoryCode,
   updateRepositorySelection,
 } from "@shared/rest/codex";
+import { processSlackWebhook } from "@shared/rest/services/support/support-ingress-service";
 import { temporalWorkflowDispatcher } from "@shared/rest/temporal-dispatcher";
 import { dispatchWorkflow } from "@shared/rest/workflow-router";
 import {
@@ -80,4 +81,14 @@ export async function recordSearchFeedbackFromHttpBody(
 
 export async function preparePrIntentFromHttpBody(body: unknown): Promise<PreparePrIntentResponse> {
   return preparePullRequestIntent(preparePrIntentRequestSchema.parse(body));
+}
+
+export async function processSlackWebhookFromHttpRequest(
+  rawBody: string,
+  headers: {
+    signature: string | null;
+    timestamp: string | null;
+  }
+) {
+  return processSlackWebhook(rawBody, headers);
 }
