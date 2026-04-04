@@ -14,9 +14,10 @@ jobs:
       APP_BASE_URL: http://localhost:3000
       NODE_ENV: test
       SESSION_COOKIE_NAME: trustloop-session
-      SESSION_TTL_HOURS: 24
+      SESSION_TTL_HOURS: "24"
       SESSION_SECRET: ci-test-secret-minimum-16
       API_KEY_PEPPER: ci-test-pepper-minimum-16
+      SLACK_SIGNING_SECRET: ci-test-slack-signing-secret
       TEMPORAL_ADDRESS: localhost:7233
       TEMPORAL_NAMESPACE: default
       TEMPORAL_TASK_QUEUE: support-general
@@ -36,8 +37,4 @@ jobs:
       - run: npm run type-check
       - run: npm run lint
       - run: npm run test
-        env:
-          SKIP_ENV_VALIDATION: "1"
-          SESSION_SECRET: ci-test-secret-minimum-16
-          SLACK_SIGNING_SECRET: ci-test-slack-signing-secret
       - run: npm run build
