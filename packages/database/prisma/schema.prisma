@@ -77,11 +77,12 @@ model Workspace {
   createdAt                DateTime                   @default(now())
   updatedAt                DateTime                   @updatedAt
 
-  @@index([deletedAt])
+  // deletedAt: no standalone index (low selectivity). Partial composites cover hot paths.
 }
 
 model User {
   id                         String                @id @default(cuid())
+  // TYPE GENERATION ONLY: DB uses partial unique index (WHERE deletedAt IS NULL).
   email                      String                @unique
   passwordHash               String
   deletedAt                  DateTime?
@@ -93,7 +94,7 @@ model User {
   createdAt                  DateTime              @default(now())
   updatedAt                  DateTime              @updatedAt
 
-  @@index([deletedAt])
+  // deletedAt: no standalone index (low selectivity). Partial composites cover hot paths.
 }
 
 model Session {
@@ -125,9 +126,11 @@ model WorkspaceMembership {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
+  // TYPE GENERATION ONLY: DB uses partial unique index (WHERE deletedAt IS NULL).
+  // Do not use db:push on this model. Use raw SQL migrations for unique constraint changes.
   @@unique([workspaceId, userId])
   @@index([userId])
-  @@index([deletedAt])
+  // deletedAt: no standalone index (low selectivity). Partial composites cover hot paths.
 }
 
 model WorkspaceApiKey {
@@ -147,7 +150,7 @@ model WorkspaceApiKey {
   updatedAt       DateTime  @updatedAt
 
   @@index([workspaceId, revokedAt, expiresAt])
-  @@index([deletedAt])
+  // deletedAt: no standalone index (low selectivity). Partial composites cover hot paths.
 }
 
 model AuditLog {
@@ -247,9 +250,10 @@ model SupportInstallation {
   createdAt              DateTime             @default(now())
   updatedAt              DateTime             @updatedAt
 
+  // TYPE GENERATION ONLY: DB uses partial unique index (WHERE deletedAt IS NULL).
   @@unique([provider, providerInstallationId])
   @@index([workspaceId])
-  @@index([deletedAt])
+  // deletedAt: no standalone index (low selectivity). Partial composites cover hot paths.
 }
 
 model SupportIngressEvent {
@@ -295,12 +299,13 @@ model SupportConversation {
   createdAt              DateTime                  @default(now())
   updatedAt              DateTime                  @updatedAt
 
+  // TYPE GENERATION ONLY: DB uses partial unique index (WHERE deletedAt IS NULL).
   @@unique([workspaceId, canonicalConversationKey])
   @@index([workspaceId, teamId, channelId, threadTs])
   @@index([workspaceId, status, staleAt, customerWaitingSince, retryCount, lastActivityAt])
   @@index([installationId])
   @@index([assigneeUserId])
-  @@index([deletedAt])
+  // deletedAt: no standalone index (low selectivity). Partial composites cover hot paths.
 }
 
 model SupportConversationEvent {
@@ -339,7 +344,7 @@ model SupportDeliveryAttempt {
 
   @@index([workspaceId, state, nextRetryAt])
   @@index([conversationId, createdAt])
-  @@index([deletedAt])
+  // deletedAt: no standalone index (low selectivity). Partial composites cover hot paths.
 }
 
 model SupportDeadLetter {
@@ -374,10 +379,11 @@ model SupportTicketLink {
   createdAt        DateTime              @default(now())
   updatedAt        DateTime              @updatedAt
 
+  // TYPE GENERATION ONLY: DB uses partial unique index (WHERE deletedAt IS NULL).
   @@unique([workspaceId, provider, externalTicketId])
   @@index([conversationId])
   @@index([workspaceId, syncState, updatedAt])
-  @@index([deletedAt])
+  // deletedAt: no standalone index (low selectivity). Partial composites cover hot paths.
 }
 
 model GitHubInstallation {

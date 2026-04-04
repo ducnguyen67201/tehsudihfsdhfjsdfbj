@@ -64,18 +64,11 @@ CREATE INDEX "WorkspaceApiKey_active_idx"
   ON "WorkspaceApiKey" ("workspaceId", "revokedAt", "expiresAt")
   WHERE "deletedAt" IS NULL;
 
--- ============================================================
--- Part D: Add deletedAt filter indexes
--- ============================================================
-
-CREATE INDEX "User_deletedAt_idx" ON "User" ("deletedAt");
-CREATE INDEX "Workspace_deletedAt_idx" ON "Workspace" ("deletedAt");
-CREATE INDEX "WorkspaceMembership_deletedAt_idx" ON "WorkspaceMembership" ("deletedAt");
-CREATE INDEX "WorkspaceApiKey_deletedAt_idx" ON "WorkspaceApiKey" ("deletedAt");
-CREATE INDEX "SupportInstallation_deletedAt_idx" ON "SupportInstallation" ("deletedAt");
-CREATE INDEX "SupportConversation_deletedAt_idx" ON "SupportConversation" ("deletedAt");
-CREATE INDEX "SupportDeliveryAttempt_deletedAt_idx" ON "SupportDeliveryAttempt" ("deletedAt");
-CREATE INDEX "SupportTicketLink_deletedAt_idx" ON "SupportTicketLink" ("deletedAt");
+-- Part D: Standalone deletedAt indexes intentionally omitted.
+-- These have near-zero selectivity (almost all rows are NULL) and add write overhead.
+-- The partial composite indexes in Part C and partial unique indexes in Part B
+-- already cover the hot query paths. The purge job (infrequent batch) can use
+-- a sequential scan on deletedAt without a dedicated index.
 
 -- ============================================================
 -- Part E: Change FK cascade rules from CASCADE to RESTRICT

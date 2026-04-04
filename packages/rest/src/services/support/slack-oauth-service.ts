@@ -2,6 +2,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { prisma } from "@shared/database";
 import { env } from "@shared/env";
 import { writeAuditEvent } from "@shared/rest/security/audit";
+import { resurrectOrUpsert } from "@shared/database";
 import { cascadeSoftDeleteInstallation } from "@shared/rest/services/soft-delete-cascade";
 import {
   type SlackOAuthStatePayload,
@@ -192,50 +193,29 @@ export async function completeSlackOAuthInstall(
     teamName: oauthResult.teamName,
   };
 
-  // Check for soft-deleted record to resurrect on reconnect
-  const existing = await (prisma.supportInstallation.findFirst as any)({
-    where: { provider: "SLACK", providerInstallationId: oauthResult.appId },
-    includeDeleted: true,
-  });
+  const installData = {
+    workspaceId,
+    teamId: oauthResult.teamId,
+    botUserId: oauthResult.botUserId,
+    metadata,
+  };
 
-  let installation;
-  if (existing?.deletedAt) {
-    // Resurrect: clear deletedAt and update fields
-    installation = await prisma.supportInstallation.update({
-      where: { id: existing.id },
-      data: {
-        deletedAt: null,
-        workspaceId,
-        teamId: oauthResult.teamId,
-        botUserId: oauthResult.botUserId,
-        metadata,
-      },
-    });
-  } else {
-    // Standard upsert (only matches active records via partial unique index)
-    installation = await prisma.supportInstallation.upsert({
-      where: {
-        provider_providerInstallationId: {
-          provider: "SLACK",
-          providerInstallationId: oauthResult.appId,
+  const installation = await resurrectOrUpsert(
+    prisma.supportInstallation,
+    { provider: "SLACK", providerInstallationId: oauthResult.appId },
+    installData,
+    async () =>
+      prisma.supportInstallation.upsert({
+        where: {
+          provider_providerInstallationId: {
+            provider: "SLACK",
+            providerInstallationId: oauthResult.appId,
+          },
         },
-      },
-      create: {
-        workspaceId,
-        provider: "SLACK",
-        providerInstallationId: oauthResult.appId,
-        teamId: oauthResult.teamId,
-        botUserId: oauthResult.botUserId,
-        metadata,
-      },
-      update: {
-        workspaceId,
-        teamId: oauthResult.teamId,
-        botUserId: oauthResult.botUserId,
-        metadata,
-      },
-    });
-  }
+        create: { provider: "SLACK", providerInstallationId: oauthResult.appId, ...installData },
+        update: installData,
+      })
+  );
 
   await writeAuditEvent({
     action: "workspace.slack.connect",

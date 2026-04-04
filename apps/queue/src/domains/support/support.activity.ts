@@ -1,5 +1,5 @@
 import { normalizeSlackMessageEvent } from "@/domains/support/adapters/slack/event-normalizer";
-import { prisma } from "@shared/database";
+import { prisma, resurrectOrUpsert } from "@shared/database";
 import {
   SUPPORT_CONVERSATION_EVENT_SOURCE,
   SUPPORT_CONVERSATION_STATUS,
@@ -105,41 +105,27 @@ export async function runSupportPipeline(
   };
 
   const conversation = await prisma.$transaction(async (tx) => {
-    // Check for soft-deleted conversation with same canonical key to resurrect
-    const softDeleted = await (tx.supportConversation.findFirst as any)({
-      where: {
-        workspaceId: input.workspaceId,
-        canonicalConversationKey,
-        deletedAt: { not: null },
-      },
-      includeDeleted: true,
-      select: { id: true },
-    });
-
-    let upsertedConversation;
-    if (softDeleted) {
-      // Resurrect the soft-deleted conversation
-      upsertedConversation = await tx.supportConversation.update({
-        where: { id: softDeleted.id },
-        data: { deletedAt: null, installationId: input.installationId, ...conversationData },
-      });
-    } else {
-      upsertedConversation = await tx.supportConversation.upsert({
-        where: {
-          workspaceId_canonicalConversationKey: {
-            workspaceId: input.workspaceId,
-            canonicalConversationKey,
+    const upsertedConversation = await resurrectOrUpsert(
+      tx.supportConversation,
+      { workspaceId: input.workspaceId, canonicalConversationKey },
+      { installationId: input.installationId, ...conversationData },
+      async () =>
+        tx.supportConversation.upsert({
+          where: {
+            workspaceId_canonicalConversationKey: {
+              workspaceId: input.workspaceId,
+              canonicalConversationKey,
+            },
           },
-        },
-        create: {
-          workspaceId: input.workspaceId,
-          installationId: input.installationId,
-          canonicalConversationKey,
-          ...conversationData,
-        },
-        update: conversationData,
-      });
-    }
+          create: {
+            workspaceId: input.workspaceId,
+            installationId: input.installationId,
+            canonicalConversationKey,
+            ...conversationData,
+          },
+          update: conversationData,
+        })
+    );
 
     await tx.supportConversationEvent.create({
       data: {

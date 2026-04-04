@@ -78,6 +78,31 @@ export async function cascadeSoftDeleteInstallation(
 }
 
 /**
+ * Deactivate a user: soft-delete the user record and hard-delete their sessions.
+ * Sessions are Tier 2 (hard delete) and won't be cleaned up by the SQL cascade
+ * since user deletion is now a soft delete (UPDATE, not DELETE).
+ */
+export async function cascadeDeactivateUser(userId: string, tx: Tx) {
+  const now = new Date();
+
+  await Promise.all([
+    tx.user.updateMany({
+      where: { id: userId, deletedAt: null },
+      data: { deletedAt: now },
+    }),
+    // Hard-delete sessions (Tier 2) — SQL cascade doesn't fire on soft delete
+    tx.session.deleteMany({
+      where: { userId },
+    }),
+    // Soft-delete memberships
+    tx.workspaceMembership.updateMany({
+      where: { userId, deletedAt: null },
+      data: { deletedAt: now },
+    }),
+  ]);
+}
+
+/**
  * Cascade soft delete a conversation's delivery attempts and ticket links.
  */
 export async function cascadeSoftDeleteConversation(conversationId: string, tx: Tx) {

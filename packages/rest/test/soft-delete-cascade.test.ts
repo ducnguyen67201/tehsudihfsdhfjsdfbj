@@ -1,4 +1,5 @@
 import {
+  cascadeDeactivateUser,
   cascadeSoftDeleteConversation,
   cascadeSoftDeleteInstallation,
   cascadeSoftDeleteWorkspace,
@@ -16,6 +17,8 @@ function createMockTx() {
     supportInstallation: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     workspaceApiKey: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     workspaceMembership: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    user: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    session: { deleteMany: vi.fn().mockResolvedValue({ count: 3 }) },
   } as any;
 }
 
@@ -121,5 +124,44 @@ describe("cascadeSoftDeleteConversation", () => {
         data: expect.objectContaining({ deletedAt: expect.any(Date) }),
       })
     );
+  });
+});
+
+describe("cascadeDeactivateUser", () => {
+  it("soft-deletes user and hard-deletes their sessions", async () => {
+    const tx = createMockTx();
+    await cascadeDeactivateUser("user_1", tx);
+
+    // User is soft-deleted
+    expect(tx.user.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: "user_1", deletedAt: null }),
+        data: expect.objectContaining({ deletedAt: expect.any(Date) }),
+      })
+    );
+
+    // Sessions are HARD deleted (Tier 2)
+    expect(tx.session.deleteMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ userId: "user_1" }),
+      })
+    );
+
+    // Memberships are soft-deleted
+    expect(tx.workspaceMembership.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ userId: "user_1", deletedAt: null }),
+        data: expect.objectContaining({ deletedAt: expect.any(Date) }),
+      })
+    );
+  });
+
+  it("uses the same timestamp for user and memberships", async () => {
+    const tx = createMockTx();
+    await cascadeDeactivateUser("user_1", tx);
+
+    const userTs = tx.user.updateMany.mock.calls[0][0].data.deletedAt;
+    const membershipTs = tx.workspaceMembership.updateMany.mock.calls[0][0].data.deletedAt;
+    expect(userTs.getTime()).toBe(membershipTs.getTime());
   });
 });

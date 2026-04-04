@@ -47,6 +47,16 @@ function applySoftDeleteFilter<T>(model: string, args: T): T {
  *
  * Uses the function-form of defineExtension to capture `client` in closure,
  * which the delete hooks use to call update on the pre-extension client.
+ *
+ * WARNING — TRANSACTION SAFETY:
+ * The delete/deleteMany hooks call `client[model].update()` on the BASE client,
+ * NOT the transaction client. If `.delete()` is called inside a `$transaction()`,
+ * the soft-delete update executes OUTSIDE the transaction boundary. If the
+ * transaction rolls back, the soft-delete persists.
+ *
+ * RULE: Never call `.delete()` or `.deleteMany()` inside `$transaction()` for
+ * soft-delete models. Use manual `updateMany({ data: { deletedAt: new Date() } })`
+ * inside transactions instead. See `disconnectInstallation()` for the correct pattern.
  */
 export const softDeleteExtension = Prisma.defineExtension((client) => {
   return client.$extends({
@@ -62,11 +72,15 @@ export const softDeleteExtension = Prisma.defineExtension((client) => {
         async findMany({ model, args, query }) {
           return query(applySoftDeleteFilter(model, args));
         },
-        async findUnique({ model, args, query }) {
-          return query(applySoftDeleteFilter(model, args));
+        // findUnique/findUniqueOrThrow: skip deletedAt injection.
+        // Partial unique indexes (WHERE deletedAt IS NULL) already guarantee
+        // that findUnique only returns active records. Injecting deletedAt
+        // causes Prisma to fall back to findFirst, losing the unique-index path.
+        async findUnique({ args, query }) {
+          return query(args);
         },
-        async findUniqueOrThrow({ model, args, query }) {
-          return query(applySoftDeleteFilter(model, args));
+        async findUniqueOrThrow({ args, query }) {
+          return query(args);
         },
         async count({ model, args, query }) {
           return query(applySoftDeleteFilter(model, args));

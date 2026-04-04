@@ -1,4 +1,4 @@
-import { prisma } from "@shared/database";
+import { prisma, resurrectOrUpsert } from "@shared/database";
 import { writeAuditEvent } from "@shared/rest/security/audit";
 import { canAssignWorkspaceRole, canManageWorkspaceMember } from "@shared/rest/security/rbac";
 import { setActiveWorkspaceForSession } from "@shared/rest/security/session";
@@ -148,34 +148,16 @@ export const workspaceRouter = router({
         });
       }
 
-      // Check for soft-deleted membership to resurrect instead of creating duplicate
-      const softDeleted = await (prisma.workspaceMembership.findFirst as any)({
-        where: {
-          workspaceId: ctx.workspaceId,
-          userId: targetUser.id,
-          deletedAt: { not: null },
-        },
-        includeDeleted: true,
-        select: { id: true },
-      });
-
-      let created;
-      if (softDeleted) {
-        created = await prisma.workspaceMembership.update({
-          where: { id: softDeleted.id },
-          data: { deletedAt: null, role: input.role },
-          include: { user: { select: { id: true, email: true } } },
-        });
-      } else {
-        created = await prisma.workspaceMembership.create({
-          data: {
-            workspaceId: ctx.workspaceId,
-            userId: targetUser.id,
-            role: input.role,
-          },
-          include: { user: { select: { id: true, email: true } } },
-        });
-      }
+      const created = await resurrectOrUpsert(
+        prisma.workspaceMembership,
+        { workspaceId: ctx.workspaceId, userId: targetUser.id },
+        { role: input.role },
+        async () =>
+          prisma.workspaceMembership.create({
+            data: { workspaceId: ctx.workspaceId, userId: targetUser.id, role: input.role },
+            include: { user: { select: { id: true, email: true } } },
+          })
+      );
 
       await writeAuditEvent({
         action: "workspace.member.add",
