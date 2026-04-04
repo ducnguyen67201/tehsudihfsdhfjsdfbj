@@ -56,14 +56,14 @@ Why fourth:
 
 - Focused execution spec: `docs/spec-auth-workspace-security-p0.md`
 
-- [ ] Replace unsigned session cookie with signed/encrypted server session.
-- [ ] Enforce authenticated procedures for sensitive mutations.
-- [ ] Remove caller-controlled `userId` trust pattern in server routes.
-- [ ] Enforce role checks (`OWNER/ADMIN/MEMBER`) for workspace actions.
-- [ ] Verify Slack webhook signatures and reject invalid requests.
-- [ ] Add idempotency protection for inbound events.
+- [x] Replace unsigned session cookie with signed/encrypted server session.
+- [x] Enforce authenticated procedures for sensitive mutations.
+- [x] Remove caller-controlled `userId` trust pattern in server routes.
+- [x] Enforce role checks (`OWNER/ADMIN/MEMBER`) for workspace actions.
+- [x] Verify Slack webhook signatures and reject invalid requests.
+- [x] Add idempotency protection for inbound events.
 - [ ] Add secret management/rotation policy for workspace integrations.
-- [ ] Add audit logging for connection changes and admin actions.
+- [x] Add audit logging for connection changes and admin actions.
 
 Definition of done:
 - Unauthorized user cannot read/write data across workspaces.
@@ -72,13 +72,13 @@ Definition of done:
 
 ## B. Slack Ingestion + Thread Grouping (P0)
 
-- [ ] Slack app + events wiring (message events, thread replies, retries).
-- [ ] Inbound message normalization schema.
-- [ ] Deterministic grouping heuristics (external thread id, reply chain, recency, fingerprint).
+- [x] Slack app + events wiring (message events, thread replies, retries).
+- [x] Inbound message normalization schema.
+- [x] Deterministic grouping heuristics (external thread id, reply chain, recency, fingerprint).
 - [ ] Manual controls to merge/split/reassign grouped threads.
-- [ ] Inbox UI with status, assignee, and thread timeline.
-- [ ] Outbound send path from app back to Slack thread/channel.
-- [ ] Retry queue for transient Slack API errors.
+- [x] Inbox UI with status, assignee, and thread timeline.
+- [x] Outbound send path from app back to Slack thread/channel.
+- [x] Retry queue for transient Slack API errors.
 
 Definition of done:
 - >95% ingestion success in pilot period.
@@ -86,12 +86,12 @@ Definition of done:
 
 ## C. Code Indexing System (P0)
 
-- [ ] Repository connection setup + sync trigger (manual first, webhook optional).
-- [ ] Parser/chunker pipeline and metadata extraction.
+- [x] Repository connection setup + sync trigger (manual first, webhook optional).
+- [x] Parser/chunker pipeline and metadata extraction.
 - [ ] Embedding + keyword index generation.
-- [ ] Search endpoint (semantic + keyword + rerank).
-- [ ] Basic relevance QA set from real support tickets.
-- [ ] Index freshness status visible per repo.
+- [x] Search endpoint (semantic + keyword + rerank).
+- [x] Basic relevance QA set from real support tickets.
+- [x] Index freshness status visible per repo.
 
 Definition of done:
 - For pilot tickets, system returns actionable code context in top results.
