@@ -38,4 +38,6 @@ jobs:
       - run: npm run test
         env:
           SKIP_ENV_VALIDATION: "1"
+          SESSION_SECRET: ci-test-secret-minimum-16
+          SLACK_SIGNING_SECRET: ci-test-slack-signing-secret
       - run: npm run build
