@@ -13,7 +13,8 @@
     "test": "vitest run --passWithNoTests",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:new-workspace": "tsx ./scripts/new-workspace.ts"
+    "db:new-workspace": "tsx ./scripts/new-workspace.ts",
+    "db:seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.0.0",

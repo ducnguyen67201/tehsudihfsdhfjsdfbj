@@ -113,14 +113,23 @@ export default function WorkspaceLayout({ children }: WorkspaceLayoutProps) {
     avatarUrl?: string | null;
   };
 
+  // Redirect unauthenticated users to login (full navigation to unmount layout)
+  if (!auth.isLoading && !auth.session) {
+    window.location.replace("/login");
+    return null;
+  }
+
+  if (auth.isLoading) {
+    return null;
+  }
+
   const sessionUser = auth.session?.user as SidebarSessionUser | undefined;
   const displayName = sessionUser?.name?.trim() || sessionUser?.email?.split("@")[0] || "Guest";
   const avatarFallback = displayName.slice(0, 1).toUpperCase();
 
   async function handleLogout() {
     await auth.logout();
-    router.replace("/login");
-    router.refresh();
+    window.location.replace("/login");
   }
 
   return (
