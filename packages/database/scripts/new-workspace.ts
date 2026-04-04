@@ -1,6 +1,6 @@
 import "dotenv/config";
 
-import { prisma } from "@shared/database";
+import { prisma, softUpsert } from "@shared/database";
 
 /**
  * Parse and validate CLI arguments for workspace bootstrap.
@@ -48,21 +48,10 @@ async function createWorkspaceForUser(workspaceName: string, email: string): Pro
         select: { id: true, name: true },
       }));
 
-    await tx.workspaceMembership.upsert({
-      where: {
-        workspaceId_userId: {
-          workspaceId: targetWorkspace.id,
-          userId: user.id,
-        },
-      },
-      update: {
-        role: "OWNER",
-      },
-      create: {
-        workspaceId: targetWorkspace.id,
-        userId: user.id,
-        role: "OWNER",
-      },
+    await softUpsert(tx.workspaceMembership, {
+      where: { workspaceId: targetWorkspace.id, userId: user.id },
+      create: { workspaceId: targetWorkspace.id, userId: user.id, role: "OWNER" },
+      update: { role: "OWNER" },
     });
 
     return targetWorkspace;
