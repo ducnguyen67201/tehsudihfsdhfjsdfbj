@@ -74,6 +74,7 @@ model Workspace {
   searchQueries            CodeSearchQuery[]
   searchFeedback           SearchFeedback[]
   pullRequestIntents       PullRequestIntent[]
+  groupingAnchors          SupportGroupingAnchor[]
   createdAt                DateTime                   @default(now())
   updatedAt                DateTime                   @updatedAt
 
@@ -296,6 +297,7 @@ model SupportConversation {
   events                 SupportConversationEvent[]
   deliveryAttempts       SupportDeliveryAttempt[]
   ticketLinks            SupportTicketLink[]
+  groupingAnchors        SupportGroupingAnchor[]
   createdAt              DateTime                  @default(now())
   updatedAt              DateTime                  @updatedAt
 
@@ -384,6 +386,30 @@ model SupportTicketLink {
   @@index([conversationId])
   @@index([workspaceId, syncState, updatedAt])
   // deletedAt: no standalone index (low selectivity). Partial composites cover hot paths.
+}
+
+/// Maps standalone messages to conversations for time-window grouping.
+/// An anchor tracks: which author, which channel, and which conversation
+/// their standalone messages should be grouped into. Expires after a
+/// configurable window (default 5 min, max 60 min).
+model SupportGroupingAnchor {
+  id                String              @id @default(cuid())
+  workspaceId       String
+  installationId    String
+  channelId         String
+  authorSlackUserId String
+  conversationId    String
+  anchorMessageTs   String
+  windowStartAt     DateTime
+  windowExpiresAt   DateTime
+  workspace         Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  conversation      SupportConversation @relation(fields: [conversationId], references: [id], onDelete: Restrict)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@unique([workspaceId, channelId, authorSlackUserId, anchorMessageTs])
+  @@index([workspaceId, channelId, authorSlackUserId, windowExpiresAt])
+  @@index([conversationId])
 }
 
 model GitHubInstallation {
