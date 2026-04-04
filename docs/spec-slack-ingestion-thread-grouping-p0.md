@@ -27,7 +27,7 @@ Core lock-ins:
 - Fast-ack webhook model: verify + idempotency persist + immediate `200`; async processing in Temporal.
 - Done-state guardrail: default Slack delivery ack required; manual override requires reason + audit log.
 - Escalation ladder: `30m assignee`, `+15m on-call`, `+30m workspace admin`.
-- Rollout posture: CI-first broad rollout is allowed for pre-user stage, but with hard kill switch: `SUPPORT_INGEST_ENABLED`.
+- Rollout posture: CI-first broad rollout is allowed for pre-user stage, with operational pause/replay runbooks.
 - Projection freshness target: `p95 < 5s`, `p99 < 15s`; delayed-data UX fallback required.
 
 ## 3) Scope Plan (Wave 1 and Wave 2)
@@ -40,7 +40,7 @@ Core lock-ins:
 - Inbox state model (`Unread`, `In Progress`, `Stale`, `Done`) + assignee.
 - Outbound send path with bounded retry + dead-letter.
 - Done-evidence gate (Slack ack or audited override).
-- Kill switch + basic operational controls.
+- Basic operational pause/replay controls.
 
 ### Wave 2 (immediately after Wave 1)
 
@@ -272,13 +272,12 @@ Recommended baseline:
 
 Validation sequence:
 
-1. `SUPPORT_INGEST_ENABLED` must be true
-2. signature header verification
-3. replay window check
-4. installation/workspace mapping check
-5. canonical key compute and idempotent event insert
-6. immediate `200` response
-7. async workflow dispatch
+1. signature header verification
+2. replay window check
+3. installation/workspace mapping check
+4. canonical key compute and idempotent event insert
+5. immediate `200` response
+6. async workflow dispatch
 
 ### 11.2 Support inbox router (authenticated workspace members)
 
@@ -401,16 +400,8 @@ Rollout mode:
 
 Mandatory safeguards even in CI-first mode:
 
-- `SUPPORT_INGEST_ENABLED` kill switch
 - smoke command/runbook for pause and replay
 - dead-letter queue dashboard visibility
-
-Kill-switch runbook (minimum):
-
-1. set `SUPPORT_INGEST_ENABLED=false`
-2. confirm ingress returns paused response
-3. inspect dead-letter and retries
-4. replay after fix
 
 ## 18) Worktree Parallelization Strategy
 
