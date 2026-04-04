@@ -20,9 +20,7 @@ export function useWorkspaceDetails() {
       const result = await trpcQuery<WorkspaceDetailsResponse>("workspace.getDetails");
       setData(result);
     } catch (loadError) {
-      setError(
-        loadError instanceof Error ? loadError.message : "Failed to load workspace details"
-      );
+      setError(loadError instanceof Error ? loadError.message : "Failed to load workspace details");
       setData(null);
     } finally {
       setIsLoading(false);

@@ -44,12 +44,7 @@ function SplitButton({
 }: SplitButtonProps) {
   return (
     <div className={cn("inline-flex", className)}>
-      <Button
-        variant={variant}
-        size={size}
-        onClick={onClick}
-        disabled={disabled}
-      >
+      <Button variant={variant} size={size} onClick={onClick} disabled={disabled}>
         {children}
       </Button>
       {menuItems.length > 0 ? (

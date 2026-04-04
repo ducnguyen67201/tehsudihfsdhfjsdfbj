@@ -1,9 +1,6 @@
 "use client";
 
-import {
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from "@/components/ui/sidebar";
+import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { RiMoonLine, RiSunLine } from "@remixicon/react";
 import { useEffect, useState } from "react";
 

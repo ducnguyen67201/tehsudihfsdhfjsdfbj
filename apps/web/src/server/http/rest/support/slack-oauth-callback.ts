@@ -46,13 +46,8 @@ export async function handleSlackOAuthCallback(request: Request): Promise<NextRe
   }
 }
 
-function redirectToSettings(
-  workspaceId: string | null,
-  status: SlackOAuthStatus
-): NextResponse {
+function redirectToSettings(workspaceId: string | null, status: SlackOAuthStatus): NextResponse {
   const base = env.APP_BASE_URL;
-  const path = workspaceId
-    ? `/${workspaceId}/settings/integrations`
-    : "/login";
+  const path = workspaceId ? `/${workspaceId}/settings/integrations` : "/login";
   return NextResponse.redirect(new URL(`${path}?slack=${status}`, base));
 }

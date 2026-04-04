@@ -54,8 +54,8 @@ export default function WorkspaceIntegrationsPage() {
             <Alert className="border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
               <AlertTitle>Slack connected</AlertTitle>
               <AlertDescription>
-                Your Slack workspace is now linked. Messages from subscribed channels will appear
-                in your support inbox.
+                Your Slack workspace is now linked. Messages from subscribed channels will appear in
+                your support inbox.
               </AlertDescription>
             </Alert>
           ) : null}

@@ -20,14 +20,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { MemberTable } from "@/components/workspace/member-table";
+import { useActiveWorkspace } from "@/hooks/use-active-workspace";
 import { useAuthSession } from "@/hooks/use-auth-session";
 import { useWorkspaceDetails } from "@/hooks/use-workspace-details";
 import { useWorkspaceMembers } from "@/hooks/use-workspace-members";
 import { useWorkspaceMemberships } from "@/hooks/use-workspace-memberships";
-import { useActiveWorkspace } from "@/hooks/use-active-workspace";
 import { replaceWorkspaceInPath } from "@/lib/workspace-paths";
-import { WORKSPACE_ROLE, type WorkspaceRole } from "@shared/types";
 import { RiArrowDownSLine, RiCheckLine, RiFileCopyLine } from "@remixicon/react";
+import { WORKSPACE_ROLE, type WorkspaceRole } from "@shared/types";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import type { FormEvent } from "react";
@@ -116,7 +116,9 @@ export default function WorkspaceSettingsPage() {
         .switchWorkspace(workspaceId)
         .then(async () => {
           await Promise.all([active.refresh(), memberships.refresh()]);
-          router.replace(replaceWorkspaceInPath(pathname, workspaceId, active.data?.activeWorkspaceId));
+          router.replace(
+            replaceWorkspaceInPath(pathname, workspaceId, active.data?.activeWorkspaceId)
+          );
           router.refresh();
         })
         .catch(() => {});
@@ -181,8 +183,15 @@ export default function WorkspaceSettingsPage() {
               {canManage && memberships.data ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" disabled={pending} className="min-w-[200px] justify-between">
-                      <span className="font-semibold">{pending ? "Switching..." : currentWorkspaceName}</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={pending}
+                      className="min-w-[200px] justify-between"
+                    >
+                      <span className="font-semibold">
+                        {pending ? "Switching..." : currentWorkspaceName}
+                      </span>
                       <RiArrowDownSLine className="size-3.5" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -263,7 +272,9 @@ export default function WorkspaceSettingsPage() {
               </div>
 
               {/* Role row */}
-              <div className={`flex items-center gap-4 border-b px-6 py-5 ${isOwner ? "bg-amber-50/50 dark:bg-amber-950/20" : "bg-muted/30"}`}>
+              <div
+                className={`flex items-center gap-4 border-b px-6 py-5 ${isOwner ? "bg-amber-50/50 dark:bg-amber-950/20" : "bg-muted/30"}`}
+              >
                 <span className="text-muted-foreground min-w-[100px] text-[11px] font-medium uppercase tracking-wide">
                   Your role
                 </span>

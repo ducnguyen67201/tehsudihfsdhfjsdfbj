@@ -96,10 +96,7 @@ export function SlackConnectionCard({
                     <DialogClose asChild>
                       <Button variant="outline">Cancel</Button>
                     </DialogClose>
-                    <Button
-                      variant="destructive"
-                      onClick={() => onDisconnect(installation.id)}
-                    >
+                    <Button variant="destructive" onClick={() => onDisconnect(installation.id)}>
                       Disconnect
                     </Button>
                   </DialogFooter>
@@ -120,9 +117,7 @@ export function SlackConnectionCard({
               <p className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
                 Workspace
               </p>
-              <p className="mt-0.5 text-sm font-medium">
-                {installation.teamName ?? "Unknown"}
-              </p>
+              <p className="mt-0.5 text-sm font-medium">{installation.teamName ?? "Unknown"}</p>
             </div>
             <div>
               <p className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">

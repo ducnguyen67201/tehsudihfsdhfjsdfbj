@@ -34,9 +34,7 @@ export function useSlackInstallation() {
       const result = await trpcQuery<InstallationListResponse>("supportInstallation.list");
       setData(result);
     } catch (loadError) {
-      setError(
-        loadError instanceof Error ? loadError.message : "Failed to load integrations"
-      );
+      setError(loadError instanceof Error ? loadError.message : "Failed to load integrations");
       setData(null);
     } finally {
       setIsLoading(false);
@@ -73,9 +71,7 @@ export function useSlackInstallation() {
         await refresh();
       } catch (disconnectError) {
         setError(
-          disconnectError instanceof Error
-            ? disconnectError.message
-            : "Failed to disconnect Slack"
+          disconnectError instanceof Error ? disconnectError.message : "Failed to disconnect Slack"
         );
       }
     },
@@ -90,8 +86,7 @@ export function useSlackInstallation() {
   }, [refresh]);
 
   /** First Slack installation, or null if none connected. */
-  const slackInstallation =
-    data?.installations.find((i) => i.provider === "SLACK") ?? null;
+  const slackInstallation = data?.installations.find((i) => i.provider === "SLACK") ?? null;
 
   return {
     data,
