@@ -1,5 +1,5 @@
 import { normalizeSlackMessageEvent } from "@/domains/support/adapters/slack/event-normalizer";
-import { prisma, resurrectOrUpsert } from "@shared/database";
+import { prisma, softUpsert } from "@shared/database";
 import {
   GROUPING_DEFAULTS,
   GROUPING_ELIGIBLE_STATUSES,
@@ -158,27 +158,16 @@ export async function runSupportPipeline(
       lastActivityAt: now,
     };
 
-    const upsertedConversation = await resurrectOrUpsert(
-      tx.supportConversation,
-      { workspaceId: input.workspaceId, canonicalConversationKey },
-      { installationId: input.installationId, ...conversationData },
-      async () =>
-        tx.supportConversation.upsert({
-          where: {
-            workspaceId_canonicalConversationKey: {
-              workspaceId: input.workspaceId,
-              canonicalConversationKey,
-            },
-          },
-          create: {
-            workspaceId: input.workspaceId,
-            installationId: input.installationId,
-            canonicalConversationKey,
-            ...conversationData,
-          },
-          update: conversationData,
-        })
-    );
+    const upsertedConversation = await softUpsert(tx.supportConversation, {
+      where: { workspaceId: input.workspaceId, canonicalConversationKey },
+      create: {
+        workspaceId: input.workspaceId,
+        installationId: input.installationId,
+        canonicalConversationKey,
+        ...conversationData,
+      },
+      update: conversationData,
+    });
 
     // Create a new grouping anchor if this is a standalone customer message
     // that didn't match an existing anchor (i.e., resolvedThreadTs === messageTs)

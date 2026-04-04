@@ -1,4 +1,4 @@
-import { prisma, resurrectOrUpsert } from "@shared/database";
+import { prisma, softUpsert } from "@shared/database";
 import { writeAuditEvent } from "@shared/rest/security/audit";
 import { canAssignWorkspaceRole, canManageWorkspaceMember } from "@shared/rest/security/rbac";
 import { setActiveWorkspaceForSession } from "@shared/rest/security/session";
@@ -148,16 +148,12 @@ export const workspaceRouter = router({
         });
       }
 
-      const created = await resurrectOrUpsert(
-        prisma.workspaceMembership,
-        { workspaceId: ctx.workspaceId, userId: targetUser.id },
-        { role: input.role },
-        async () =>
-          prisma.workspaceMembership.create({
-            data: { workspaceId: ctx.workspaceId, userId: targetUser.id, role: input.role },
-            include: { user: { select: { id: true, email: true } } },
-          })
-      );
+      const created = await softUpsert(prisma.workspaceMembership, {
+        where: { workspaceId: ctx.workspaceId, userId: targetUser.id },
+        create: { workspaceId: ctx.workspaceId, userId: targetUser.id, role: input.role },
+        update: { role: input.role },
+        include: { user: { select: { id: true, email: true } } },
+      });
 
       await writeAuditEvent({
         action: "workspace.member.add",

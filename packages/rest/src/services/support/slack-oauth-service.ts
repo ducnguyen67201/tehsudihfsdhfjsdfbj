@@ -2,7 +2,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { prisma } from "@shared/database";
 import { env } from "@shared/env";
 import { writeAuditEvent } from "@shared/rest/security/audit";
-import { resurrectOrUpsert } from "@shared/database";
+import { softUpsert } from "@shared/database";
 import { cascadeSoftDeleteInstallation } from "@shared/rest/services/soft-delete-cascade";
 import {
   type SlackOAuthStatePayload,
@@ -200,22 +200,11 @@ export async function completeSlackOAuthInstall(
     metadata,
   };
 
-  const installation = await resurrectOrUpsert(
-    prisma.supportInstallation,
-    { provider: "SLACK", providerInstallationId: oauthResult.appId },
-    installData,
-    async () =>
-      prisma.supportInstallation.upsert({
-        where: {
-          provider_providerInstallationId: {
-            provider: "SLACK",
-            providerInstallationId: oauthResult.appId,
-          },
-        },
-        create: { provider: "SLACK", providerInstallationId: oauthResult.appId, ...installData },
-        update: installData,
-      })
-  );
+  const installation = await softUpsert(prisma.supportInstallation, {
+    where: { provider: "SLACK", providerInstallationId: oauthResult.appId },
+    create: { provider: "SLACK", providerInstallationId: oauthResult.appId, ...installData },
+    update: installData,
+  });
 
   await writeAuditEvent({
     action: "workspace.slack.connect",
