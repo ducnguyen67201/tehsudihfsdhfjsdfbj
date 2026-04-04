@@ -166,14 +166,15 @@ Do not manually maintain parallel OpenAPI and TS contracts for the same payload.
 
 ## Commenting Conventions
 
-- Write comments for human clarity first, but keep them precise so AI agents can reliably infer intent.
-- Add a short JSDoc comment for exported functions and non-trivial internal functions:
-  - purpose of the function
-  - key inputs/assumptions
-  - important side effects (DB writes, external calls, retries, idempotency)
-- Add inline comments only for non-obvious logic, invariants, or deterministic workflow constraints.
-- Do not add noisy comments that restate obvious code.
+Follows Robert C. Martin's _Clean Code_ — code should express intent; comments are a last resort.
+
+- **Prefer expressive code over comments.** If you need a comment, first try renaming, extracting a function, or restructuring. A well-named function eliminates the need for a comment above it.
+- **Only add JSDoc when the name and signature aren't enough:** non-obvious side effects (DB writes, external calls), preconditions, idempotency guarantees, or important performance characteristics.
+- **Good comments:** intent behind non-obvious business rules, `// TODO(TICKET-123)` with references, warnings of consequences, legal headers.
+- **Bad comments (delete on sight):** restating the code, journal/changelog entries, closing brace markers, commented-out code (git remembers), attribution (git blame exists).
+- Add inline comments only for invariants, deterministic workflow constraints, or genuinely non-obvious logic.
 - Keep comments updated when behavior changes; stale comments are treated as bugs.
+- See also: [Clean Code Philosophy](#clean-code-philosophy-robert-c-martin) for the full set of principles.
 
 ## Import Conventions
 
@@ -272,6 +273,91 @@ Primary governance skill:
 - On every substantive AGENTS change, verify linked docs remain accurate.
 
 If uncertain between clever and simple, choose simple while preserving boundaries.
+
+## Clean Code Philosophy (Robert C. Martin)
+
+All code in this repo aspires to the standards in _Clean Code: A Handbook of Agile Software Craftsmanship_ (Robert C. Martin, Prentice Hall, 2008). These principles are non-negotiable for both human and AI-authored code.
+
+> "Clean code reads like well-written prose." — Grady Booch, quoted in Ch. 1
+
+> "You know you are working on clean code when each routine you read turns out to be pretty much what you expected." — Ward Cunningham, quoted in Ch. 1
+
+### Functions _(Ch. 3: Functions)_
+
+> "The first rule of functions is that they should be small. The second rule of functions is that they should be smaller than that." — p. 34
+
+- **Small.** Functions should do one thing, do it well, and do it only (p. 35). If a function does more than one thing, extract the other thing.
+- **One level of abstraction per function** (p. 36, "The Stepdown Rule"). Don't mix high-level orchestration with low-level detail in the same function body. Code should read top-down like a narrative.
+- **Descriptive names** (p. 39). _"A long descriptive name is better than a short enigmatic name. A long descriptive name is better than a long descriptive comment."_ The name should tell you what the function does without reading its body.
+- **Few arguments** (p. 40, "Function Arguments"). Zero (niladic) is ideal, one (monadic) is good, two (dyadic) is acceptable. Three+ (triadic) is a code smell — consider wrapping in an options object.
+- **No side effects hidden behind the name** (p. 44). If it says `checkPassword`, it must not also initialize a session. _"Side effects are lies."_
+- **Command/query separation** (p. 45). A function should either change state or return a value, not both.
+
+### Naming _(Ch. 2: Meaningful Names)_
+
+> "The name of a variable, function, or class should answer all the big questions. It should tell you why it exists, what it does, and how it is used." — p. 18
+
+- **Intention-revealing names** (p. 18). If a name requires a comment, the name is wrong.
+- **Avoid disinformation** (p. 19). Don't use `accountList` if it's not actually a `List`. Don't use names that vary in small ways (`XYZControllerForHandling` vs `XYZControllerForStorage`).
+- **Make meaningful distinctions** (p. 20). Don't add noise words (`data`, `info`, `the`, `a`) just to satisfy the compiler. _"Noise words are redundant."_ If you can't tell two names apart, rename them.
+- **Use pronounceable, searchable names** (p. 22-24). Single-letter variables and magic numbers are forbidden outside tiny loop scopes. _"If you can't pronounce it, you can't discuss it without sounding like an idiot."_
+- **Class names** should be nouns; **method names** should be verbs (p. 25).
+
+### Comments _(Ch. 4: Comments)_
+
+> "Don't comment bad code — rewrite it." — Brian Kernighan & P. J. Plauger, quoted on p. 53
+
+> "The proper use of comments is to compensate for our failure to express ourselves in code." — p. 54
+
+- A comment is an admission that the code failed to express intent. Before writing one, ask: can I rename something, extract a function, or restructure to make this obvious?
+- **Good comments** (p. 55-59): legal headers, intent explanation for non-obvious business rules, clarification of obscure API return values, `// TODO` with ticket references, warnings of consequences, amplification of importance.
+- **Bad comments** (p. 59-74): restating the code ("redundant comments"), journal/changelog entries, closing brace markers, commented-out code (_"delete it — git remembers"_), attribution comments (git blame exists), position markers used to excess, mandated Javadoc on every function.
+- **Mandated JSDoc on every function is noise** (p. 64, "Mandated Comments"). Only add JSDoc when the function's name and signature don't tell the full story (side effects, non-obvious preconditions, important performance characteristics).
+
+### Formatting _(Ch. 5: Formatting)_
+
+> "Code formatting is about communication, and communication is the professional developer's first order of business." — p. 76
+
+- **Vertical openness between concepts** (p. 78). Blank lines separate distinct thoughts. Related lines stay together ("vertical density", p. 79).
+- **Caller above callee** (p. 82-83, "Dependent Functions"). High-level functions appear before the lower-level functions they call — the "newspaper metaphor": headline first, details later.
+- **Keep files short and focused** (p. 77). If a file grows past ~300 lines, look for extraction opportunities. Martin found most well-crafted files are 200 lines or fewer.
+- **Horizontal alignment is unnecessary** (p. 87). Let the code's indentation and structure do the work.
+
+### Error Handling _(Ch. 7: Error Handling)_
+
+> "Error handling is important, but if it obscures logic, it's wrong." — p. 103
+
+- **Prefer exceptions over error codes** (p. 103-104). Don't return null to signal failure; throw a typed error.
+- **Write try-catch-finally first** (p. 105). Try-catch at the outer boundary, not around every statement. Functions called within should throw, and the boundary catches.
+- **Don't return null** (p. 110). _"When we return null, we are essentially creating work for ourselves."_ Every null return is a missing `NullPointerException` waiting to happen.
+- **Don't pass null** (p. 111). _"Returning null from methods is bad, but passing null into methods is worse."_
+
+### Classes _(Ch. 10: Classes)_
+
+> "The first rule of classes is that they should be small. The second rule of classes is that they should be smaller than that." — p. 136
+
+- **Single Responsibility Principle** (p. 138). A class should have one, and only one, reason to change. _"Getting software to work and making software clean are two very different activities."_
+- **High cohesion** (p. 140). When a class loses cohesion, split it. If a subset of variables are used by a subset of methods, that's a new class trying to get out.
+
+### Tests _(Ch. 9: Unit Tests)_
+
+> "Test code is just as important as production code." — p. 124
+
+- **F.I.R.S.T. principles** (p. 132): Fast, Independent, Repeatable, Self-Validating, Timely.
+- **One assert per concept** (p. 130). A test should test one thing. Multiple asserts are fine if they all verify facets of the same behavior.
+- **Clean tests are readable tests** (p. 124). The same naming and structure rules apply — tests are documentation.
+
+### The Boy Scout Rule _(Ch. 1, p. 14)_
+
+> "Leave the campground cleaner than you found it."
+
+When touching a file for a bug fix or feature, clean up one small thing nearby — a bad name, an unnecessary comment, a too-long function. Not a full refactor, just one improvement. Over time the codebase gets better instead of worse.
+
+### Successive Refinement _(Ch. 14)_
+
+> "Writing clean code requires the disciplined use of a myriad little techniques applied through a painstakingly acquired sense of 'cleanliness'." — p. 14
+
+No one writes clean code on the first pass. Write it, make it work, then refine: extract, rename, simplify. The act of cleaning is part of the craft, not an afterthought.
 
 ## Skill routing
 
