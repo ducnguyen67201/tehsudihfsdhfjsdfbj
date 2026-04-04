@@ -121,6 +121,12 @@ Do not manually maintain parallel OpenAPI and TS contracts for the same payload.
 - Use explicit transactions for multi-step writes requiring atomicity.
 - Add indexes intentionally for new query paths.
 
+### Soft Delete Rules
+
+- Never call `.delete()` or `.deleteMany()` inside `$transaction()` for soft-delete models. The extension's delete-to-update conversion uses the base client, not the transaction client, so the soft-delete escapes the transaction boundary. Use manual `updateMany({ data: { deletedAt: new Date() } })` inside transactions instead.
+- `@@unique` annotations in `schema.prisma` drive TypeScript type generation only. The actual DB constraints are partial unique indexes (`WHERE deletedAt IS NULL`) managed in raw SQL migrations. Do not use `db:push` on soft-deletable models as it will recreate full unique indexes.
+- Use the `findIncludingDeleted()` helper for queries that need to see soft-deleted records. Do not use `as any` casts with `includeDeleted`.
+
 ## UI Rules (Non-Negotiable)
 
 - Use **shadcn/ui** exclusively for all UI components. Do not use any other component library (MUI, Chakra, Ant Design, Radix primitives directly, etc.).

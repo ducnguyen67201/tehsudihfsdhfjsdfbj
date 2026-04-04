@@ -1,5 +1,5 @@
 import { normalizeSlackMessageEvent } from "@/domains/support/adapters/slack/event-normalizer";
-import { prisma } from "@shared/database";
+import { prisma, resurrectOrUpsert } from "@shared/database";
 import {
   SUPPORT_CONVERSATION_EVENT_SOURCE,
   SUPPORT_CONVERSATION_STATUS,
@@ -93,38 +93,39 @@ export async function runSupportPipeline(
     normalized.threadTs
   );
 
+  const conversationData = {
+    teamId: normalized.teamId,
+    channelId: normalized.channelId,
+    threadTs: normalized.threadTs,
+    status: SUPPORT_CONVERSATION_STATUS.unread,
+    lastCustomerMessageAt: now,
+    customerWaitingSince: now,
+    staleAt: computeUnreadStaleAt(now),
+    lastActivityAt: now,
+  };
+
   const conversation = await prisma.$transaction(async (tx) => {
-    const upsertedConversation = await tx.supportConversation.upsert({
-      where: {
-        workspaceId_canonicalConversationKey: {
-          workspaceId: input.workspaceId,
-          canonicalConversationKey,
-        },
-      },
-      create: {
-        workspaceId: input.workspaceId,
-        installationId: input.installationId,
-        canonicalConversationKey,
-        teamId: normalized.teamId,
-        channelId: normalized.channelId,
-        threadTs: normalized.threadTs,
-        status: SUPPORT_CONVERSATION_STATUS.unread,
-        lastCustomerMessageAt: now,
-        customerWaitingSince: now,
-        staleAt: computeUnreadStaleAt(now),
-        lastActivityAt: now,
-      },
-      update: {
-        teamId: normalized.teamId,
-        channelId: normalized.channelId,
-        threadTs: normalized.threadTs,
-        status: SUPPORT_CONVERSATION_STATUS.unread,
-        lastCustomerMessageAt: now,
-        customerWaitingSince: now,
-        staleAt: computeUnreadStaleAt(now),
-        lastActivityAt: now,
-      },
-    });
+    const upsertedConversation = await resurrectOrUpsert(
+      tx.supportConversation,
+      { workspaceId: input.workspaceId, canonicalConversationKey },
+      { installationId: input.installationId, ...conversationData },
+      async () =>
+        tx.supportConversation.upsert({
+          where: {
+            workspaceId_canonicalConversationKey: {
+              workspaceId: input.workspaceId,
+              canonicalConversationKey,
+            },
+          },
+          create: {
+            workspaceId: input.workspaceId,
+            installationId: input.installationId,
+            canonicalConversationKey,
+            ...conversationData,
+          },
+          update: conversationData,
+        })
+    );
 
     await tx.supportConversationEvent.create({
       data: {
