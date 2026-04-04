@@ -19,7 +19,7 @@ type WorkspaceSettingsLayoutProps = {
 type SettingsNavItem = {
   href: string;
   label: string;
-  icon: typeof RiGroupLine;
+  icon: typeof RiSettings3Line;
   isActive: boolean;
 };
 
