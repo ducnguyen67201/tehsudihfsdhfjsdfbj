@@ -1,9 +1,11 @@
-import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFile, readdir } from "node:fs/promises";
-import { extname, join, relative } from "node:path";
-import { promisify } from "node:util";
+import { extname, relative } from "node:path";
 import { prisma } from "@shared/database";
+import {
+  fetchFileContents,
+  fetchLatestCommitSha,
+  fetchRepoTree,
+} from "@shared/rest/codex/github";
 import {
   generateEmbeddings,
   getCachedEmbeddings,
@@ -17,8 +19,6 @@ import {
   WORKFLOW_PROCESSING_STATUS,
 } from "@shared/types";
 import { ApplicationFailure } from "@temporalio/activity";
-
-const execFileAsync = promisify(execFile);
 const SUPPORTED_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".md", ".json"]);
 const IGNORED_DIRECTORIES = new Set([".git", ".next", "node_modules", "dist", "coverage"]);
 const SYMBOL_PATTERN =
@@ -53,41 +53,12 @@ function escapeSql(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }
 
-async function gitCommitSha(sourceRoot: string): Promise<string | null> {
-  try {
-    const { stdout } = await execFileAsync("git", [
-      "-C",
-      sourceRoot,
-      "rev-parse",
-      "--short",
-      "HEAD",
-    ]);
-    return stdout.trim() || null;
-  } catch {
-    return null;
+function isPathAllowed(filePath: string): boolean {
+  if (!SUPPORTED_EXTENSIONS.has(extname(filePath))) return false;
+  for (const dir of IGNORED_DIRECTORIES) {
+    if (filePath.includes(`/${dir}/`) || filePath.startsWith(`${dir}/`)) return false;
   }
-}
-
-async function collectFiles(root: string, current = root): Promise<string[]> {
-  const entries = await readdir(current, { withFileTypes: true });
-  const collected: string[] = [];
-
-  for (const entry of entries) {
-    if (entry.isDirectory()) {
-      if (!IGNORED_DIRECTORIES.has(entry.name)) {
-        collected.push(...(await collectFiles(root, join(current, entry.name))));
-      }
-
-      continue;
-    }
-
-    const absolutePath = join(current, entry.name);
-    if (SUPPORTED_EXTENSIONS.has(extname(absolutePath))) {
-      collected.push(absolutePath);
-    }
-  }
-
-  return collected;
+  return true;
 }
 
 function buildChunkContent(lines: string[], start: number, end: number): string {
@@ -252,7 +223,7 @@ function chunkFile(filePath: string, sourceRoot: string, content: string): Chunk
 }
 
 /**
- * Read the selected repository, build a new snapshot version, and atomically flip it active.
+ * Read the selected repository via GitHub API, build a new snapshot version, and atomically flip it active.
  */
 export async function runRepositoryIndexPipeline(
   input: RepositoryIndexWorkflowInput
@@ -268,23 +239,27 @@ export async function runRepositoryIndexPipeline(
     throw new Error(`Sync request ${input.syncRequestId} was not found.`);
   }
 
-  if (!syncRequest.repository.sourceRoot) {
+  const installation = await prisma.gitHubInstallation.findUnique({
+    where: { workspaceId: input.workspaceId },
+  });
+
+  if (!installation?.githubInstallationId) {
     await prisma.repositorySyncRequest.update({
       where: { id: syncRequest.id },
       data: {
         status: "failed",
         completedAt: new Date(),
-        errorMessage: `Repository ${input.repositoryId} has no sourceRoot configured.`,
+        errorMessage: `No GitHub installation found for workspace ${input.workspaceId}.`,
       },
     });
-
     throw ApplicationFailure.nonRetryable(
-      `Repository ${input.repositoryId} has no sourceRoot configured. Cannot index.`,
+      `No GitHub installation found for workspace ${input.workspaceId}. Cannot index.`,
       "ValidationError"
     );
   }
 
-  const sourceRoot = syncRequest.repository.sourceRoot;
+  const { owner, name, defaultBranch } = syncRequest.repository;
+  const installationId = installation.githubInstallationId;
 
   await prisma.repositorySyncRequest.update({
     where: { id: syncRequest.id },
@@ -306,16 +281,19 @@ export async function runRepositoryIndexPipeline(
   });
 
   try {
-    const files = await collectFiles(sourceRoot);
-    const chunks = (
-      await Promise.all(
-        files.map(async (filePath) => {
-          const content = await readFile(filePath, "utf8");
-          return chunkFile(filePath, sourceRoot, content);
-        })
-      )
-    ).flat();
-    const commitSha = await gitCommitSha(sourceRoot);
+    const tree = await fetchRepoTree(installationId, owner, name, defaultBranch);
+    const allowedPaths = tree.filter((entry) => isPathAllowed(entry.path)).map((e) => e.path);
+
+    const fileContents = await fetchFileContents(
+      installationId,
+      owner,
+      name,
+      defaultBranch,
+      allowedPaths
+    );
+
+    const chunks = fileContents.flatMap((file) => chunkFile(file.path, "", file.content));
+    const commitSha = await fetchLatestCommitSha(installationId, owner, name, defaultBranch);
     const completedAt = new Date();
 
     if (chunks.length > 0) {
@@ -402,7 +380,7 @@ export async function runRepositoryIndexPipeline(
           commitSha,
           completedAt,
           activatedAt: completedAt,
-          fileCount: files.length,
+          fileCount: fileContents.length,
           chunkCount: chunks.length,
         },
       }),
