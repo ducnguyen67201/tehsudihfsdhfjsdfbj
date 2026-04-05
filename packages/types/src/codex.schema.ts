@@ -184,6 +184,8 @@ export const searchScoreBreakdownSchema = z.object({
   pathScore: z.number(),
   freshnessScore: z.number(),
   mergedScore: z.number(),
+  rerankerScore: z.number().nullable().optional(),
+  rerankerReason: z.string().nullable().optional(),
 });
 
 export const searchEvidenceResultSchema = z.object({
