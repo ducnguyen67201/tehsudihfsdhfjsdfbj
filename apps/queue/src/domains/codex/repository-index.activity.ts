@@ -49,9 +49,6 @@ function hashContent(content: string): string {
   return createHash("sha256").update(content).digest("hex");
 }
 
-function escapeSql(value: string): string {
-  return `'${value.replace(/'/g, "''")}'`;
-}
 
 function isPathAllowed(filePath: string): boolean {
   if (!SUPPORTED_EXTENSIONS.has(extname(filePath))) return false;
@@ -325,37 +322,41 @@ export async function runRepositoryIndexPipeline(
           });
         }
 
-        const values = batch
-          .map((chunk, idx) => {
-            const embedding = embeddings[idx];
-            const preprocessed = splitIdentifiers(chunk.content);
-            const embeddingValue = embedding ? `'${formatVector(embedding)}'::vector` : "NULL";
-            return `(
-              gen_random_uuid(),
-              '${indexVersion.id}',
-              ${escapeSql(chunk.filePath)},
-              ${escapeSql(chunk.language)},
-              ${chunk.symbolName ? escapeSql(chunk.symbolName) : "NULL"},
-              ${chunk.lineStart},
-              ${chunk.lineEnd},
-              ${escapeSql(chunk.contentHash)},
-              ${escapeSql(chunk.content)},
-              ${embeddingValue},
-              to_tsvector('english', ${escapeSql(preprocessed)}),
-              ${chunk.qualityScore},
-              ${embedding ? escapeSql(EMBEDDING_MODEL) : "NULL"},
-              NOW()
-            )`;
-          })
-          .join(",\n");
+        const params: unknown[] = [];
+        const rows = batch.map((chunk, idx) => {
+          const embedding = embeddings[idx];
+          const preprocessed = splitIdentifiers(chunk.content);
+          const o = params.length;
+          params.push(
+            indexVersion.id,
+            chunk.filePath,
+            chunk.language,
+            chunk.symbolName,
+            chunk.lineStart,
+            chunk.lineEnd,
+            chunk.contentHash,
+            chunk.content,
+            embedding ? formatVector(embedding) : null,
+            preprocessed,
+            chunk.qualityScore,
+            embedding ? EMBEDDING_MODEL : null,
+          );
+          return `(
+            gen_random_uuid(),
+            $${o + 1}, $${o + 2}, $${o + 3}, $${o + 4}, $${o + 5}, $${o + 6},
+            $${o + 7}, $${o + 8}, $${o + 9}::vector, to_tsvector('english', $${o + 10}),
+            $${o + 11}, $${o + 12}, NOW()
+          )`;
+        });
 
-        await prisma.$executeRawUnsafe(`
-          INSERT INTO "RepositoryIndexChunk" (
+        await prisma.$executeRawUnsafe(
+          `INSERT INTO "RepositoryIndexChunk" (
             "id", "indexVersionId", "filePath", "language", "symbolName",
             "lineStart", "lineEnd", "contentHash", "content",
             "embedding", "tsv", "qualityScore", "embeddingModel", "createdAt"
-          ) VALUES ${values}
-        `);
+          ) VALUES ${rows.join(",")}`,
+          ...params
+        );
       }
     }
 
