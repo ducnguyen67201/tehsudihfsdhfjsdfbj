@@ -5,7 +5,7 @@ TrustLoop is an AI-native customer ops workspace with a type-safe monorepo found
 ### Runtime topology
 
 - `web` service: Next.js 16 UI + HTTP transport (`/api/rest/*`, `/api/trpc/*`)
-- `worker` service: single Temporal worker process consuming:
+- `queue` service: single Temporal worker process consuming:
   - `TEMPORAL_TASK_QUEUE` (support/general)
   - `CODEX_TASK_QUEUE` (codex)
 
@@ -13,8 +13,7 @@ TrustLoop is an AI-native customer ops workspace with a type-safe monorepo found
 
 - `apps/web`: product UI + API transport
   - HTTP handlers in `src/server/http/*`
-- `apps/worker`: deployed worker runtime
-- `apps/queue`: workflow domain module (support + codex workflows)
+- `apps/queue`: workflow domain + worker runtime (support + codex workflows)
   - domain folders in `src/domains/*`
 - `packages/types`: shared Zod/TS contracts
 - `packages/rest`: shared API and orchestration logic
@@ -22,7 +21,7 @@ TrustLoop is an AI-native customer ops workspace with a type-safe monorepo found
 - `packages/env`: env validation/parsing
 
 Local import convention:
-- app runtimes (`apps/web`, `apps/queue`, `apps/worker`): use `@/` (`@/` => app `src` root)
+- app runtimes (`apps/web`, `apps/queue`): use `@/` (`@/` => app `src` root)
 - shared packages (`packages/*`): use package-root imports (`@shared/<pkg>/*`)
 
 ### Local setup
@@ -34,7 +33,7 @@ docker compose up -d postgres temporal
 npm run db:generate
 npm run openapi:generate
 npm run dev:web
-npm run dev:worker
+npm run dev:queue
 ```
 
 ### Quality gates

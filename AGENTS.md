@@ -20,7 +20,7 @@ Use **2 deployed services**:
    - Next.js app
    - API/tRPC surface
    - workflow dispatch
-2. `worker`
+2. `queue`
    - single deployment running both support and codex workers
 
 Use **2 Temporal task queues** (must stay separate):
@@ -33,8 +33,7 @@ Queue-level isolation is mandatory even if both are run in one worker runtime.
 ## Code/Domain Boundaries
 
 - `apps/web`: UI + API transport boundary
-- `apps/worker`: single worker runtime (consumes both Temporal queues)
-- `apps/queue`: workflow domain (support + codex)
+- `apps/queue`: workflow domain + worker runtime (support + codex)
 - `packages/types`: shared types + Zod schemas + Prisma-generated model types
 - `packages/rest`: tRPC routers/orchestration
 - `packages/database`: Prisma schema + client
@@ -53,7 +52,7 @@ Queue-level isolation is mandatory even if both are run in one worker runtime.
 - `apps/queue/src/runtime/`: worker registration surfaces (`./workflows`, `./activities`) consumed by worker runtime
 - `apps/web/src/server/http/`: HTTP transport handlers grouped by concern (`system`, `rest`, `trpc`)
 - `apps/web/src/app/api/**/route.ts`: thin wrappers that delegate to `src/server/http/*`
-- Use `@/` for local imports inside app runtimes (`apps/web`, `apps/queue`, `apps/worker`)
+- Use `@/` for local imports inside app runtimes (`apps/web`, `apps/queue`)
 - Use package-root imports inside shared packages (for example `@shared/rest/*`, `@shared/types/*`)
 
 ## Core Stack
@@ -80,10 +79,8 @@ cp .env.example .env
 npm run db:generate
 npm run db:migrate
 npm run dev:web
-npm run dev:worker
+npm run dev:queue
 ```
-
-For workflow-only debugging, local dev can run `npm run dev:queue`.
 
 ## Type Safety Rules (Non-Negotiable)
 
@@ -178,7 +175,7 @@ Follows Robert C. Martin's _Clean Code_ — code should express intent; comments
 
 ## Import Conventions
 
-- Use `@/` for local imports inside app runtimes (`apps/web`, `apps/queue`, `apps/worker`).
+- Use `@/` for local imports inside app runtimes (`apps/web`, `apps/queue`).
 - Use `@shared/*` for cross-package shared modules.
 - Inside `packages/*`, prefer package-root imports (for example `@shared/types/workflow.schema`) over `@/`.
 - Do not use deep relative import chains (`../../..`) for local code.
