@@ -4,6 +4,7 @@ import { SupportStatusBadge } from "@/components/support/support-status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { SupportConversation } from "@shared/types";
+import type { DragEvent } from "react";
 
 function formatTimestamp(value: string | null): string {
   if (!value) {
@@ -25,15 +26,27 @@ interface SupportConversationCardProps {
 }
 
 /**
- * Compact conversation card for the kanban board columns.
+ * Draggable conversation card for the kanban board.
+ * Uses native HTML Drag and Drop API (no library needed).
  */
 export function SupportConversationCard({
   conversation,
   isSelected,
   onSelect,
 }: SupportConversationCardProps) {
+  function handleDragStart(event: DragEvent) {
+    event.dataTransfer.setData("text/plain", conversation.id);
+    event.dataTransfer.effectAllowed = "move";
+  }
+
   return (
-    <button type="button" onClick={() => onSelect(conversation.id)} className="w-full text-left">
+    <button
+      type="button"
+      onClick={() => onSelect(conversation.id)}
+      draggable
+      onDragStart={handleDragStart}
+      className="w-full text-left cursor-grab active:cursor-grabbing"
+    >
       <Card
         size="sm"
         className={cn(

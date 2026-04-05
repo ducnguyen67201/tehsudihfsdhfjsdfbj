@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useActiveWorkspace } from "@/hooks/use-active-workspace";
 import { useSupportInbox } from "@/hooks/use-support-inbox";
-import { SUPPORT_CONVERSATION_STATUS } from "@shared/types";
+import { SUPPORT_CONVERSATION_STATUS, type SupportConversationStatus } from "@shared/types";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -114,6 +114,14 @@ export function SupportInbox() {
     updateThreadParam(conversationId);
   }
 
+  function handleDrop(conversationId: string, targetStatus: SupportConversationStatus) {
+    // Don't update if dropped on the same column
+    const conversation = inbox.listData?.conversations.find((c) => c.id === conversationId);
+    if (conversation && conversation.status !== targetStatus) {
+      void inbox.updateConversationStatus(conversationId, targetStatus);
+    }
+  }
+
   function handleSheetOpenChange(open: boolean) {
     setIsSheetOpen(open);
     if (!open) {
@@ -189,6 +197,7 @@ export function SupportInbox() {
                 key={column.status}
                 conversations={column.conversations}
                 description={column.description}
+                onDrop={handleDrop}
                 onSelect={handleSelectConversation}
                 selectedConversationId={inbox.selectedConversationId}
                 status={column.status}
