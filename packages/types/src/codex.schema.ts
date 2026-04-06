@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { workspaceSummarySchema } from "./workspace.schema";
 
 export const GITHUB_CONNECTION_STATUS = {
   disconnected: "disconnected",
@@ -89,11 +90,6 @@ export const searchFeedbackLabelSchema = z.enum([
 ]);
 
 export const prIntentStatusSchema = z.enum([PR_INTENT_STATUS.validated]);
-
-export const workspaceSummarySchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1),
-});
 
 export const githubConnectionSummarySchema = z.object({
   status: githubConnectionStatusSchema,
@@ -254,7 +250,6 @@ export type RepositoryIndexStatus = z.infer<typeof repositoryIndexStatusSchema>;
 export type RepositoryBranchPolicy = z.infer<typeof repositoryBranchPolicySchema>;
 export type SearchFeedbackLabel = z.infer<typeof searchFeedbackLabelSchema>;
 export type PrIntentStatus = z.infer<typeof prIntentStatusSchema>;
-export type WorkspaceSummary = z.infer<typeof workspaceSummarySchema>;
 export type GithubConnectionSummary = z.infer<typeof githubConnectionSummarySchema>;
 export type RepositoryIndexHealth = z.infer<typeof repositoryIndexHealthSchema>;
 export type RepositorySummary = z.infer<typeof repositorySummarySchema>;

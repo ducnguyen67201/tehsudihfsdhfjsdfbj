@@ -6,7 +6,7 @@ import {
   proxyActivities,
   startChild,
 } from "@temporalio/workflow";
-import { newMessageSignal } from "@/domains/support/analysis-trigger.workflow";
+import { newMessageSignal } from "./analysis-trigger.workflow";
 
 const { runSupportPipeline } = proxyActivities<typeof supportActivities>({
   startToCloseTimeout: "1 minute",

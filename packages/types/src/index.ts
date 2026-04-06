@@ -8,3 +8,4 @@ export * from "@shared/types/support/index";
 export * from "@shared/types/workspace-api-key.schema";
 export * from "@shared/types/workspace.schema";
 export * from "@shared/types/workflow.schema";
+export * from "@shared/types/positional-format/index";

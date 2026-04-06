@@ -172,7 +172,7 @@ export const analyzeRequestSchema = z.object({
 
 export const toolCallRecordSchema = z.object({
   tool: z.string(),
-  input: z.record(z.unknown()),
+  input: z.record(z.string(), z.unknown()),
   output: z.string(),
   durationMs: z.number(),
 });
