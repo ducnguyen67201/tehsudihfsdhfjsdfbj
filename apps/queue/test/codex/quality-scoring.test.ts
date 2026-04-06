@@ -17,9 +17,7 @@ vi.mock("@temporalio/activity", () => ({
   ApplicationFailure: { nonRetryable: vi.fn() },
 }));
 
-const { computeQualityScore } = await import(
-  "../../src/domains/codex/repository-index.activity"
-);
+const { computeQualityScore } = await import("../../src/domains/codex/repository-index.activity");
 
 function makeChunk(overrides: {
   content?: string;
@@ -79,7 +77,7 @@ describe("computeQualityScore", () => {
     });
     const srcFile = makeChunk({
       filePath: "src/auth.ts",
-      content: 'export function authenticate() {\n  return true;\n}',
+      content: "export function authenticate() {\n  return true;\n}",
     });
     expect(computeQualityScore(testFile)).toBeLessThan(computeQualityScore(srcFile));
   });
@@ -103,14 +101,12 @@ describe("computeQualityScore", () => {
 
   it("rewards chunks with comments", () => {
     const withComments = makeChunk({
-      content: '// Processes the order\nexport function processOrder() {\n  return true;\n}',
+      content: "// Processes the order\nexport function processOrder() {\n  return true;\n}",
     });
     const without = makeChunk({
-      content: 'export function processOrder() {\n  return true;\n}',
+      content: "export function processOrder() {\n  return true;\n}",
     });
-    expect(computeQualityScore(withComments)).toBeGreaterThanOrEqual(
-      computeQualityScore(without)
-    );
+    expect(computeQualityScore(withComments)).toBeGreaterThanOrEqual(computeQualityScore(without));
   });
 
   it("clamps score to [0, 1]", () => {

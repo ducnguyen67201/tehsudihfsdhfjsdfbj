@@ -1,17 +1,13 @@
 import { createHash } from "node:crypto";
 import { extname, relative } from "node:path";
 import { prisma } from "@shared/database";
+import { fetchFileContents, fetchLatestCommitSha, fetchRepoTree } from "@shared/rest/codex/github";
 import {
-  fetchFileContents,
-  fetchLatestCommitSha,
-  fetchRepoTree,
-} from "@shared/rest/codex/github";
-import {
+  EMBEDDING_MODEL,
+  formatVector,
   generateEmbeddings,
   getCachedEmbeddings,
   splitIdentifiers,
-  formatVector,
-  EMBEDDING_MODEL,
 } from "@shared/rest/services/codex/embedding";
 import {
   type RepositoryIndexWorkflowInput,
@@ -49,7 +45,6 @@ function hashContent(content: string): string {
   return createHash("sha256").update(content).digest("hex");
 }
 
-
 function isPathAllowed(filePath: string): boolean {
   if (!SUPPORTED_EXTENSIONS.has(extname(filePath))) return false;
   for (const dir of IGNORED_DIRECTORIES) {
@@ -83,9 +78,7 @@ export function computeQualityScore(chunk: ChunkRecord): number {
   if (chunk.symbolName) score += 0.2;
   if (nonEmptyLines.length >= 10 && nonEmptyLines.length <= 80) score += 0.1;
 
-  const hasComments = lines.some(
-    (l) => /^\s*(\/\/|\/\*|\*|#)/.test(l) || /\*\/\s*$/.test(l)
-  );
+  const hasComments = lines.some((l) => /^\s*(\/\/|\/\*|\*|#)/.test(l) || /\*\/\s*$/.test(l));
   if (hasComments) score += 0.1;
 
   const projectImports = importLines.filter(
@@ -339,7 +332,7 @@ export async function runRepositoryIndexPipeline(
             embedding ? formatVector(embedding) : null,
             preprocessed,
             chunk.qualityScore,
-            embedding ? EMBEDDING_MODEL : null,
+            embedding ? EMBEDDING_MODEL : null
           );
           return `(
             gen_random_uuid(),

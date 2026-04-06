@@ -54,7 +54,7 @@ export function SupportInbox() {
       inbox.setSelectedConversationId(threadParam);
       setIsSheetOpen(true);
     }
-  }, [threadParam]);
+  }, [threadParam, inbox.selectedConversationId, inbox.setSelectedConversationId]);
 
   const updateThreadParam = useCallback(
     (conversationId: string | null) => {

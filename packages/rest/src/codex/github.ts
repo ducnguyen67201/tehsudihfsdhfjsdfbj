@@ -1,19 +1,19 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createAppAuth } from "@octokit/auth-app";
+import { Octokit } from "@octokit/rest";
 import { prisma } from "@shared/database";
 import { env } from "@shared/env";
+import { ensureWorkspace, getCodexSettings } from "@shared/rest/codex/shared";
 import {
   type ConnectGithubInstallationRequest,
   type ConnectGithubInstallationResponse,
+  type GithubOAuthStatePayload,
   REPOSITORY_BRANCH_POLICY,
   ValidationError,
   connectGithubInstallationRequestSchema,
   connectGithubInstallationResponseSchema,
-  type GithubOAuthStatePayload,
   githubOAuthStatePayloadSchema,
 } from "@shared/types";
-import { createAppAuth } from "@octokit/auth-app";
-import { Octokit } from "@octokit/rest";
-import { ensureWorkspace, getCodexSettings } from "@shared/rest/codex/shared";
 
 /** State token expiry: 10 minutes. */
 const STATE_TTL_MS = 10 * 60 * 1000;
@@ -147,9 +147,7 @@ async function fetchInstallationOwner(installationId: number): Promise<string> {
 /**
  * Fetch all repositories accessible to a GitHub App installation.
  */
-async function fetchInstallationRepositories(
-  installationId: number
-): Promise<
+async function fetchInstallationRepositories(installationId: number): Promise<
   Array<{
     owner: string;
     name: string;

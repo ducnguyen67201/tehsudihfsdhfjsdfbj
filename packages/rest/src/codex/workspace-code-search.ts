@@ -1,5 +1,5 @@
 import { prisma } from "@shared/database";
-import { hybridSearch, type RerankedChunk } from "@shared/rest/codex/hybrid-search";
+import { type RerankedChunk, hybridSearch } from "@shared/rest/codex/hybrid-search";
 
 export interface WorkspaceSearchResult {
   filePath: string;

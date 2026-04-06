@@ -41,15 +41,11 @@ export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
   return results;
 }
 
-export async function getCachedEmbeddings(
-  contentHashes: string[]
-): Promise<Map<string, number[]>> {
+export async function getCachedEmbeddings(contentHashes: string[]): Promise<Map<string, number[]>> {
   if (contentHashes.length === 0) return new Map();
 
   const placeholders = contentHashes.map((_, i) => `$${i + 1}`).join(", ");
-  const rows = await prisma.$queryRawUnsafe<
-    Array<{ contentHash: string; embedding: string }>
-  >(
+  const rows = await prisma.$queryRawUnsafe<Array<{ contentHash: string; embedding: string }>>(
     `SELECT DISTINCT ON ("contentHash") "contentHash", "embedding"::text
      FROM "RepositoryIndexChunk"
      WHERE "contentHash" IN (${placeholders})

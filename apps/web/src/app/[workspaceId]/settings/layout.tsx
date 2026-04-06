@@ -9,7 +9,13 @@ import {
   workspaceGithubPath,
   workspaceIntegrationsPath,
 } from "@/lib/workspace-paths";
-import { RiGithubLine, RiKey2Line, RiPlugLine, RiRobot2Line, RiSettings3Line } from "@remixicon/react";
+import {
+  RiGithubLine,
+  RiKey2Line,
+  RiPlugLine,
+  RiRobot2Line,
+  RiSettings3Line,
+} from "@remixicon/react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import type { ReactNode } from "react";

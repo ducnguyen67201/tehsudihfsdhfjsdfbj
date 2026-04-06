@@ -1,11 +1,11 @@
 import { prisma } from "@shared/database";
-import {
-  generateEmbeddings,
-  splitIdentifiers,
-  parseVector,
-  formatVector,
-} from "@shared/rest/services/codex/embedding";
 import { env } from "@shared/env";
+import {
+  formatVector,
+  generateEmbeddings,
+  parseVector,
+  splitIdentifiers,
+} from "@shared/rest/services/codex/embedding";
 import { MODEL_CONFIG } from "@shared/types";
 import OpenAI from "openai";
 
@@ -230,8 +230,9 @@ ${snippets.join("\n\n")}`;
     }
 
     const parsed = JSON.parse(content);
-    const scores: Array<{ index: number; score: number; reason: string }> =
-      Array.isArray(parsed) ? parsed : parsed.results ?? parsed.rankings ?? [];
+    const scores: Array<{ index: number; score: number; reason: string }> = Array.isArray(parsed)
+      ? parsed
+      : (parsed.results ?? parsed.rankings ?? []);
 
     const reranked: RerankedChunk[] = top.map((chunk, i) => {
       const match = scores.find((s) => s.index === i);
@@ -252,10 +253,7 @@ ${snippets.join("\n\n")}`;
   }
 }
 
-export async function hybridSearch(
-  query: string,
-  versionId: string
-): Promise<RerankedChunk[]> {
+export async function hybridSearch(query: string, versionId: string): Promise<RerankedChunk[]> {
   const queryEmbedding = await embedQuery(query);
 
   const [vectorResults, kwResults] = await Promise.all([
