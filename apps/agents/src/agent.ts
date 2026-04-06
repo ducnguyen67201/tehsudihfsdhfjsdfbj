@@ -110,12 +110,17 @@ export async function runAnalysis(request: AnalyzeRequest): Promise<AnalyzeRespo
   }));
 
   const durationMs = Date.now() - startTime;
+  const usage = (result as unknown as { usage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number } }).usage;
   console.log("[agents] Analysis complete", {
     conversationId: request.conversationId,
     durationMs,
     toolCalls: toolCalls.length,
+    steps: result.steps?.length ?? 0,
     confidence: output.analysis.confidence,
     severity: output.analysis.severity,
+    tokens: usage
+      ? { prompt: usage.promptTokens, completion: usage.completionTokens, total: usage.totalTokens }
+      : "unavailable",
   });
 
   return {
