@@ -245,36 +245,36 @@ export default function BillingSettingsPage() {
                   View Plans
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-3xl">
+              <DialogContent className="max-w-5xl w-[95vw]">
                 <DialogHeader>
-                  <DialogTitle className="font-mono">Choose a plan</DialogTitle>
+                  <DialogTitle className="font-mono text-lg">Choose a plan</DialogTitle>
                   <DialogDescription>
                     Per-seat pricing with AI analysis included. Upgrade or downgrade anytime.
                   </DialogDescription>
                 </DialogHeader>
-                <div className="grid grid-cols-3 gap-4 pt-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-6">
                   {PLANS.map((p) => {
                     const isCurrent = p.tier === plan.tier;
                     return (
                       <div
                         key={p.tier}
-                        className={`rounded-md border p-4 space-y-4 ${isCurrent ? "border-primary bg-primary/5" : ""}`}
+                        className={`rounded-lg border p-6 space-y-6 flex flex-col ${isCurrent ? "border-primary bg-primary/5 ring-1 ring-primary" : ""}`}
                       >
                         <div>
                           <div className="flex items-center justify-between">
-                            <h3 className="text-sm font-semibold">{p.name}</h3>
+                            <h3 className="text-base font-semibold">{p.name}</h3>
                             {isCurrent && (
                               <Badge variant="outline" className="text-xs">
                                 Current
                               </Badge>
                             )}
                           </div>
-                          <p className="mt-1">
-                            <span className="text-2xl font-bold">{p.price}</span>
-                            <span className="text-sm text-muted-foreground">{p.period}</span>
+                          <p className="mt-2">
+                            <span className="text-4xl font-bold tracking-tight">{p.price}</span>
+                            <span className="text-base text-muted-foreground">{p.period}</span>
                           </p>
                         </div>
-                        <ul className="space-y-2 text-sm">
+                        <ul className="space-y-3 text-sm flex-1">
                           {p.features.map((f) => (
                             <li key={f} className="flex items-start gap-2">
                               <RiCheckLine className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
@@ -283,11 +283,11 @@ export default function BillingSettingsPage() {
                           ))}
                         </ul>
                         {isCurrent ? (
-                          <Button variant="outline" size="sm" className="w-full" disabled>
+                          <Button variant="outline" className="w-full" disabled>
                             Current plan
                           </Button>
                         ) : (
-                          <Button variant="default" size="sm" className="w-full">
+                          <Button variant="default" className="w-full">
                             {PLANS.findIndex((x) => x.tier === p.tier) >
                             PLANS.findIndex((x) => x.tier === plan.tier)
                               ? `Upgrade to ${p.name}`
