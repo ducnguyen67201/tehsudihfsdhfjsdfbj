@@ -16,7 +16,13 @@ import { z } from "zod";
 // ── Code Mappings ───────────────────────────────────────────────────
 
 export const SEVERITY_CODES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const;
-export const CATEGORY_CODES = ["BUG", "QUESTION", "FEATURE_REQUEST", "CONFIGURATION", "UNKNOWN"] as const;
+export const CATEGORY_CODES = [
+  "BUG",
+  "QUESTION",
+  "FEATURE_REQUEST",
+  "CONFIGURATION",
+  "UNKNOWN",
+] as const;
 export const TONE_CODES = ["professional", "empathetic", "technical"] as const;
 
 // ── Compressed Schema (what the LLM returns) ────────────────────────
@@ -91,7 +97,7 @@ function parseCitation(raw: string): { file: string; line?: number; text: string
 }
 
 export function reconstructAnalysisOutput(
-  compressed: CompressedAnalysisOutput,
+  compressed: CompressedAnalysisOutput
 ): ReconstructedAnalysisOutput {
   return {
     analysis: {
