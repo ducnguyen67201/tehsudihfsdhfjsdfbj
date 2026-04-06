@@ -1,13 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { findIncludingDeleted, softUpsert } from "../src/soft-delete-helpers";
 
+// biome-ignore lint/suspicious/noExplicitAny: test mock for Prisma delegate
 function createMockDelegate(findFirstResult: any = null) {
   return {
     findFirst: vi.fn().mockResolvedValue(findFirstResult),
+    // biome-ignore lint/suspicious/noExplicitAny: test mock
     update: vi.fn().mockImplementation(async (args: any) => ({
       id: findFirstResult?.id ?? "new_id",
       ...args.data,
     })),
+    // biome-ignore lint/suspicious/noExplicitAny: test mock
     create: vi.fn().mockImplementation(async (args: any) => ({
       id: "created_id",
       ...args.data,
@@ -142,6 +145,7 @@ describe("softUpsert", () => {
   });
 
   it("never calls Prisma upsert", async () => {
+    // biome-ignore lint/suspicious/noExplicitAny: test mock extending delegate
     const delegate = createMockDelegate(null) as any;
     delegate.upsert = vi.fn();
 

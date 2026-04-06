@@ -122,7 +122,7 @@ npm run dev:queue
 
 ## Type Safety Rules (Non-Negotiable)
 
-- **No `any` types.** Every variable, parameter, and return value must have an explicit or inferred type. Use `unknown` with type narrowing instead of `any`. If a third-party library returns untyped data, define a local type and cast via `as unknown as YourType`.
+- **No `any` types. No `as unknown as` casts.** Every variable, parameter, and return value must have an explicit or inferred type. If a helper function loses type information (e.g. generic returns `Record<string, unknown>`), fix the helper's generics or use a follow-up query with proper includes instead of casting. Type assertions (`as`) are a last resort for third-party library boundaries only — never for internal code.
 - **All apps must pass `tsc --noEmit` and `biome check`** before merge. This includes `apps/web`, `apps/queue`, and `apps/agents`.
 - Define request/response schemas in shared contracts (`packages/types`) with Zod.
 - Infer TypeScript types from Zod; do not duplicate DTOs per app.

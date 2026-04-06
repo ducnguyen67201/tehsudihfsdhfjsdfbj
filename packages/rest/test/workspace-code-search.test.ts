@@ -79,9 +79,9 @@ describe("searchWorkspaceCode", () => {
     const results = await searchWorkspaceCode("ws_1", "auth token verify");
 
     expect(results.length).toBeGreaterThan(0);
-    expect(results[0].filePath).toBe("src/auth/auth-service.ts");
-    expect(results[0].repositoryFullName).toBe("org/api-server");
-    expect(results[0].mergedScore).toBeGreaterThan(0);
+    expect(results[0]!.filePath).toBe("src/auth/auth-service.ts");
+    expect(results[0]!.repositoryFullName).toBe("org/api-server");
+    expect(results[0]!.mergedScore).toBeGreaterThan(0);
   });
 
   it("respects the limit parameter", async () => {
@@ -103,7 +103,7 @@ describe("searchWorkspaceCode", () => {
     // Should have called findMany twice: once for versions, once for the SQL fallback
     expect(prisma.repositoryIndexChunk.findMany).toHaveBeenCalledTimes(1);
     expect(results.length).toBe(1);
-    expect(results[0].mergedScore).toBe(0); // SQL fallback doesn't score
+    expect(results[0]!.mergedScore).toBe(0); // SQL fallback doesn't score
   });
 
   it("applies filePattern filter", async () => {
@@ -113,8 +113,8 @@ describe("searchWorkspaceCode", () => {
 
     await searchWorkspaceCode("ws_1", "auth", { filePattern: "auth" });
 
-    const findManyCall = vi.mocked(prisma.repositoryIndexChunk.findMany).mock.calls[0][0] as any;
-    expect(findManyCall.where.filePath).toEqual({ contains: "auth" });
+    const findManyCall = vi.mocked(prisma.repositoryIndexChunk.findMany).mock.calls[0]![0] as Record<string, Record<string, unknown>>;
+    expect(findManyCall["where"]!["filePath"]).toEqual({ contains: "auth" });
   });
 
   it("returns results from multiple repositories", async () => {

@@ -80,6 +80,7 @@ export async function dispatchAnalysis(input: {
     await temporalWorkflowDispatcher.startSupportAnalysisWorkflow({
       workspaceId: input.workspaceId,
       conversationId: input.conversationId,
+      triggerType: "AUTO",
     });
   } catch {
     // Workflow already running or completed for this conversation. Fine.

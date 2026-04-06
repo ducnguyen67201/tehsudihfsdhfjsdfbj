@@ -5,10 +5,12 @@ import type { prisma } from "./index";
  */
 type Tx = Parameters<Parameters<(typeof prisma)["$transaction"]>[0]>[0];
 
-/** Any Prisma delegate that has findFirst + update + create methods. */
 type SoftDeletableDelegate = {
+  // biome-ignore lint/suspicious/noExplicitAny: Prisma delegate pattern
   findFirst: (args: any) => Promise<any>;
+  // biome-ignore lint/suspicious/noExplicitAny: Prisma delegate pattern
   update: (args: any) => Promise<any>;
+  // biome-ignore lint/suspicious/noExplicitAny: Prisma delegate pattern
   create: (args: any) => Promise<any>;
 };
 
@@ -25,10 +27,8 @@ export async function findIncludingDeleted<T extends SoftDeletableDelegate>(
   delegate: T,
   args: { where: Record<string, unknown>; select?: Record<string, unknown> }
 ): Promise<Awaited<ReturnType<T["findFirst"]>> | null> {
-  return (delegate.findFirst as any)({
-    ...args,
-    includeDeleted: true,
-  });
+  // biome-ignore lint/suspicious/noExplicitAny: Prisma delegate call with extension-specific option
+  return (delegate.findFirst as any)({ ...args, includeDeleted: true });
 }
 
 /**
@@ -68,6 +68,7 @@ export async function softUpsert<T extends SoftDeletableDelegate>(
 
   if (existing) {
     return delegate.update({
+      // biome-ignore lint/suspicious/noExplicitAny: generic delegate result
       where: { id: (existing as any).id },
       data: update,
       ...(include ? { include } : {}),
@@ -82,6 +83,7 @@ export async function softUpsert<T extends SoftDeletableDelegate>(
 
   if (softDeleted) {
     return delegate.update({
+      // biome-ignore lint/suspicious/noExplicitAny: generic delegate result
       where: { id: (softDeleted as any).id },
       data: { deletedAt: null, ...create },
       ...(include ? { include } : {}),

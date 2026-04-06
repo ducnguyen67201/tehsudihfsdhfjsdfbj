@@ -11,7 +11,7 @@ import {
 } from "@shared/types";
 import { env } from "@shared/env";
 
-interface TriggerAnalysisResult {
+export interface TriggerAnalysisResult {
   analysisId: string | null;
   workflowId: string;
   alreadyInProgress: boolean;
@@ -65,6 +65,7 @@ export async function triggerSupportAnalysis(
   const dispatchResult = await dispatcher.startSupportAnalysisWorkflow({
     workspaceId: input.workspaceId,
     conversationId: input.conversationId,
+    triggerType: "MANUAL",
   });
 
   return {

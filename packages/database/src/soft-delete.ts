@@ -32,6 +32,7 @@ function lowerFirst(s: string): string {
 function applySoftDeleteFilter<T>(model: string, args: T): T {
   if (!isSoftDeleteModel(model)) return args;
 
+  // biome-ignore lint/suspicious/noExplicitAny: Prisma extension args don't have typed includeDeleted
   const { includeDeleted, ...rest } = args as any;
   if (includeDeleted) return rest as T;
 
@@ -94,16 +95,15 @@ export const softDeleteExtension = Prisma.defineExtension((client) => {
         async delete({ model, args, query }) {
           if (isSoftDeleteModel(model)) {
             const modelKey = lowerFirst(model) as keyof typeof client;
-            return (client[modelKey] as any).update({
-              ...args,
-              data: { deletedAt: new Date() },
-            });
+            // biome-ignore lint/suspicious/noExplicitAny: dynamic Prisma model access
+            return (client[modelKey] as any).update({ ...args, data: { deletedAt: new Date() } });
           }
           return query(args);
         },
         async deleteMany({ model, args, query }) {
           if (isSoftDeleteModel(model)) {
             const modelKey = lowerFirst(model) as keyof typeof client;
+            // biome-ignore lint/suspicious/noExplicitAny: dynamic Prisma model access
             return (client[modelKey] as any).updateMany({
               ...args,
               data: { deletedAt: new Date() },
