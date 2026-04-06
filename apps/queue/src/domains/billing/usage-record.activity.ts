@@ -17,7 +17,7 @@ export async function recordUsageEvent(input: RecordUsageEventInput): Promise<vo
       workspaceId: input.workspaceId,
       eventType: input.eventType,
       resourceId: input.resourceId ?? null,
-      metadata: input.metadata ?? null,
+      metadata: input.metadata ?? undefined,
       billingPeriod,
     },
   });
