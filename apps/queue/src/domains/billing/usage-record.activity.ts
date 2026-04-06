@@ -1,11 +1,12 @@
 import { prisma } from "@shared/database";
+import type { Prisma } from "@prisma/client";
 import type { UsageEventType } from "@shared/types";
 
 type RecordUsageEventInput = {
   workspaceId: string;
   eventType: UsageEventType;
   resourceId?: string;
-  metadata?: Record<string, unknown>;
+  metadata?: Prisma.InputJsonValue;
 };
 
 export async function recordUsageEvent(input: RecordUsageEventInput): Promise<void> {
