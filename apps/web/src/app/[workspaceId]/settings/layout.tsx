@@ -5,11 +5,19 @@ import { cn } from "@/lib/utils";
 import {
   workspaceAiAnalysisPath,
   workspaceApiKeysPath,
+  workspaceBillingPath,
   workspaceGeneralPath,
   workspaceGithubPath,
   workspaceIntegrationsPath,
 } from "@/lib/workspace-paths";
-import { RiGithubLine, RiKey2Line, RiPlugLine, RiRobot2Line, RiSettings3Line } from "@remixicon/react";
+import {
+  RiGithubLine,
+  RiKey2Line,
+  RiMoneyDollarCircleLine,
+  RiPlugLine,
+  RiRobot2Line,
+  RiSettings3Line,
+} from "@remixicon/react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import type { ReactNode } from "react";
@@ -41,6 +49,7 @@ export default function WorkspaceSettingsLayout({ children }: WorkspaceSettingsL
   const integrationsPath = workspaceIntegrationsPath(workspaceId);
   const githubPath = workspaceGithubPath(workspaceId);
   const aiAnalysisPath = workspaceAiAnalysisPath(workspaceId);
+  const billingPath = workspaceBillingPath(workspaceId);
 
   const navItems: SettingsNavItem[] = [
     {
@@ -72,6 +81,12 @@ export default function WorkspaceSettingsLayout({ children }: WorkspaceSettingsL
       label: "AI Analysis",
       icon: RiRobot2Line,
       isActive: pathname === aiAnalysisPath,
+    },
+    {
+      href: billingPath,
+      label: "Billing",
+      icon: RiMoneyDollarCircleLine,
+      isActive: pathname === billingPath,
     },
   ];
 
