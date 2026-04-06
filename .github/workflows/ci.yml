@@ -40,6 +40,8 @@ jobs:
           rm -f "$(which yarn 2>/dev/null)" "$(which yarnpkg 2>/dev/null)" 2>/dev/null || true
 
       - run: npm install
+      - name: Install platform-specific native binaries for Linux CI
+        run: npm install --no-save @tailwindcss/oxide-linux-x64-gnu @next/swc-linux-x64-gnu || true
       - run: npm run db:generate
       - run: git diff --exit-code
       - run: npm run openapi:check
