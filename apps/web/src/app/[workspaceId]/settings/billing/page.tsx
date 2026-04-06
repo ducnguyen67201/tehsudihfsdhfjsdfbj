@@ -3,6 +3,14 @@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,7 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { RiArrowRightUpLine, RiErrorWarningLine } from "@remixicon/react";
+import { RiArrowRightUpLine, RiCheckLine, RiErrorWarningLine } from "@remixicon/react";
 import { useEffect, useState } from "react";
 
 type PlanInfo = {
@@ -44,6 +52,42 @@ const TIER_PRICES: Record<string, string> = {
   PRO: "$79/seat/mo",
 };
 
+const PLANS = [
+  {
+    tier: "FREE" as const,
+    name: "Free",
+    price: "$0",
+    period: "",
+    features: ["1 seat", "25 AI analyses/mo", "2 indexed repos", "Community support"],
+  },
+  {
+    tier: "STARTER" as const,
+    name: "Starter",
+    price: "$39",
+    period: "/seat/mo",
+    features: [
+      "3+ seats",
+      "200 AI analyses/seat/mo",
+      "10 indexed repos",
+      "$0.50/run overage",
+      "Email support",
+    ],
+  },
+  {
+    tier: "PRO" as const,
+    name: "Pro",
+    price: "$79",
+    period: "/seat/mo",
+    features: [
+      "3+ seats",
+      "500 AI analyses/seat/mo",
+      "Unlimited repos",
+      "$0.30/run overage",
+      "Priority support",
+    ],
+  },
+];
+
 export default function BillingSettingsPage() {
   const [plan, setPlan] = useState<PlanInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,12 +95,6 @@ export default function BillingSettingsPage() {
 
   useEffect(() => {
     // TODO: Replace with actual tRPC query when billing router is wired
-    // trpcQuery<PlanInfo>("billing.getPlanInfo")
-    //   .then(setPlan)
-    //   .catch(() => setError("Unable to load billing info."))
-    //   .finally(() => setLoading(false));
-
-    // Placeholder: simulate a FREE plan for now
     setPlan({
       tier: "FREE",
       seatLimit: 1,
@@ -201,11 +239,67 @@ export default function BillingSettingsPage() {
                 Manage subscription <RiArrowRightUpLine className="ml-1 h-3 w-3" />
               </Button>
             )}
-            {plan.tier !== "PRO" && (
-              <Button size="sm" variant="default">
-                {plan.tier === "FREE" ? "Upgrade to Starter" : "Upgrade to Pro"}
-              </Button>
-            )}
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="default">
+                  View Plans
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-3xl">
+                <DialogHeader>
+                  <DialogTitle className="font-mono">Choose a plan</DialogTitle>
+                  <DialogDescription>
+                    Per-seat pricing with AI analysis included. Upgrade or downgrade anytime.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid grid-cols-3 gap-4 pt-4">
+                  {PLANS.map((p) => {
+                    const isCurrent = p.tier === plan.tier;
+                    return (
+                      <div
+                        key={p.tier}
+                        className={`rounded-md border p-4 space-y-4 ${isCurrent ? "border-primary bg-primary/5" : ""}`}
+                      >
+                        <div>
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-semibold">{p.name}</h3>
+                            {isCurrent && (
+                              <Badge variant="outline" className="text-xs">
+                                Current
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="mt-1">
+                            <span className="text-2xl font-bold">{p.price}</span>
+                            <span className="text-sm text-muted-foreground">{p.period}</span>
+                          </p>
+                        </div>
+                        <ul className="space-y-2 text-sm">
+                          {p.features.map((f) => (
+                            <li key={f} className="flex items-start gap-2">
+                              <RiCheckLine className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
+                              <span>{f}</span>
+                            </li>
+                          ))}
+                        </ul>
+                        {isCurrent ? (
+                          <Button variant="outline" size="sm" className="w-full" disabled>
+                            Current plan
+                          </Button>
+                        ) : (
+                          <Button variant="default" size="sm" className="w-full">
+                            {PLANS.findIndex((x) => x.tier === p.tier) >
+                            PLANS.findIndex((x) => x.tier === plan.tier)
+                              ? `Upgrade to ${p.name}`
+                              : `Switch to ${p.name}`}
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
       </div>
@@ -253,50 +347,6 @@ export default function BillingSettingsPage() {
           </TableBody>
         </Table>
       </div>
-
-      {/* FREE tier comparison */}
-      {plan.tier === "FREE" && (
-        <>
-          <Separator />
-          <div className="space-y-3">
-            <h2 className="text-sm font-medium">Compare plans</h2>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead />
-                  <TableHead>Free</TableHead>
-                  <TableHead>Starter ($39/seat/mo)</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow>
-                  <TableCell className="font-medium">Seats</TableCell>
-                  <TableCell>1</TableCell>
-                  <TableCell>3+</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium">AI analyses/mo</TableCell>
-                  <TableCell>25</TableCell>
-                  <TableCell>200/seat</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium">Indexed repos</TableCell>
-                  <TableCell>2</TableCell>
-                  <TableCell>10</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium">Overages</TableCell>
-                  <TableCell className="text-muted-foreground">Blocked</TableCell>
-                  <TableCell>$0.50/run</TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-            <Button variant="default" className="w-full sm:w-auto">
-              Upgrade to Starter
-            </Button>
-          </div>
-        </>
-      )}
     </div>
   );
 }
