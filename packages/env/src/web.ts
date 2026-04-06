@@ -35,8 +35,6 @@ export const env = createEnv({
     GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
     GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
     GITHUB_APP_PRIVATE_KEY: process.env.GITHUB_APP_PRIVATE_KEY,
-    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-    AGENT_SERVICE_URL: process.env.AGENT_SERVICE_URL,
     TRUSTLOOP_DEBUG_TRPC: process.env.TRUSTLOOP_DEBUG_TRPC,
     // Client vars — inlined by Next.js bundler
     NEXT_PUBLIC_TRUSTLOOP_DEBUG_TRPC: process.env.NEXT_PUBLIC_TRUSTLOOP_DEBUG_TRPC,

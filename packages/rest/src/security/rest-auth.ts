@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { extractApiKeyPrefix, verifyApiKeySecret } from "./api-key";
 import { isServiceKeyFormat, verifyServiceKey } from "./service-key";
 
-interface RouteContext {
+export interface RouteContext {
   params: Promise<Record<string, string>>;
 }
 
