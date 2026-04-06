@@ -110,7 +110,11 @@ export async function runAnalysis(request: AnalyzeRequest): Promise<AnalyzeRespo
   }));
 
   const durationMs = Date.now() - startTime;
-  const usage = (result as unknown as { usage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number } }).usage;
+  const usage = (
+    result as unknown as {
+      usage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number };
+    }
+  ).usage;
   console.log("[agents] Analysis complete", {
     conversationId: request.conversationId,
     durationMs,

@@ -24,6 +24,7 @@ import {
   AGENT_PROVIDER_DEFAULTS,
   type AgentProviderConfig,
   type AgentProviderInfo,
+  MODEL_CONFIG,
 } from "@shared/types";
 
 const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -39,7 +40,7 @@ const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
  */
 export function resolveModel(config: AgentProviderConfig): ReturnType<typeof openai> {
   const defaults = AGENT_PROVIDER_DEFAULTS[config.provider];
-  const modelName = config.model ?? defaults?.model ?? "gpt-4o";
+  const modelName = config.model ?? defaults?.model ?? MODEL_CONFIG.agent;
 
   switch (config.provider) {
     case AGENT_PROVIDER.openai:

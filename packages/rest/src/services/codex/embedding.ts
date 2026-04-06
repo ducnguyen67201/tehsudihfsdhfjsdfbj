@@ -1,9 +1,10 @@
 import { prisma } from "@shared/database";
 import { env } from "@shared/env";
+import { MODEL_CONFIG } from "@shared/types";
 import OpenAI from "openai";
 
-const EMBEDDING_MODEL = "text-embedding-3-small";
-const EMBEDDING_DIMENSIONS = 1536;
+const EMBEDDING_MODEL = MODEL_CONFIG.embedding;
+const EMBEDDING_DIMENSIONS = MODEL_CONFIG.embeddingDimensions;
 const MAX_BATCH_SIZE = 100;
 
 let openaiClient: OpenAI | null = null;

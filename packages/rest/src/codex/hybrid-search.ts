@@ -6,6 +6,7 @@ import {
   formatVector,
 } from "@shared/rest/services/codex/embedding";
 import { env } from "@shared/env";
+import { MODEL_CONFIG } from "@shared/types";
 import OpenAI from "openai";
 
 const RRF_K = 60;
@@ -213,7 +214,7 @@ ${snippets.join("\n\n")}`;
 
     const response = await client.chat.completions.create(
       {
-        model: "gpt-4o-mini",
+        model: MODEL_CONFIG.fast,
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
         temperature: 0,
