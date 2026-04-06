@@ -33,7 +33,12 @@ jobs:
           node-version: 24
           cache: npm
 
-      - run: corepack disable || true
+      - name: Remove yarn to prevent Corepack/SWC registry conflict
+        run: |
+          corepack disable || true
+          npm rm -g yarn 2>/dev/null || true
+          rm -f "$(which yarn 2>/dev/null)" "$(which yarnpkg 2>/dev/null)" 2>/dev/null || true
+
       - run: npm install
       - run: npm run db:generate
       - run: git diff --exit-code
