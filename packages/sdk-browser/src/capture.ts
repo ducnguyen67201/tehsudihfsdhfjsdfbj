@@ -66,10 +66,10 @@ export function captureClicks(buffer: RingBuffer): CleanupFn {
       const text = truncateText(target.textContent?.trim() ?? "");
 
       const event: StructuredEvent = {
-        t: EVENT_TYPE.click,
-        ts: Date.now(),
-        u: currentUrl(),
-        p: {
+        eventType: EVENT_TYPE.click,
+        timestamp: Date.now(),
+        url: currentUrl(),
+        payload: {
           selector,
           tag: target.tagName.toLowerCase(),
           text,
@@ -101,10 +101,10 @@ export function captureRouteChanges(buffer: RingBuffer): CleanupFn {
       if (newUrl === previousUrl) return;
 
       const event: StructuredEvent = {
-        t: EVENT_TYPE.route,
-        ts: Date.now(),
-        u: newUrl,
-        p: {
+        eventType: EVENT_TYPE.route,
+        timestamp: Date.now(),
+        url: newUrl,
+        payload: {
           from: previousUrl,
           to: newUrl,
           method,
@@ -176,10 +176,10 @@ export function captureConsoleErrors(buffer: RingBuffer): CleanupFn {
           .join(" ");
 
         const event: StructuredEvent = {
-          t: EVENT_TYPE.consoleError,
-          ts: Date.now(),
-          u: currentUrl(),
-          p: {
+          eventType: EVENT_TYPE.consoleError,
+          timestamp: Date.now(),
+          url: currentUrl(),
+          payload: {
             level: "ERROR",
             message: message.slice(0, 1000),
           },
@@ -207,10 +207,10 @@ export function captureConsoleErrors(buffer: RingBuffer): CleanupFn {
           .join(" ");
 
         const event: StructuredEvent = {
-          t: EVENT_TYPE.consoleError,
-          ts: Date.now(),
-          u: currentUrl(),
-          p: {
+          eventType: EVENT_TYPE.consoleError,
+          timestamp: Date.now(),
+          url: currentUrl(),
+          payload: {
             level: "WARN",
             message: message.slice(0, 1000),
           },
@@ -234,10 +234,10 @@ export function captureExceptions(buffer: RingBuffer): CleanupFn {
   function errorHandler(e: ErrorEvent): void {
     try {
       const event: StructuredEvent = {
-        t: EVENT_TYPE.exception,
-        ts: Date.now(),
-        u: currentUrl(),
-        p: {
+        eventType: EVENT_TYPE.exception,
+        timestamp: Date.now(),
+        url: currentUrl(),
+        payload: {
           message: e.message ?? "Unknown error",
           stack: e.error?.stack?.slice(0, 2000),
           name: e.error?.name ?? "Error",
@@ -260,10 +260,10 @@ export function captureExceptions(buffer: RingBuffer): CleanupFn {
       const name = reason?.name ?? "UnhandledRejection";
 
       const event: StructuredEvent = {
-        t: EVENT_TYPE.exception,
-        ts: Date.now(),
-        u: currentUrl(),
-        p: { message, stack, name },
+        eventType: EVENT_TYPE.exception,
+        timestamp: Date.now(),
+        url: currentUrl(),
+        payload: { message, stack, name },
       };
 
       pushEvent(buffer, event);
@@ -282,7 +282,7 @@ export function captureExceptions(buffer: RingBuffer): CleanupFn {
   };
 }
 
-export function captureNetworkFailures(buffer: RingBuffer): CleanupFn {
+export function captureNetworkFailures(buffer: RingBuffer, excludeUrl?: string): CleanupFn {
   const originalFetch = globalThis.fetch;
   if (!originalFetch) return () => {};
 
@@ -297,6 +297,11 @@ export function captureNetworkFailures(buffer: RingBuffer): CleanupFn {
       url = String(input);
     }
 
+    // Skip capturing SDK's own ingest requests to prevent feedback loops
+    if (excludeUrl && url.startsWith(excludeUrl)) {
+      return originalFetch.call(globalThis, input, init);
+    }
+
     try {
       const response = await originalFetch.call(globalThis, input, init);
 
@@ -304,10 +309,10 @@ export function captureNetworkFailures(buffer: RingBuffer): CleanupFn {
         try {
           const durationMs = Date.now() - startTime;
           const event: StructuredEvent = {
-            t: EVENT_TYPE.networkError,
-            ts: Date.now(),
-            u: currentUrl(),
-            p: {
+            eventType: EVENT_TYPE.networkError,
+            timestamp: Date.now(),
+            url: currentUrl(),
+            payload: {
               method: method.toUpperCase(),
               url: url.slice(0, 500),
               status: response.status,
@@ -328,10 +333,10 @@ export function captureNetworkFailures(buffer: RingBuffer): CleanupFn {
       try {
         const durationMs = Date.now() - startTime;
         const event: StructuredEvent = {
-          t: EVENT_TYPE.networkError,
-          ts: Date.now(),
-          u: currentUrl(),
-          p: {
+          eventType: EVENT_TYPE.networkError,
+          timestamp: Date.now(),
+          url: currentUrl(),
+          payload: {
             method: method.toUpperCase(),
             url: url.slice(0, 500),
             status: 0,
@@ -356,7 +361,7 @@ export interface CaptureHandle {
   destroy(): void;
 }
 
-export function startCapture(buffer: RingBuffer): CaptureHandle {
+export function startCapture(buffer: RingBuffer, ingestUrl?: string): CaptureHandle {
   const cleanups: CleanupFn[] = [];
 
   try {
@@ -384,7 +389,7 @@ export function startCapture(buffer: RingBuffer): CaptureHandle {
   }
 
   try {
-    cleanups.push(captureNetworkFailures(buffer));
+    cleanups.push(captureNetworkFailures(buffer, ingestUrl));
   } catch (err) {
     warnLog("Failed to start network failure capture", err);
   }

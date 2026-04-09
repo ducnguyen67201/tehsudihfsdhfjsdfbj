@@ -1,6 +1,6 @@
 # Session Replay Implementation Checklist
 
-**Branch**: `duc/billing-metering`
+**Branch**: `duc/session-replay`
 **Date**: 2026-04-07
 
 ## Week 1: SDK + Ingest + AI Integration

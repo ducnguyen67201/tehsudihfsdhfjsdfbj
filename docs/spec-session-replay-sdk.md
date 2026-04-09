@@ -1,7 +1,7 @@
 # Session Replay SDK + Error Context Capture Pipeline
 
 **Status**: In Progress
-**Branch**: `duc/billing-metering`
+**Branch**: `duc/session-replay`
 **Date**: 2026-04-07
 
 ## Overview

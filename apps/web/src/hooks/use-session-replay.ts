@@ -11,7 +11,7 @@ import {
 } from "@shared/types";
 import { useCallback, useEffect, useState } from "react";
 
-interface UseSessionReplayResult {
+export interface UseSessionReplayResult {
   isLoading: boolean;
   error: string | null;
   session: SessionRecordResponse | null;
@@ -56,6 +56,8 @@ export function useSessionReplay(
 
     let cancelled = false;
 
+    const currentConversationId = conversationId;
+
     async function correlate() {
       setIsLoading(true);
       setError(null);
@@ -66,8 +68,12 @@ export function useSessionReplay(
 
         const result = await trpcQuery<
           SessionCorrelateResult,
-          { windowStartAt: string; windowEndAt: string }
-        >("sessionReplay.correlate", { windowStartAt: windowStart, windowEndAt: windowEnd });
+          { conversationId: string; windowStartAt: string; windowEndAt: string }
+        >("sessionReplay.correlate", {
+          conversationId: currentConversationId,
+          windowStartAt: windowStart,
+          windowEndAt: windowEnd,
+        });
 
         if (cancelled) return;
 

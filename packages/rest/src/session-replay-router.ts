@@ -1,5 +1,6 @@
 import { prisma } from "@shared/database";
 import { router, workspaceProcedure } from "@shared/rest/trpc";
+import { SESSION_MATCH_CONFIDENCE } from "@shared/types";
 import { z } from "zod";
 
 export const sessionReplayRouter = router({
@@ -8,7 +9,6 @@ export const sessionReplayRouter = router({
       z.object({
         sessionRecordId: z.string().min(1),
         limit: z.number().int().min(1).max(500).default(200),
-        cursor: z.string().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
@@ -16,34 +16,64 @@ export const sessionReplayRouter = router({
         where: {
           sessionRecordId: input.sessionRecordId,
           workspaceId: ctx.workspaceId,
-          ...(input.cursor ? { id: { gt: input.cursor } } : {}),
         },
         orderBy: { timestamp: "asc" },
-        take: input.limit + 1,
+        take: input.limit,
       });
 
-      const hasMore = events.length > input.limit;
-      const items = hasMore ? events.slice(0, input.limit) : events;
-      const nextCursor = hasMore ? items[items.length - 1]?.id : undefined;
+      // Find the last exception or network error as the failure point
+      let failurePointId: string | null = null;
+      for (let i = events.length - 1; i >= 0; i--) {
+        const event = events[i];
+        if (event && (event.eventType === "EXCEPTION" || event.eventType === "NETWORK_ERROR")) {
+          failurePointId = event.id;
+          break;
+        }
+      }
 
-      return { items, nextCursor };
+      return { events, failurePointId };
     }),
 
   correlate: workspaceProcedure
     .input(
       z.object({
+        conversationId: z.string().min(1).optional(),
         userEmail: z.string().email().optional(),
         userId: z.string().optional(),
         windowStartAt: z.string().datetime(),
         windowEndAt: z.string().datetime(),
-        limit: z.number().int().min(1).max(10).default(5),
       })
     )
     .query(async ({ ctx, input }) => {
-      const emailFilter = input.userEmail ? { userEmail: input.userEmail } : {};
-      const userIdFilter = input.userId ? { userId: input.userId } : {};
+      // If conversationId provided, extract emails from conversation events
+      let resolvedEmail = input.userEmail;
+      const resolvedUserId = input.userId;
 
-      const sessions = await prisma.sessionRecord.findMany({
+      if (input.conversationId && !resolvedEmail && !resolvedUserId) {
+        const events = await prisma.supportConversationEvent.findMany({
+          where: { conversationId: input.conversationId, workspaceId: ctx.workspaceId },
+          select: { summary: true, detailsJson: true },
+          take: 50,
+          orderBy: { createdAt: "desc" },
+        });
+
+        const { extractEmailsFromEvents } = await import(
+          "./services/support/session-correlation-service"
+        );
+        const emails = extractEmailsFromEvents(events);
+        if (emails.length > 0) {
+          resolvedEmail = emails[0];
+        }
+      }
+
+      if (!resolvedEmail && !resolvedUserId) {
+        return { session: null, matchConfidence: SESSION_MATCH_CONFIDENCE.none };
+      }
+
+      const emailFilter = resolvedEmail ? { userEmail: resolvedEmail } : {};
+      const userIdFilter = resolvedUserId ? { userId: resolvedUserId } : {};
+
+      const session = await prisma.sessionRecord.findFirst({
         where: {
           workspaceId: ctx.workspaceId,
           ...emailFilter,
@@ -55,10 +85,18 @@ export const sessionReplayRouter = router({
           deletedAt: null,
         },
         orderBy: { lastEventAt: "desc" },
-        take: input.limit,
       });
 
-      return sessions;
+      if (!session) {
+        return { session: null, matchConfidence: SESSION_MATCH_CONFIDENCE.none };
+      }
+
+      const matchConfidence =
+        resolvedUserId && session.userId === resolvedUserId
+          ? SESSION_MATCH_CONFIDENCE.confirmed
+          : SESSION_MATCH_CONFIDENCE.fuzzy;
+
+      return { session, matchConfidence };
     }),
 
   getSession: workspaceProcedure
@@ -92,6 +130,14 @@ export const sessionReplayRouter = router({
         },
       });
 
-      return { chunks, total: chunks.length };
+      // Base64-encode binary data for safe JSON transport via tRPC
+      const encodedChunks = chunks.map((chunk) => ({
+        sequenceNumber: chunk.sequenceNumber,
+        compressedData: Buffer.from(chunk.compressedData).toString("base64"),
+        startTimestamp: chunk.startTimestamp.toISOString(),
+        endTimestamp: chunk.endTimestamp.toISOString(),
+      }));
+
+      return { chunks: encodedChunks, total: chunks.length };
     }),
 });

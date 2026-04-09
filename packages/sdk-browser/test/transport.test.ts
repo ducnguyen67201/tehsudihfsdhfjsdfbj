@@ -8,9 +8,9 @@ function makePayload(eventCount = 1): FlushPayload {
     workspaceId: "test-workspace",
     timestamp: Date.now(),
     structuredEvents: Array.from({ length: eventCount }, (_, i) => ({
-      t: "CLICK",
-      ts: Date.now() + i,
-      p: { selector: "button", tag: "button", text: "Submit", x: 100, y: 200 },
+      eventType: "CLICK",
+      timestamp: Date.now() + i,
+      payload: { selector: "button", tag: "button", text: "Submit", x: 100, y: 200 },
     })),
   };
 }

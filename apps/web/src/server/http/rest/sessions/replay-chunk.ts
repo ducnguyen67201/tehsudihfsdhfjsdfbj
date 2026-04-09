@@ -2,29 +2,10 @@ import { prisma } from "@shared/database";
 import type { RouteContext } from "@shared/rest/security/rest-auth";
 import { withWorkspaceApiKeyAuth } from "@shared/rest/security/rest-auth";
 import { NextResponse } from "next/server";
-
-function corsHeaders(): HeadersInit {
-  return {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
-    "Access-Control-Allow-Headers": "Authorization, Content-Type",
-    "Access-Control-Max-Age": "86400",
-  };
-}
-
-function jsonWithCors(body: Record<string, unknown>, status: number): NextResponse {
-  return NextResponse.json(body, { status, headers: corsHeaders() });
-}
-
-function withCorsHeaders(response: NextResponse): NextResponse {
-  for (const [key, value] of Object.entries(corsHeaders())) {
-    response.headers.set(key, value);
-  }
-  return response;
-}
+import { jsonWithCors, sessionCorsHeaders, withCorsHeaders } from "./cors";
 
 export async function handleReplayChunkOptions(): Promise<NextResponse> {
-  return new NextResponse(null, { status: 204, headers: corsHeaders() });
+  return new NextResponse(null, { status: 204, headers: sessionCorsHeaders("GET, OPTIONS") });
 }
 
 const innerHandler = withWorkspaceApiKeyAuth(async (_request, ctx) => {
@@ -69,7 +50,7 @@ const innerHandler = withWorkspaceApiKeyAuth(async (_request, ctx) => {
   return new NextResponse(chunk.compressedData, {
     status: 200,
     headers: {
-      ...corsHeaders(),
+      ...sessionCorsHeaders("GET, OPTIONS"),
       "Content-Type": "application/octet-stream",
       "Cache-Control": "public, max-age=86400, immutable",
     },

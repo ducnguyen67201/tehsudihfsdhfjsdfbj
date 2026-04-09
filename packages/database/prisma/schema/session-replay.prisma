@@ -61,5 +61,5 @@ model SessionReplayChunk {
   workspace       Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   createdAt       DateTime      @default(now())
 
-  @@index([sessionRecordId, sequenceNumber])
+  @@unique([sessionRecordId, sequenceNumber])
 }

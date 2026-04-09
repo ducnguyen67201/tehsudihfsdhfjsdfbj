@@ -181,7 +181,7 @@ export const TrustLoop = {
       ringBuffer = createRingBuffer(bufferWindowMs);
 
       // Structured event capture
-      captureHandle = startCapture(ringBuffer);
+      captureHandle = startCapture(ringBuffer, resolvedConfig.ingestUrl);
 
       // rrweb recorder (async, non-blocking)
       void createRecorder(resolvedConfig.maskAllText, resolvedConfig.maskAllInputs).then(

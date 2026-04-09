@@ -1,3 +1,4 @@
+import { avatarColor, senderInitials } from "@/components/support/avatar-utils";
 import { cn } from "@/lib/utils";
 import { RiReplyLine } from "@remixicon/react";
 import { SUPPORT_CONVERSATION_EVENT_SOURCE } from "@shared/types";
@@ -35,30 +36,6 @@ function extractMessageText(event: SupportConversationTimelineEvent): string | n
   return null;
 }
 
-const AVATAR_COLORS = [
-  "bg-amber-100 text-amber-700",
-  "bg-blue-100 text-blue-700",
-  "bg-emerald-100 text-emerald-700",
-  "bg-violet-100 text-violet-700",
-  "bg-rose-100 text-rose-700",
-  "bg-cyan-100 text-cyan-700",
-];
-
-function senderInitials(name: string): string {
-  const parts = name.trim().split(/[\s_-]+/);
-  if (parts.length >= 2) {
-    return `${(parts[0]?.[0] ?? "").toUpperCase()}${(parts[1]?.[0] ?? "").toUpperCase()}`;
-  }
-  return name.slice(0, 2).toUpperCase();
-}
-
-function avatarColor(name: string): string {
-  let hash = 0;
-  for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) | 0;
-  const idx = Math.abs(hash) % AVATAR_COLORS.length;
-  return AVATAR_COLORS[idx] ?? AVATAR_COLORS[0]!;
-}
-
 interface MessageBlockProps {
   event: SupportConversationTimelineEvent;
   showHeader: boolean;
@@ -84,7 +61,7 @@ export function MessageBlock({ event, showHeader, onReplyToThread, children }: M
             <div
               className={cn(
                 "flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold",
-                isOperator ? "bg-primary/15 text-primary" : avatarColor(name)
+                avatarColor(name, isOperator)
               )}
             >
               {senderInitials(name)}

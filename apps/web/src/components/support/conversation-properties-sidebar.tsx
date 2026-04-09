@@ -12,14 +12,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import { useAuthSession } from "@/hooks/use-auth-session";
+import type { UseSessionReplayResult } from "@/hooks/use-session-replay";
 import { useWorkspaceMembers } from "@/hooks/use-workspace-members";
 import { RiCheckLine, RiFlashlightLine, RiUserSharedLine } from "@remixicon/react";
 import {
-  type ReplayChunkResponse,
   SUPPORT_CONVERSATION_STATUS,
-  type SessionMatchConfidence,
-  type SessionRecordResponse,
-  type SessionTimelineEvent,
   type SupportAnalysisWithRelations,
   type SupportConversation,
   type SupportConversationStatus,
@@ -42,22 +39,7 @@ interface ConversationPropertiesSidebarProps {
   onDismissDraft: (draftId: string, reason?: string) => void;
   workspaceId: string;
 
-  sessionReplay: {
-    isLoading: boolean;
-    error: string | null;
-    session: SessionRecordResponse | null;
-    matchConfidence: SessionMatchConfidence;
-    events: SessionTimelineEvent[];
-    isLoadingEvents: boolean;
-    failurePointId: string | null;
-    replayChunks: ReplayChunkResponse[];
-    totalReplayChunks: number;
-    isLoadingReplayChunks: boolean;
-    replayLoadError: string | null;
-    hasSessionData: boolean;
-    loadReplayChunks: () => void;
-    retryReplayLoad: () => void;
-  };
+  sessionReplay: UseSessionReplayResult;
 }
 
 const STATUS_OPTIONS: Array<{ label: string; value: SupportConversationStatus }> = [

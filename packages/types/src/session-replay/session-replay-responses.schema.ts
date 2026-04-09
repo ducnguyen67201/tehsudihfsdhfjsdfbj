@@ -15,7 +15,7 @@ export const sessionTimelineEventSchema = z.object({
 
 export const replayChunkResponseSchema = z.object({
   sequenceNumber: z.number().int(),
-  compressedData: z.instanceof(Uint8Array),
+  compressedData: z.string(), // base64-encoded binary data for JSON-safe transport
   startTimestamp: z.string(),
   endTimestamp: z.string(),
 });

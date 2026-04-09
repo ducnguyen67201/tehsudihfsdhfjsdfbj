@@ -27,13 +27,13 @@ export interface UserInfo {
 
 export interface StructuredEvent {
   /** Event type: CLICK, ROUTE, NETWORK_ERROR, CONSOLE_ERROR, EXCEPTION */
-  t: string;
+  eventType: string;
   /** Timestamp in ms since epoch */
-  ts: number;
+  timestamp: number;
   /** Current URL at time of event */
-  u?: string;
+  url?: string;
   /** Type-specific payload */
-  p: unknown;
+  payload: unknown;
 }
 
 export interface FlushPayload {

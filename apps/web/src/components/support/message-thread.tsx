@@ -1,13 +1,13 @@
+import { avatarColor, senderInitials } from "@/components/support/avatar-utils";
 import { cn } from "@/lib/utils";
 import { SUPPORT_CONVERSATION_EVENT_SOURCE } from "@shared/types";
 import type { SupportConversationTimelineEvent } from "@shared/types";
 
 function formatThreadTime(value: string): string {
-  const date = new Date(value);
   return new Intl.DateTimeFormat(undefined, {
     hour: "numeric",
     minute: "2-digit",
-  }).format(date);
+  }).format(new Date(value));
 }
 
 function threadSourceLabel(eventSource: string): string {
@@ -19,31 +19,6 @@ function threadSourceLabel(eventSource: string): string {
     default:
       return eventSource;
   }
-}
-
-const AVATAR_COLORS = [
-  "bg-amber-100 text-amber-700",
-  "bg-blue-100 text-blue-700",
-  "bg-emerald-100 text-emerald-700",
-  "bg-violet-100 text-violet-700",
-  "bg-rose-100 text-rose-700",
-  "bg-cyan-100 text-cyan-700",
-];
-
-function threadInitials(name: string): string {
-  const parts = name.trim().split(/[\s_-]+/);
-  if (parts.length >= 2) {
-    return `${(parts[0]?.[0] ?? "").toUpperCase()}${(parts[1]?.[0] ?? "").toUpperCase()}`;
-  }
-  return name.slice(0, 2).toUpperCase();
-}
-
-function threadAvatarColor(name: string, isOperator: boolean): string {
-  if (isOperator) return "bg-primary/15 text-primary";
-  let hash = 0;
-  for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) | 0;
-  const idx = Math.abs(hash) % AVATAR_COLORS.length;
-  return AVATAR_COLORS[idx] ?? AVATAR_COLORS[0]!;
 }
 
 interface MessageThreadProps {
@@ -76,10 +51,10 @@ export function MessageThread({ replies, onReplyToThread }: MessageThreadProps) 
             <div
               className={cn(
                 "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold",
-                threadAvatarColor(name, isOperator)
+                avatarColor(name, isOperator)
               )}
             >
-              {threadInitials(name)}
+              {senderInitials(name)}
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline gap-2">

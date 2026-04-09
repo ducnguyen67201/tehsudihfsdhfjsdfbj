@@ -3,22 +3,8 @@
 import { SessionEventTimeline } from "@/components/session-replay/session-event-timeline";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import type { ReplayChunkResponse, SessionTimelineEvent } from "@shared/types";
 import { useCallback, useEffect, useRef, useState } from "react";
-
-interface ReplayChunk {
-  sequenceNumber: number;
-  compressedData: Uint8Array;
-  startTimestamp: string;
-  endTimestamp: string;
-}
-
-interface SessionTimelineEvent {
-  id: string;
-  eventType: string;
-  timestamp: string;
-  url: string | null;
-  payload: Record<string, unknown>;
-}
 
 interface SessionReplayModalProps {
   isOpen: boolean;
@@ -26,7 +12,7 @@ interface SessionReplayModalProps {
   sessionId: string;
   events: SessionTimelineEvent[];
   failurePointId: string | null;
-  chunks: ReplayChunk[];
+  chunks: ReplayChunkResponse[];
   totalChunks: number;
   isLoadingChunks: boolean;
   loadError: string | null;
@@ -89,8 +75,8 @@ export function SessionReplayModal({
         const allEvents: unknown[] = [];
         for (const chunk of chunks) {
           try {
-            const decompressed = await decompressChunk(chunk.compressedData);
-            const parsed = JSON.parse(decompressed) as unknown[];
+            const decoded = decodeBase64Chunk(chunk.compressedData);
+            const parsed = JSON.parse(decoded) as unknown[];
             allEvents.push(...parsed);
           } catch {
             // Skip corrupt chunks
@@ -125,7 +111,18 @@ export function SessionReplayModal({
     }
 
     void initPlayer();
-  }, [isOpen, chunks, playbackSpeed]);
+  }, [isOpen, chunks]);
+
+  // Update speed without reinitializing the player
+  useEffect(() => {
+    const player = playerRef.current;
+    if (
+      player &&
+      typeof (player as { setConfig: (c: { speed: number }) => void }).setConfig === "function"
+    ) {
+      (player as { setConfig: (c: { speed: number }) => void }).setConfig({ speed: playbackSpeed });
+    }
+  }, [playbackSpeed]);
 
   const handleEventClick = useCallback((_eventId: string, timestamp: string) => {
     setSelectedEventId(_eventId);
@@ -261,29 +258,11 @@ export function SessionReplayModal({
   );
 }
 
-async function decompressChunk(data: Uint8Array): Promise<string> {
-  // Try DecompressionStream (modern browsers)
-  if (typeof DecompressionStream !== "undefined") {
-    const stream = new Blob([data as BlobPart])
-      .stream()
-      .pipeThrough(new DecompressionStream("gzip"));
-    const reader = stream.getReader();
-    const chunks: Uint8Array[] = [];
-    let done = false;
-    while (!done) {
-      const result = await reader.read();
-      if (result.value) chunks.push(result.value);
-      done = result.done;
-    }
-    const merged = new Uint8Array(chunks.reduce((acc, c) => acc + c.length, 0));
-    let offset = 0;
-    for (const chunk of chunks) {
-      merged.set(chunk, offset);
-      offset += chunk.length;
-    }
-    return new TextDecoder().decode(merged);
+function decodeBase64Chunk(base64: string): string {
+  const binaryStr = atob(base64);
+  const bytes = new Uint8Array(binaryStr.length);
+  for (let i = 0; i < binaryStr.length; i++) {
+    bytes[i] = binaryStr.charCodeAt(i);
   }
-
-  // Fallback: assume uncompressed
-  return new TextDecoder().decode(data);
+  return new TextDecoder().decode(bytes);
 }

@@ -17,9 +17,15 @@ export function consumeIngestAttempt(workspaceId: string): {
 } {
   const now = Date.now();
   const cutoff = now - WINDOW_MS;
-  const window = buckets.get(workspaceId) ?? { timestamps: [] };
+  const existing = buckets.get(workspaceId);
+  const window = existing ?? { timestamps: [] };
 
   window.timestamps = window.timestamps.filter((ts) => ts > cutoff);
+
+  // Evict stale buckets (had timestamps that all expired) to prevent unbounded memory growth
+  if (existing && window.timestamps.length === 0) {
+    buckets.delete(workspaceId);
+  }
 
   if (window.timestamps.length >= MAX_REQUESTS_PER_WINDOW) {
     const oldest = window.timestamps[0] ?? now;

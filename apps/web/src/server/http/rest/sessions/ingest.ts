@@ -4,48 +4,35 @@ import type { RouteContext } from "@shared/rest/security/rest-auth";
 import { withWorkspaceApiKeyAuth } from "@shared/rest/security/rest-auth";
 import { sessionIngestPayloadSchema } from "@shared/types";
 import { NextResponse } from "next/server";
+import { jsonWithCors, sessionCorsHeaders, withCorsHeaders } from "./cors";
 
 const MAX_BODY_BYTES = 1_048_576; // 1 MB
-
-function corsHeaders(): HeadersInit {
-  return {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Authorization, Content-Type",
-    "Access-Control-Max-Age": "86400",
-  };
-}
-
-function jsonWithCors(
-  body: Record<string, unknown>,
-  status: number,
-  extraHeaders?: HeadersInit
-): NextResponse {
-  return NextResponse.json(body, {
-    status,
-    headers: { ...corsHeaders(), ...extraHeaders },
-  });
-}
-
-/** Inject CORS headers into any response, including auth-layer 401s. */
-function withCorsHeaders(response: NextResponse): NextResponse {
-  const headers = corsHeaders();
-  for (const [key, value] of Object.entries(headers)) {
-    response.headers.set(key, value);
-  }
-  return response;
-}
+const MAX_EVENTS_PER_SESSION = 10_000;
 
 export async function handleSessionIngestOptions(): Promise<NextResponse> {
-  return new NextResponse(null, { status: 204, headers: corsHeaders() });
+  return new NextResponse(null, { status: 204, headers: sessionCorsHeaders() });
 }
 
 const innerHandler = withWorkspaceApiKeyAuth(async (request, ctx) => {
+  // Check workspace feature gate
+  const workspace = await prisma.workspace.findUnique({
+    where: { id: ctx.workspaceId },
+    select: { sessionCaptureEnabled: true },
+  });
+  if (!workspace?.sessionCaptureEnabled) {
+    return jsonWithCors(
+      {
+        error: { message: "Session capture is not enabled for this workspace", code: "FORBIDDEN" },
+      },
+      403
+    );
+  }
+
   // Rate limit by workspace
   const rateResult = consumeIngestAttempt(ctx.workspaceId);
   if (!rateResult.allowed) {
     return jsonWithCors({ error: { message: "Rate limit exceeded", code: "RATE_LIMITED" } }, 429, {
-      "Retry-After": String(rateResult.retryAfterSeconds),
+      extraHeaders: { "Retry-After": String(rateResult.retryAfterSeconds) },
     });
   }
 
@@ -106,78 +93,86 @@ const innerHandler = withWorkspaceApiKeyAuth(async (request, ctx) => {
 
   void (async () => {
     try {
-      const startedAt = new Date(payload.timestamp);
+      // Use actual event timestamps instead of flush time for accuracy
+      const eventTimestamps = payload.structuredEvents.map((e) => e.timestamp);
+      const earliestEventTime = eventTimestamps.length > 0
+        ? new Date(Math.min(...eventTimestamps))
+        : new Date(payload.timestamp);
+      const latestEventTime = eventTimestamps.length > 0
+        ? new Date(Math.max(...eventTimestamps))
+        : new Date(payload.timestamp);
+      const hasRrweb = payload.rrwebEvents !== undefined;
 
-      // Upsert the session record
-      const sessionRecord = await prisma.sessionRecord.upsert({
-        where: {
-          workspaceId_sessionId: {
+      await prisma.$transaction(async (tx) => {
+        // Upsert the session record
+        const sessionRecord = await tx.sessionRecord.upsert({
+          where: {
+            workspaceId_sessionId: { workspaceId, sessionId: payload.sessionId },
+          },
+          create: {
             workspaceId,
             sessionId: payload.sessionId,
+            userId: payload.userId ?? null,
+            userEmail: payload.userEmail ?? null,
+            startedAt: earliestEventTime,
+            lastEventAt: latestEventTime,
+            eventCount: payload.structuredEvents.length,
+            hasReplayData: hasRrweb,
           },
-        },
-        create: {
-          workspaceId,
-          sessionId: payload.sessionId,
-          userId: payload.userId ?? null,
-          userEmail: payload.userEmail ?? null,
-          startedAt,
-          lastEventAt: startedAt,
-          eventCount: payload.structuredEvents.length,
-          hasReplayData: payload.rrwebEvents !== undefined,
-        },
-        update: {
-          lastEventAt: startedAt,
-          eventCount: { increment: payload.structuredEvents.length },
-          ...(payload.rrwebEvents !== undefined ? { hasReplayData: true } : {}),
-          ...(payload.userId ? { userId: payload.userId } : {}),
-          ...(payload.userEmail ? { userEmail: payload.userEmail } : {}),
-        },
+          update: {
+            lastEventAt: latestEventTime,
+            eventCount: { increment: payload.structuredEvents.length },
+            ...(hasRrweb ? { hasReplayData: true } : {}),
+            ...(payload.userId ? { userId: payload.userId } : {}),
+            ...(payload.userEmail ? { userEmail: payload.userEmail } : {}),
+          },
+        });
+
+        // Enforce per-session event cap to prevent unbounded growth
+        if (sessionRecord.eventCount >= MAX_EVENTS_PER_SESSION) {
+          return;
+        }
+
+        // Batch insert structured events
+        if (payload.structuredEvents.length > 0) {
+          await tx.sessionEvent.createMany({
+            data: payload.structuredEvents.map((event) => ({
+              workspaceId,
+              sessionRecordId: sessionRecord.id,
+              eventType: event.eventType,
+              timestamp: new Date(event.timestamp),
+              url: "url" in event ? (event.url ?? null) : null,
+              payload: event.payload as Prisma.InputJsonValue,
+            })),
+          });
+        }
+
+        // Insert replay chunk with unique constraint protection
+        if (hasRrweb) {
+          const rrwebString =
+            typeof payload.rrwebEvents === "string"
+              ? payload.rrwebEvents
+              : JSON.stringify(payload.rrwebEvents);
+
+          const lastChunk = await tx.sessionReplayChunk.findFirst({
+            where: { sessionRecordId: sessionRecord.id },
+            orderBy: { sequenceNumber: "desc" },
+            select: { sequenceNumber: true },
+          });
+
+          await tx.sessionReplayChunk.create({
+            data: {
+              workspaceId,
+              sessionRecordId: sessionRecord.id,
+              sequenceNumber: (lastChunk?.sequenceNumber ?? -1) + 1,
+              compressedData: Buffer.from(rrwebString, "utf-8"),
+              eventCount: Array.isArray(payload.rrwebEvents) ? payload.rrwebEvents.length : 0,
+              startTimestamp: earliestEventTime,
+              endTimestamp: latestEventTime,
+            },
+          });
+        }
       });
-
-      // Batch insert structured events
-      if (payload.structuredEvents.length > 0) {
-        await prisma.sessionEvent.createMany({
-          data: payload.structuredEvents.map((event) => ({
-            workspaceId,
-            sessionRecordId: sessionRecord.id,
-            eventType: event.eventType,
-            timestamp: new Date(event.timestamp),
-            url: "url" in event ? (event.url ?? null) : null,
-            payload: event.payload as Prisma.InputJsonValue,
-          })),
-        });
-      }
-
-      // Insert replay chunk if rrweb data present
-      if (payload.rrwebEvents !== undefined) {
-        const rrwebString =
-          typeof payload.rrwebEvents === "string"
-            ? payload.rrwebEvents
-            : JSON.stringify(payload.rrwebEvents);
-
-        const compressed = Buffer.from(rrwebString, "utf-8");
-
-        // Determine next sequence number
-        const lastChunk = await prisma.sessionReplayChunk.findFirst({
-          where: { sessionRecordId: sessionRecord.id },
-          orderBy: { sequenceNumber: "desc" },
-          select: { sequenceNumber: true },
-        });
-        const nextSequence = (lastChunk?.sequenceNumber ?? -1) + 1;
-
-        await prisma.sessionReplayChunk.create({
-          data: {
-            workspaceId,
-            sessionRecordId: sessionRecord.id,
-            sequenceNumber: nextSequence,
-            compressedData: compressed,
-            eventCount: Array.isArray(payload.rrwebEvents) ? payload.rrwebEvents.length : 0,
-            startTimestamp: startedAt,
-            endTimestamp: startedAt,
-          },
-        });
-      }
     } catch (error) {
       console.error("[session-ingest] Async write failed", {
         workspaceId,

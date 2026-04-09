@@ -4,16 +4,12 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { sessionEventDescription, sessionEventTypeDisplay } from "@shared/types";
+import {
+  type SessionTimelineEvent,
+  sessionEventDescription,
+  sessionEventTypeDisplay,
+} from "@shared/types";
 import { useCallback, useRef } from "react";
-
-interface SessionTimelineEvent {
-  id: string;
-  eventType: string;
-  timestamp: string;
-  url: string | null;
-  payload: Record<string, unknown>;
-}
 
 interface SessionEventTimelineProps {
   events: SessionTimelineEvent[];

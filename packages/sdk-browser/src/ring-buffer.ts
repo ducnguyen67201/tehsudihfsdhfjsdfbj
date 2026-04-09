@@ -14,7 +14,7 @@ export function createRingBuffer(windowMs: number): RingBuffer {
     const cutoff = Date.now() - windowMs;
     // Find the first event within the window
     let firstValid = 0;
-    while (firstValid < events.length && events[firstValid]!.ts < cutoff) {
+    while (firstValid < events.length && events[firstValid]!.timestamp < cutoff) {
       firstValid++;
     }
     if (firstValid > 0) {

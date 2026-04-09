@@ -217,34 +217,27 @@ export function createTransport(config: TransportConfig): TransportHandle {
 
     flushBeacon(payload: FlushPayload): void {
       try {
-        if (!globalThis.navigator?.sendBeacon) {
-          debugLog("sendBeacon not available, using fetch fallback");
-          void flushPayload(payload);
-          return;
-        }
-
-        // sendBeacon is limited to 64KB, only use for lightweight payloads
+        // Strip rrweb data for lightweight unload flush
         const stripped: FlushPayload = {
           ...payload,
           rrwebEvents: undefined,
         };
         const jsonStr = JSON.stringify(stripped);
 
-        if (jsonStr.length > 64_000) {
-          debugLog("Beacon payload too large, using fetch fallback");
-          void flushPayload(payload);
-          return;
-        }
+        // Use fetch with keepalive (supports auth headers, unlike sendBeacon)
+        void globalThis.fetch(config.ingestUrl, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${config.apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: jsonStr,
+          keepalive: true,
+        }).catch(() => {
+          // Best-effort on page unload, nothing to retry
+        });
 
-        const blob = new Blob([jsonStr], { type: "application/json" });
-        const sent = globalThis.navigator.sendBeacon(config.ingestUrl, blob);
-
-        if (!sent) {
-          debugLog("sendBeacon failed, using fetch fallback");
-          void flushPayload(payload);
-        } else {
-          debugLog("Beacon flush sent");
-        }
+        debugLog("Beacon flush sent via fetch keepalive");
       } catch (err) {
         warnLog("Beacon flush error", err);
       }

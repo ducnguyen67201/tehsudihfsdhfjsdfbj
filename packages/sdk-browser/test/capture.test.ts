@@ -37,16 +37,16 @@ describe("Capture", () => {
       expect(events).toHaveLength(1);
 
       const event = events[0]!;
-      expect(event.t).toBe("CLICK");
-      expect(event.ts).toBeGreaterThan(0);
-      expect(event.p).toMatchObject({
+      expect(event.eventType).toBe("CLICK");
+      expect(event.timestamp).toBeGreaterThan(0);
+      expect(event.payload).toMatchObject({
         tag: "button",
         text: "Submit",
         x: 150,
         y: 250,
       });
 
-      const payload = event.p as { selector: string };
+      const payload = event.payload as { selector: string };
       expect(payload.selector).toContain("button#submit-btn");
 
       document.body.removeChild(button);
@@ -63,7 +63,7 @@ describe("Capture", () => {
       div.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
       const events = buffer.flush();
-      const payload = events[0]!.p as { text: string };
+      const payload = events[0]!.payload as { text: string };
       expect(payload.text.length).toBeLessThanOrEqual(53); // 50 + "..."
 
       document.body.removeChild(div);
@@ -91,10 +91,10 @@ describe("Capture", () => {
       const events = buffer.flush();
       expect(events.length).toBeGreaterThanOrEqual(1);
 
-      const routeEvent = events.find((e) => e.t === "ROUTE");
+      const routeEvent = events.find((e) => e.eventType === "ROUTE");
       expect(routeEvent).toBeTruthy();
 
-      const payload = routeEvent!.p as { from: string; to: string; method: string };
+      const payload = routeEvent!.payload as { from: string; to: string; method: string };
       expect(payload.method).toBe("PUSH");
       expect(payload.to).toContain("/new-page");
 
@@ -113,7 +113,7 @@ describe("Capture", () => {
       const events = buffer.flush();
 
       // No route events should be captured after cleanup
-      expect(events.filter((e) => e.t === "ROUTE")).toHaveLength(0);
+      expect(events.filter((e) => e.eventType === "ROUTE")).toHaveLength(0);
     });
   });
 
@@ -127,9 +127,9 @@ describe("Capture", () => {
       expect(events).toHaveLength(1);
 
       const event = events[0]!;
-      expect(event.t).toBe("CONSOLE_ERROR");
+      expect(event.eventType).toBe("CONSOLE_ERROR");
 
-      const payload = event.p as { level: string; message: string };
+      const payload = event.payload as { level: string; message: string };
       expect(payload.level).toBe("ERROR");
       expect(payload.message).toContain("test error message");
 
@@ -144,7 +144,7 @@ describe("Capture", () => {
       const events = buffer.flush();
       expect(events).toHaveLength(1);
 
-      const payload = events[0]!.p as { level: string; message: string };
+      const payload = events[0]!.payload as { level: string; message: string };
       expect(payload.level).toBe("WARN");
       expect(payload.message).toContain("test warning");
 
@@ -190,9 +190,9 @@ describe("Capture", () => {
       expect(events).toHaveLength(1);
 
       const event = events[0]!;
-      expect(event.t).toBe("NETWORK_ERROR");
+      expect(event.eventType).toBe("NETWORK_ERROR");
 
-      const payload = event.p as { method: string; url: string; status: number };
+      const payload = event.payload as { method: string; url: string; status: number };
       expect(payload.method).toBe("POST");
       expect(payload.url).toBe("https://api.example.com/data");
       expect(payload.status).toBe(500);
@@ -225,7 +225,7 @@ describe("Capture", () => {
       const events = buffer.flush();
       expect(events).toHaveLength(1);
 
-      const payload = events[0]!.p as { status: number };
+      const payload = events[0]!.payload as { status: number };
       expect(payload.status).toBe(0);
 
       cleanup();
@@ -258,9 +258,9 @@ describe("Capture", () => {
       expect(events).toHaveLength(1);
 
       const event = events[0]!;
-      expect(event.t).toBe("EXCEPTION");
+      expect(event.eventType).toBe("EXCEPTION");
 
-      const payload = event.p as { message: string; name: string; source: string };
+      const payload = event.payload as { message: string; name: string; source: string };
       expect(payload.message).toBe("Test exception");
       expect(payload.name).toBe("Error");
       expect(payload.source).toBe("test.js:42:10");

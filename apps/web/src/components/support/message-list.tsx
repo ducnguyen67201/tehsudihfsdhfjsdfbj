@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageBlock, extractSenderKey } from "@/components/support/message-block";
+import { MessageBlock } from "@/components/support/message-block";
 import { MessageThread } from "@/components/support/message-thread";
 import { SystemAnnotation } from "@/components/support/system-annotation";
 import { Separator } from "@/components/ui/separator";
@@ -22,8 +22,6 @@ const SIDEBAR_ONLY_EVENT_TYPES = new Set([
   "MERGED",
   "SPLIT",
 ]);
-
-const FIVE_MINUTES_MS = 5 * 60 * 1000;
 
 interface ThreadTree {
   topLevel: SupportConversationTimelineEvent[];
@@ -82,17 +80,6 @@ function formatDateSeparator(dateStr: string): string {
 function dateKey(dateStr: string): string {
   const d = new Date(dateStr);
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-}
-
-function shouldShowHeader(
-  event: SupportConversationTimelineEvent,
-  prevEvent: SupportConversationTimelineEvent | null
-): boolean {
-  if (!prevEvent) return true;
-  if (!MESSAGE_EVENT_TYPES.has(prevEvent.eventType)) return true;
-  if (extractSenderKey(event) !== extractSenderKey(prevEvent)) return true;
-  const gap = new Date(event.createdAt).getTime() - new Date(prevEvent.createdAt).getTime();
-  return gap > FIVE_MINUTES_MS;
 }
 
 interface MessageListProps {
@@ -179,7 +166,6 @@ export function MessageList({
   const { topLevel, childrenByParent } = buildThreadTree(events);
 
   let lastDateKey = "";
-  let prevTopLevelEvent: SupportConversationTimelineEvent | null = null;
 
   return (
     <div className="relative flex-1 overflow-hidden">
@@ -213,7 +199,7 @@ export function MessageList({
             }
 
             if (INLINE_ANNOTATION_TYPES.has(event.eventType)) {
-              prevTopLevelEvent = null;
+
               nodes.push(
                 <SystemAnnotation
                   key={event.id}
@@ -247,11 +233,10 @@ export function MessageList({
                 </div>
               );
 
-              prevTopLevelEvent = event;
+
               return nodes;
             }
 
-            prevTopLevelEvent = null;
             nodes.push(
               <SystemAnnotation
                 key={event.id}

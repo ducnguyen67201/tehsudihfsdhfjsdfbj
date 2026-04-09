@@ -3,7 +3,7 @@ import { createRingBuffer } from "../src/ring-buffer.js";
 import type { StructuredEvent } from "../src/types.js";
 
 function makeEvent(ts: number, type = "CLICK"): StructuredEvent {
-  return { t: type, ts, p: {} };
+  return { eventType: type, timestamp: ts, payload: {} };
 }
 
 describe("RingBuffer", () => {
@@ -51,8 +51,8 @@ describe("RingBuffer", () => {
 
     const flushed = buffer.flush();
     expect(flushed).toHaveLength(3);
-    expect(flushed[0]!.ts).toBe(now - 2000);
-    expect(flushed[2]!.ts).toBe(now);
+    expect(flushed[0]!.timestamp).toBe(now - 2000);
+    expect(flushed[2]!.timestamp).toBe(now);
 
     // Buffer should be empty after flush
     expect(buffer.size()).toBe(0);
