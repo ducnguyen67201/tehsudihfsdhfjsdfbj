@@ -65,12 +65,22 @@ function buildFlushPayload(): FlushPayload | null {
   };
 }
 
+let identityWarningLogged = false;
+
 function performFlush(): void {
   try {
     if (!consentManager?.isRecording()) return;
 
     const payload = buildFlushPayload();
     if (!payload || !transportHandle) return;
+
+    if (!identityWarningLogged && !userId && !userEmail) {
+      warnLog(
+        "No user identity set. Session replay cannot be matched to support conversations. " +
+          "Call TrustLoop.setUser({ id, email }) after authentication."
+      );
+      identityWarningLogged = true;
+    }
 
     void transportHandle.flush(payload);
     debugLog("Flush triggered", payload.structuredEvents.length, "events");
@@ -136,6 +146,7 @@ function teardown(): void {
 
   resolvedConfig = null;
   initialized = false;
+  identityWarningLogged = false;
 
   globalThis.removeEventListener?.("beforeunload", handleBeforeUnload);
   globalThis.document?.removeEventListener("visibilitychange", handleVisibilityChange);
@@ -208,6 +219,7 @@ export const TrustLoop = {
     try {
       userId = user.id;
       userEmail = user.email;
+      identityWarningLogged = false;
       debugLog("User set", user.id);
     } catch (err) {
       warnLog("setUser error", err);

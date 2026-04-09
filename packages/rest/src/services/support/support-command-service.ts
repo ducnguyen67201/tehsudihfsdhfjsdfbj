@@ -260,6 +260,26 @@ async function sendReplyWithRecordedAttempt(
     return attempt;
   });
 
+  // Resolve the Slack thread_ts: use the target event's messageTs if replying
+  // to a specific message, otherwise fall back to the conversation root.
+  let resolvedThreadTs = conversation.threadTs;
+  if (params.replyToEventId) {
+    const targetEvent = await prisma.supportConversationEvent.findUnique({
+      where: { id: params.replyToEventId },
+      select: { detailsJson: true },
+    });
+    const messageTs =
+      typeof targetEvent?.detailsJson === "object" &&
+      targetEvent.detailsJson !== null &&
+      "messageTs" in targetEvent.detailsJson &&
+      typeof targetEvent.detailsJson.messageTs === "string"
+        ? targetEvent.detailsJson.messageTs
+        : null;
+    if (messageTs) {
+      resolvedThreadTs = messageTs;
+    }
+  }
+
   try {
     const delivery = await sender({
       provider: "SLACK",
@@ -269,7 +289,7 @@ async function sendReplyWithRecordedAttempt(
       thread: {
         teamId: conversation.teamId,
         channelId: conversation.channelId,
-        threadTs: conversation.threadTs,
+        threadTs: resolvedThreadTs,
       },
       messageText: params.payload.messageText,
       attachments: params.payload.attachments,

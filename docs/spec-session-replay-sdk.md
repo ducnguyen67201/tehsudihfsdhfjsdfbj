@@ -50,15 +50,19 @@ npm install @trustloop/sdk rrweb
 ```typescript
 import { TrustLoop } from '@trustloop/sdk';
 
+// Initialize early — works before the user logs in
 TrustLoop.init({
   apiKey: 'tlk_...',
   maskAllText: true,      // default: true (PII safe)
   maskAllInputs: true,    // default: true
 });
 
-// Identify the end-user (enables session-to-thread correlation)
+// IMPORTANT: Call setUser() after authentication.
+// Without user identity, session replays cannot be matched to support
+// conversations. The SDK logs a warning on first flush if no identity is set.
 TrustLoop.setUser({
-  email: 'jane@acme.com',
+  id: 'user_123',         // your internal user ID
+  email: 'jane@acme.com', // used to match sessions to Slack support threads
   name: 'Jane Doe',
 });
 
@@ -191,14 +195,38 @@ Partitioned by month on `timestamp` column.
 
 ## Session-to-Thread Correlation
 
-When a support thread arrives (via Slack), TrustLoop correlates it to a browser session:
+When a support thread arrives (via Slack), TrustLoop correlates it to a browser session using a priority chain:
 
-1. Extract email addresses mentioned in the Slack thread messages (fuzzy regex match)
-2. Query `SessionRecord` by matched email within 30-minute window before the thread timestamp
-3. If multiple matches: pick the session with the most recent `lastEventAt`
-4. Compile a `SessionDigest` from the matched session's structured events (LIMIT 200)
+### Priority 1: Slack User Email Resolution (strongest)
 
-**Important**: The Slack thread author (bob@company.com) is NOT the end-user (jane@acme.com). Correlation relies on the thread mentioning the end-user's email. This is a fuzzy match and may be wrong. The UI displays match confidence.
+1. Extract the customer's `slackUserId` from the conversation event `detailsJson`
+2. Call Slack `users.info` API to resolve the Slack user's `profile.email`
+3. Query `SessionRecord` where `userEmail` matches the resolved email within a 30-minute window
+4. Requires the `users:read` and `users:read.email` bot scopes on the Slack app
+
+This works when:
+- The customer called `TrustLoop.setUser({ email })` in their app (so the session has an email)
+- The Slack user who filed the thread has the same email as the end-user in the customer's app
+
+### Priority 2: Regex Email Extraction (fallback)
+
+If Slack email resolution fails (no `slackUserId`, no email on the Slack profile, or no matching session):
+
+1. Scan conversation event summaries and `detailsJson` for email addresses via regex
+2. Query `SessionRecord` by matched emails within the 30-minute window
+
+This is a fuzzy fallback for cases where the end-user's email appears in the message text.
+
+### Common to Both
+
+- If multiple sessions match: pick the one with the most recent `lastEventAt`
+- Compile a `SessionDigest` from the matched session's structured events (LIMIT 200)
+- Correlation is best-effort — if it fails, analysis proceeds without session context
+
+### Prerequisites for Reliable Matching
+
+- **SDK side**: The customer must call `TrustLoop.setUser({ id, email })` after their user authenticates. Without this, sessions are anonymous and cannot be matched. The SDK logs a console warning on first flush if no identity is set.
+- **Slack side**: The Slack app must have `users:read` and `users:read.email` bot scopes. These are included in the default OAuth scope request.
 
 ## SessionDigest (AI Agent Input)
 

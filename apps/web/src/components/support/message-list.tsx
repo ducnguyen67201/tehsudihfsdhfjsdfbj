@@ -10,9 +10,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const MESSAGE_EVENT_TYPES = new Set(["MESSAGE_RECEIVED", "DELIVERY_ATTEMPTED", "NOTE"]);
 
-const ANNOTATION_EVENT_TYPES = new Set([
+const INLINE_ANNOTATION_TYPES = new Set(["DELIVERY_FAILED"]);
+
+const SIDEBAR_ONLY_EVENT_TYPES = new Set([
   "DELIVERY_SUCCEEDED",
-  "DELIVERY_FAILED",
   "STATUS_CHANGED",
   "ASSIGNEE_CHANGED",
   "ANALYSIS_COMPLETED",
@@ -207,7 +208,11 @@ export function MessageList({
               );
             }
 
-            if (ANNOTATION_EVENT_TYPES.has(event.eventType)) {
+            if (SIDEBAR_ONLY_EVENT_TYPES.has(event.eventType)) {
+              return nodes;
+            }
+
+            if (INLINE_ANNOTATION_TYPES.has(event.eventType)) {
               prevTopLevelEvent = null;
               nodes.push(
                 <SystemAnnotation
@@ -222,17 +227,14 @@ export function MessageList({
 
             if (MESSAGE_EVENT_TYPES.has(event.eventType)) {
               const replies = childrenByParent.get(event.id) ?? [];
-              const showHeader = shouldShowHeader(event, prevTopLevelEvent);
 
-              if (showHeader) {
-                nodes.push(<div key={`spacer-${event.id}`} className="h-2" />);
-              }
+              nodes.push(<div key={`spacer-${event.id}`} className="h-3" />);
 
               nodes.push(
                 <div key={event.id} className="group">
                   <MessageBlock
                     event={event}
-                    showHeader={showHeader}
+                    showHeader
                     onReplyToThread={() => onSetReplyToEventId(event.id)}
                   >
                     {replies.length > 0 ? (

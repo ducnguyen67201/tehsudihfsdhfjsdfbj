@@ -1,54 +1,55 @@
 "use client";
 
-import { SupportStatusBadge } from "@/components/support/support-status-badge";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
-import { useAuthSession } from "@/hooks/use-auth-session";
-import { RiFlashlightLine, RiUserSharedLine } from "@remixicon/react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { RiCheckLine, RiFileCopyLine, RiHashtag } from "@remixicon/react";
 import {
   SUPPORT_CONVERSATION_STATUS,
   type SupportConversation,
   type SupportConversationStatus,
 } from "@shared/types";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 interface ConversationHeaderProps {
   conversation: SupportConversation;
   isMutating: boolean;
-  isAnalyzing: boolean;
   onBack: () => void;
-  onAssign: (conversationId: string, assigneeUserId: string | null) => Promise<unknown>;
-  onUpdateStatus: (conversationId: string, status: SupportConversationStatus) => Promise<unknown>;
   onMarkDoneWithOverride: (conversationId: string, overrideReason: string) => Promise<unknown>;
-  onTriggerAnalysis: () => void;
+  onUpdateStatus: (conversationId: string, status: SupportConversationStatus) => Promise<unknown>;
 }
 
 /**
- * Compact header bar for the conversation view with back button, status, assignee, actions.
+ * Full-width header bar matching the reference layout.
+ * Left: # icon + thread title. Right: thread ID badge, copy link, mark resolved.
  */
 export function ConversationHeader({
   conversation,
   isMutating,
-  isAnalyzing,
   onBack,
-  onAssign,
-  onUpdateStatus,
   onMarkDoneWithOverride,
-  onTriggerAnalysis,
+  onUpdateStatus,
 }: ConversationHeaderProps) {
-  const auth = useAuthSession();
   const [overrideOpen, setOverrideOpen] = useState(false);
   const [overrideReason, setOverrideReason] = useState("");
+  const [copied, setCopied] = useState(false);
 
-  const isAssignedToMe = conversation.assigneeUserId === auth.session?.user.id;
+  const isDone = conversation.status === SUPPORT_CONVERSATION_STATUS.done;
+
+  const handleCopyLink = useCallback(() => {
+    const url = `${window.location.origin}${window.location.pathname}?thread=${conversation.id}`;
+    void navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [conversation.id]);
+
+  function handleMarkResolved() {
+    if (isDone) return;
+    void onUpdateStatus(conversation.id, SUPPORT_CONVERSATION_STATUS.done);
+  }
 
   async function handleOverrideSubmit() {
     if (overrideReason.trim().length < 10) return;
@@ -59,65 +60,44 @@ export function ConversationHeader({
 
   return (
     <>
-      <div className="space-y-3 border-b px-5 py-4">
-        <p className="truncate text-sm font-medium">
-          {conversation.thread.channelId} / {conversation.thread.threadTs}
-        </p>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" disabled={isMutating}>
-                <SupportStatusBadge status={conversation.status} />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={() => onUpdateStatus(conversation.id, SUPPORT_CONVERSATION_STATUS.unread)}
-              >
-                Unread
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() =>
-                  onUpdateStatus(conversation.id, SUPPORT_CONVERSATION_STATUS.inProgress)
-                }
-              >
-                In progress
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => onUpdateStatus(conversation.id, SUPPORT_CONVERSATION_STATUS.done)}
-              >
-                Done
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setOverrideOpen(true)}>
-                Done with override reason...
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!auth.session || isMutating}
-            onClick={() =>
-              onAssign(conversation.id, isAssignedToMe ? null : (auth.session?.user.id ?? null))
-            }
+      <div className="flex items-center justify-between border-b px-5 py-3">
+        {/* Left: thread title */}
+        <div className="flex min-w-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={onBack}
+            className="flex shrink-0 items-center justify-center rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+            aria-label="Close conversation"
           >
-            <RiUserSharedLine className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">{isAssignedToMe ? "Unassign" : "Assign to me"}</span>
-          </Button>
+            <RiHashtag className="h-4 w-4" />
+          </button>
+          <h1 className="truncate text-sm font-semibold">{conversation.thread.channelId}</h1>
+          <Badge variant="outline" className="shrink-0 font-mono text-[10px]">
+            {conversation.thread.threadTs}
+          </Badge>
+        </div>
 
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={isMutating || isAnalyzing}
-            onClick={onTriggerAnalysis}
-          >
-            <RiFlashlightLine className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">
-              {isAnalyzing ? "Analyzing..." : "Run Analysis"}
-            </span>
+        {/* Right: copy link + mark resolved */}
+        <div className="flex shrink-0 items-center gap-2">
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="sm" onClick={handleCopyLink}>
+                  {copied ? (
+                    <RiCheckLine className="h-3.5 w-3.5 text-emerald-600" />
+                  ) : (
+                    <RiFileCopyLine className="h-3.5 w-3.5" />
+                  )}
+                  <span className="hidden sm:inline">{copied ? "Copied" : "Copy Link"}</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Copy thread link</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <Button size="sm" disabled={isMutating || isDone} onClick={handleMarkResolved}>
+            <RiCheckLine className="h-3.5 w-3.5" />
+            <span>{isDone ? "Resolved" : "Mark Resolved"}</span>
           </Button>
         </div>
       </div>

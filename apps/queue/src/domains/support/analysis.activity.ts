@@ -5,6 +5,7 @@ import {
   extractEmailsFromEvents,
   findCorrelatedSession,
 } from "@shared/rest/services/support/session-correlation-service";
+import { fetchSlackUserEmail } from "@shared/rest/services/support/adapters/slack/slack-user-service";
 import {
   ANALYSIS_RESULT_STATUS,
   ANALYSIS_STATUS,
@@ -48,6 +49,7 @@ export async function buildThreadSnapshot(
   const conversation = await prisma.supportConversation.findUniqueOrThrow({
     where: { id: input.conversationId },
     include: {
+      installation: { select: { metadata: true } },
       events: {
         orderBy: { createdAt: "asc" },
         select: {
@@ -76,13 +78,32 @@ export async function buildThreadSnapshot(
   };
 
   // --- Session Correlation (best-effort) ---
+  // Priority: Slack user email (resolved via API) > regex-scraped emails from messages
   let sessionDigest: SessionDigest | null = null;
   try {
-    const mentionedEmails = extractEmailsFromEvents(conversation.events);
-    if (mentionedEmails.length > 0) {
+    const correlationEmails: string[] = [];
+
+    // 1. Resolve email from Slack user ID (strongest signal)
+    const customerSlackUserId = extractCustomerSlackUserId(conversation.events);
+    if (customerSlackUserId) {
+      const slackEmail = await fetchSlackUserEmail(
+        customerSlackUserId,
+        conversation.installation.metadata
+      );
+      if (slackEmail) {
+        correlationEmails.push(slackEmail);
+      }
+    }
+
+    // 2. Fall back to regex-scraped emails from message text
+    if (correlationEmails.length === 0) {
+      correlationEmails.push(...extractEmailsFromEvents(conversation.events));
+    }
+
+    if (correlationEmails.length > 0) {
       const correlation = await findCorrelatedSession({
         workspaceId: input.workspaceId,
-        emails: mentionedEmails,
+        emails: correlationEmails,
         windowMinutes: 30,
       });
 
@@ -231,4 +252,33 @@ export async function runAnalysisAgent(
       toolCallCount: 0,
     };
   }
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────
+
+interface EventWithDetails {
+  eventType: string;
+  detailsJson: unknown;
+}
+
+/**
+ * Extract the first customer Slack user ID from conversation events.
+ * The slackUserId is stored in detailsJson during ingress processing.
+ */
+function extractCustomerSlackUserId(events: EventWithDetails[]): string | null {
+  for (const event of events) {
+    if (event.eventType !== "MESSAGE_RECEIVED") continue;
+
+    const details = event.detailsJson as Record<string, unknown> | null;
+    if (!details) continue;
+
+    if (details.authorRoleBucket !== "customer") continue;
+
+    const slackUserId = details.slackUserId;
+    if (typeof slackUserId === "string" && slackUserId.length > 0) {
+      return slackUserId;
+    }
+  }
+
+  return null;
 }

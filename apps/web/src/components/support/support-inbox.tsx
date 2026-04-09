@@ -195,7 +195,8 @@ export function SupportInbox() {
       <Sheet open={isSheetOpen} onOpenChange={handleSheetOpenChange}>
         <SheetContent
           side="right"
-          className="flex w-full flex-col gap-0 overflow-hidden p-0 data-[side=right]:sm:max-w-3xl"
+          showCloseButton={false}
+          className="flex w-full flex-col gap-0 overflow-hidden p-0 data-[side=right]:sm:max-w-6xl"
         >
           <SheetHeader className="sr-only">
             <SheetTitle>Conversation</SheetTitle>

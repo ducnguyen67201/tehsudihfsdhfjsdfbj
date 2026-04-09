@@ -74,4 +74,24 @@ export const sessionReplayRouter = router({
 
       return session;
     }),
+
+  getReplayChunks: workspaceProcedure
+    .input(z.object({ sessionRecordId: z.string().min(1) }))
+    .query(async ({ ctx, input }) => {
+      const chunks = await prisma.sessionReplayChunk.findMany({
+        where: {
+          sessionRecordId: input.sessionRecordId,
+          workspaceId: ctx.workspaceId,
+        },
+        orderBy: { sequenceNumber: "asc" },
+        select: {
+          sequenceNumber: true,
+          compressedData: true,
+          startTimestamp: true,
+          endTimestamp: true,
+        },
+      });
+
+      return { chunks, total: chunks.length };
+    }),
 });
