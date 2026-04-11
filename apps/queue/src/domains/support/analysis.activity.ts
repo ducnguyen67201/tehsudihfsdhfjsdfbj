@@ -9,6 +9,7 @@ import {
   ANALYSIS_STATUS,
   ANALYSIS_TRIGGER_TYPE,
   type AnalysisTriggerType,
+  type AnalyzeResponse,
   DRAFT_STATUS,
   MAX_ANALYSIS_RETRIES,
   type SentryContext,
@@ -53,11 +54,6 @@ interface EscalateInput {
   errorMessage: string;
 }
 
-// Uses analyzeResponseSchema from @shared/types — same contract as apps/agents
-
-/**
- * Fetch conversation + events, create an ANALYZING record, return compact snapshot.
- */
 export async function buildThreadSnapshot(
   input: ThreadSnapshotInput
 ): Promise<ThreadSnapshotResult> {
@@ -77,25 +73,8 @@ export async function buildThreadSnapshot(
     },
   });
 
-  // Resolve customer email from event metadata
   const customerEmail = resolveCustomerEmail(conversation.events);
-
-  const snapshot = {
-    conversationId: conversation.id,
-    channelId: conversation.channelId,
-    threadTs: conversation.threadTs,
-    status: conversation.status,
-    customer: {
-      email: customerEmail,
-    },
-    events: conversation.events.map((e) => ({
-      type: e.eventType,
-      source: e.eventSource,
-      summary: e.summary,
-      details: e.detailsJson,
-      at: e.createdAt.toISOString(),
-    })),
-  };
+  const snapshot = buildSnapshot(conversation, customerEmail);
 
   const analysis = await prisma.supportAnalysis.create({
     data: {
@@ -103,7 +82,7 @@ export async function buildThreadSnapshot(
       conversationId: input.conversationId,
       status: ANALYSIS_STATUS.gatheringContext,
       triggerType: input.triggerType ?? ANALYSIS_TRIGGER_TYPE.manual,
-      threadSnapshot: snapshot,
+      threadSnapshot: JSON.parse(JSON.stringify(snapshot)),
       customerEmail,
     },
   });
@@ -115,114 +94,20 @@ export async function buildThreadSnapshot(
   };
 }
 
-/**
- * Call the agent service via HTTP, persist analysis + evidence + draft, emit conversation event.
- *
- * The Temporal activity is a thin HTTP client. The agent service (apps/agents)
- * owns all AI reasoning. This separation enables framework swaps (Mastra today,
- * LangGraph tomorrow) without touching the queue worker.
- */
 export async function runAnalysisAgent(
   input: AnalysisAgentInput
 ): Promise<SupportAnalysisWorkflowResult> {
   try {
     heartbeat();
 
-    // Fetch workspace tone config for draft generation
-    const aiSettings = await prisma.workspaceAiSettings.findUnique({
-      where: { workspaceId: input.workspaceId },
-    });
-
-    const agentUrl = env.AGENT_SERVICE_URL ?? "http://localhost:3100";
-    const response = await fetch(`${agentUrl}/analyze`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        workspaceId: input.workspaceId,
-        conversationId: input.conversationId,
-        threadSnapshot: input.threadSnapshot,
-        config: aiSettings
-          ? {
-              toneConfig: {
-                defaultTone: aiSettings.defaultTone,
-                responseStyle: aiSettings.responseStyle,
-                signatureLine: aiSettings.signatureLine,
-                maxDraftLength: aiSettings.maxDraftLength,
-                includeCodeRefs: aiSettings.includeCodeRefs,
-              },
-            }
-          : undefined,
-      }),
-      signal: AbortSignal.timeout(4 * 60 * 1000), // 4 min (activity timeout is 5 min)
-    });
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(`Agent service returned ${response.status}: ${errorBody}`);
-    }
+    const toneConfig = await fetchToneConfig(input.workspaceId);
+    const result = await callAgentService(input, toneConfig);
 
     heartbeat();
 
-    const result = analyzeResponseSchema.parse(await response.json());
-
-    // Persist analysis result
-    await prisma.supportAnalysis.update({
-      where: { id: input.analysisId },
-      data: {
-        status: result.draft ? ANALYSIS_STATUS.analyzed : ANALYSIS_STATUS.needsContext,
-        problemStatement: result.analysis.problemStatement,
-        likelySubsystem: result.analysis.likelySubsystem,
-        severity: result.analysis.severity,
-        category: result.analysis.category,
-        confidence: result.analysis.confidence,
-        missingInfo: result.analysis.missingInfo,
-        reasoningTrace: result.analysis.reasoningTrace,
-        toolCallCount: result.meta.turnCount,
-        llmModel: result.meta.model,
-        llmLatencyMs: result.meta.totalDurationMs,
-      },
-    });
-
-    // Persist draft if produced
-    let draftId: string | null = null;
-    if (result.draft) {
-      const draft = await prisma.supportDraft.create({
-        data: {
-          analysisId: input.analysisId,
-          conversationId: input.conversationId,
-          workspaceId: input.workspaceId,
-          status: DRAFT_STATUS.awaitingApproval,
-          draftBody: result.draft.body,
-          internalNotes: result.draft.internalNotes,
-          citations: result.draft.citations,
-          tone: result.draft.tone,
-          llmModel: result.meta.model,
-          llmLatencyMs: result.meta.totalDurationMs,
-        },
-      });
-      draftId = draft.id;
-    }
-
-    // Emit conversation timeline event
-    await prisma.supportConversationEvent.create({
-      data: {
-        workspaceId: input.workspaceId,
-        conversationId: input.conversationId,
-        eventType: "ANALYSIS_COMPLETED",
-        eventSource: "SYSTEM",
-        summary: result.draft
-          ? `Analysis complete (${Math.round(result.analysis.confidence * 100)}% confidence). Draft ready for review.`
-          : `Analysis complete but needs more context. Missing: ${result.analysis.missingInfo.join(", ")}`,
-        detailsJson: {
-          analysisId: input.analysisId,
-          draftId,
-          confidence: result.analysis.confidence,
-          category: result.analysis.category,
-          severity: result.analysis.severity,
-          toolCallCount: result.meta.turnCount,
-        },
-      },
-    });
+    await persistAnalysisResult(input.analysisId, result);
+    const draftId = await persistDraft(input, result);
+    await emitAnalysisCompletedEvent(input, result, draftId);
 
     return {
       analysisId: input.analysisId,
@@ -232,42 +117,12 @@ export async function runAnalysisAgent(
       toolCallCount: result.meta.turnCount,
     };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-
-    const analysis = await prisma.supportAnalysis.update({
-      where: { id: input.analysisId },
-      data: {
-        status: ANALYSIS_STATUS.failed,
-        errorMessage,
-      },
-    });
-
-    // Escalate if max retries exceeded
-    if (analysis.retryCount >= MAX_ANALYSIS_RETRIES) {
-      await escalateToManualHandling({
-        workspaceId: input.workspaceId,
-        conversationId: input.conversationId,
-        analysisId: input.analysisId,
-        errorMessage,
-      });
-    }
-
-    return {
-      analysisId: input.analysisId,
-      draftId: null,
-      status: "FAILED",
-      confidence: 0,
-      toolCallCount: 0,
-    };
+    return handleAnalysisFailure(input, error);
   }
 }
 
-/**
- * Fetch Sentry context for the customer email. Non-fatal — returns null if
- * Sentry is not configured or the API is unreachable.
- */
 export async function fetchSentryContextActivity(
-  input: FetchSentryContextInput,
+  input: FetchSentryContextInput
 ): Promise<FetchSentryContextResult> {
   if (!input.customerEmail || !isSentryConfigured()) {
     return { sentryContext: null };
@@ -285,9 +140,6 @@ export async function fetchSentryContextActivity(
   return { sentryContext };
 }
 
-/**
- * Transition the analysis record from GATHERING_CONTEXT to ANALYZING.
- */
 export async function markAnalyzing(analysisId: string): Promise<void> {
   await prisma.supportAnalysis.update({
     where: { id: analysisId },
@@ -295,13 +147,7 @@ export async function markAnalyzing(analysisId: string): Promise<void> {
   });
 }
 
-/**
- * Escalate a failed analysis to manual handling after max retries.
- * Moves conversation to IN_PROGRESS and emits an escalation event.
- */
-export async function escalateToManualHandling(
-  input: EscalateInput,
-): Promise<void> {
+export async function escalateToManualHandling(input: EscalateInput): Promise<void> {
   await prisma.supportConversation.update({
     where: { id: input.conversationId },
     data: { status: "IN_PROGRESS" },
@@ -323,7 +169,7 @@ export async function escalateToManualHandling(
   });
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────
+// ── Private Helpers ─────────────────────────────────────────────────
 
 type EventRow = { detailsJson: unknown };
 
@@ -335,4 +181,180 @@ function resolveCustomerEmail(events: EventRow[]): string | null {
     }
   }
   return null;
+}
+
+function buildSnapshot(
+  conversation: {
+    id: string;
+    channelId: string;
+    threadTs: string;
+    status: string;
+    events: Array<{
+      eventType: string;
+      eventSource: string;
+      summary: string | null;
+      detailsJson: unknown;
+      createdAt: Date;
+    }>;
+  },
+  customerEmail: string | null
+) {
+  return {
+    conversationId: conversation.id,
+    channelId: conversation.channelId,
+    threadTs: conversation.threadTs,
+    status: conversation.status,
+    customer: { email: customerEmail },
+    events: conversation.events.map((e) => ({
+      type: e.eventType,
+      source: e.eventSource,
+      summary: e.summary,
+      details: e.detailsJson as Record<string, unknown> | null,
+      at: e.createdAt.toISOString(),
+    })),
+  };
+}
+
+async function fetchToneConfig(workspaceId: string) {
+  const aiSettings = await prisma.workspaceAiSettings.findUnique({
+    where: { workspaceId },
+  });
+
+  if (!aiSettings) return undefined;
+
+  return {
+    toneConfig: {
+      defaultTone: aiSettings.defaultTone,
+      responseStyle: aiSettings.responseStyle,
+      signatureLine: aiSettings.signatureLine,
+      maxDraftLength: aiSettings.maxDraftLength,
+      includeCodeRefs: aiSettings.includeCodeRefs,
+    },
+  };
+}
+
+const AGENT_TIMEOUT_MS = 4 * 60 * 1000;
+
+async function callAgentService(
+  input: AnalysisAgentInput,
+  config?: { toneConfig: Record<string, unknown> }
+) {
+  const agentUrl = env.AGENT_SERVICE_URL ?? "http://localhost:3100";
+  const response = await fetch(`${agentUrl}/analyze`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      workspaceId: input.workspaceId,
+      conversationId: input.conversationId,
+      threadSnapshot: input.threadSnapshot,
+      config,
+    }),
+    signal: AbortSignal.timeout(AGENT_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`Agent service returned ${response.status}: ${errorBody}`);
+  }
+
+  return analyzeResponseSchema.parse(await response.json());
+}
+
+async function persistAnalysisResult(analysisId: string, result: AnalyzeResponse) {
+  await prisma.supportAnalysis.update({
+    where: { id: analysisId },
+    data: {
+      status: result.draft ? ANALYSIS_STATUS.analyzed : ANALYSIS_STATUS.needsContext,
+      problemStatement: result.analysis.problemStatement,
+      likelySubsystem: result.analysis.likelySubsystem,
+      severity: result.analysis.severity,
+      category: result.analysis.category,
+      confidence: result.analysis.confidence,
+      missingInfo: result.analysis.missingInfo,
+      reasoningTrace: result.analysis.reasoningTrace,
+      toolCallCount: result.meta.turnCount,
+      llmModel: result.meta.model,
+      llmLatencyMs: result.meta.totalDurationMs,
+    },
+  });
+}
+
+async function persistDraft(
+  input: AnalysisAgentInput,
+  result: AnalyzeResponse
+): Promise<string | null> {
+  if (!result.draft) return null;
+
+  const draft = await prisma.supportDraft.create({
+    data: {
+      analysisId: input.analysisId,
+      conversationId: input.conversationId,
+      workspaceId: input.workspaceId,
+      status: DRAFT_STATUS.awaitingApproval,
+      draftBody: result.draft.body,
+      internalNotes: result.draft.internalNotes,
+      citations: result.draft.citations,
+      tone: result.draft.tone,
+      llmModel: result.meta.model,
+      llmLatencyMs: result.meta.totalDurationMs,
+    },
+  });
+  return draft.id;
+}
+
+async function emitAnalysisCompletedEvent(
+  input: AnalysisAgentInput,
+  result: AnalyzeResponse,
+  draftId: string | null
+) {
+  const summary = result.draft
+    ? `Analysis complete (${Math.round(result.analysis.confidence * 100)}% confidence). Draft ready for review.`
+    : `Analysis complete but needs more context. Missing: ${result.analysis.missingInfo.join(", ")}`;
+
+  await prisma.supportConversationEvent.create({
+    data: {
+      workspaceId: input.workspaceId,
+      conversationId: input.conversationId,
+      eventType: "ANALYSIS_COMPLETED",
+      eventSource: "SYSTEM",
+      summary,
+      detailsJson: {
+        analysisId: input.analysisId,
+        draftId,
+        confidence: result.analysis.confidence,
+        category: result.analysis.category,
+        severity: result.analysis.severity,
+        toolCallCount: result.meta.turnCount,
+      },
+    },
+  });
+}
+
+async function handleAnalysisFailure(
+  input: AnalysisAgentInput,
+  error: unknown
+): Promise<SupportAnalysisWorkflowResult> {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+
+  const analysis = await prisma.supportAnalysis.update({
+    where: { id: input.analysisId },
+    data: { status: ANALYSIS_STATUS.failed, errorMessage },
+  });
+
+  if (analysis.retryCount >= MAX_ANALYSIS_RETRIES) {
+    await escalateToManualHandling({
+      workspaceId: input.workspaceId,
+      conversationId: input.conversationId,
+      analysisId: input.analysisId,
+      errorMessage,
+    });
+  }
+
+  return {
+    analysisId: input.analysisId,
+    draftId: null,
+    status: "FAILED",
+    confidence: 0,
+    toolCallCount: 0,
+  };
 }
