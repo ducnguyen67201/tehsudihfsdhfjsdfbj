@@ -225,17 +225,19 @@ export function createTransport(config: TransportConfig): TransportHandle {
         const jsonStr = JSON.stringify(stripped);
 
         // Use fetch with keepalive (supports auth headers, unlike sendBeacon)
-        void globalThis.fetch(config.ingestUrl, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${config.apiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: jsonStr,
-          keepalive: true,
-        }).catch(() => {
-          // Best-effort on page unload, nothing to retry
-        });
+        void globalThis
+          .fetch(config.ingestUrl, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${config.apiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: jsonStr,
+            keepalive: true,
+          })
+          .catch(() => {
+            // Best-effort on page unload, nothing to retry
+          });
 
         debugLog("Beacon flush sent via fetch keepalive");
       } catch (err) {
