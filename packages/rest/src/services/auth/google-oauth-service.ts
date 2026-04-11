@@ -1,5 +1,5 @@
 import { env } from "@shared/env";
-import { normalizeUserEmail } from "@shared/rest/services/user-service";
+import * as users from "@shared/rest/services/user-service";
 import {
   AUTH_PROVIDER,
   PermanentExternalError,
@@ -272,7 +272,7 @@ export async function verifyIdToken(
 
   return {
     sub: claims.sub,
-    email: normalizeUserEmail(claims.email),
+    email: users.normalizeEmail(claims.email),
     emailVerified: claims.email_verified,
     name: claims.name ?? null,
     picture: claims.picture ?? null,

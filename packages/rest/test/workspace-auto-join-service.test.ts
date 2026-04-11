@@ -1,10 +1,4 @@
-import {
-  PERSONAL_EMAIL_DOMAINS,
-  type WorkspaceAutoJoinTx,
-  ensureMembership,
-  extractDomain,
-  resolveWorkspaceFromVerifiedEmail,
-} from "@shared/rest/services/auth/workspace-auto-join-service";
+import * as autoJoin from "@shared/rest/services/auth/workspace-auto-join-service";
 import { WORKSPACE_ROLE } from "@shared/types";
 import { describe, expect, it, vi } from "vitest";
 
@@ -23,39 +17,39 @@ vi.mock("@shared/database", () => ({
 
 describe("extractDomain", () => {
   it("extracts a lowercased domain from a well-formed email", () => {
-    expect(extractDomain("alice@acme.com")).toBe("acme.com");
+    expect(autoJoin.extractDomain("alice@acme.com")).toBe("acme.com");
   });
 
   it("normalizes uppercase to lowercase", () => {
-    expect(extractDomain("Alice@ACME.COM")).toBe("acme.com");
+    expect(autoJoin.extractDomain("Alice@ACME.COM")).toBe("acme.com");
   });
 
   it("trims surrounding whitespace", () => {
-    expect(extractDomain("  alice@acme.com  ")).toBe("acme.com");
+    expect(autoJoin.extractDomain("  alice@acme.com  ")).toBe("acme.com");
   });
 
   it("returns null for email with no @", () => {
-    expect(extractDomain("alice")).toBeNull();
+    expect(autoJoin.extractDomain("alice")).toBeNull();
   });
 
   it("returns null for email with empty local part", () => {
-    expect(extractDomain("@acme.com")).toBeNull();
+    expect(autoJoin.extractDomain("@acme.com")).toBeNull();
   });
 
   it("returns null for email with empty domain", () => {
-    expect(extractDomain("alice@")).toBeNull();
+    expect(autoJoin.extractDomain("alice@")).toBeNull();
   });
 
   it("returns null for empty string", () => {
-    expect(extractDomain("")).toBeNull();
+    expect(autoJoin.extractDomain("")).toBeNull();
   });
 
   it("returns null for domain without a dot (bare hostname)", () => {
-    expect(extractDomain("alice@localhost")).toBeNull();
+    expect(autoJoin.extractDomain("alice@localhost")).toBeNull();
   });
 
   it("handles sub-domains correctly", () => {
-    expect(extractDomain("alice@eng.acme.co.uk")).toBe("eng.acme.co.uk");
+    expect(autoJoin.extractDomain("alice@eng.acme.co.uk")).toBe("eng.acme.co.uk");
   });
 });
 
@@ -65,11 +59,11 @@ describe("extractDomain", () => {
 
 describe("resolveWorkspaceFromVerifiedEmail", () => {
   function createMockTx(workspaceResult: { id: string } | null): {
-    tx: WorkspaceAutoJoinTx;
+    tx: autoJoin.WorkspaceAutoJoinTx;
     workspaceFindFirst: ReturnType<typeof vi.fn>;
   } {
     const workspaceFindFirst = vi.fn(async () => workspaceResult);
-    const tx: WorkspaceAutoJoinTx = {
+    const tx: autoJoin.WorkspaceAutoJoinTx = {
       workspace: { findFirst: workspaceFindFirst },
       workspaceMembership: {
         findFirst: async () => null,
@@ -82,7 +76,7 @@ describe("resolveWorkspaceFromVerifiedEmail", () => {
   it("returns null when emailVerified is false (defense in depth)", async () => {
     const { tx, workspaceFindFirst } = createMockTx({ id: "ws-acme" });
 
-    const result = await resolveWorkspaceFromVerifiedEmail(tx, {
+    const result = await autoJoin.resolveFromVerifiedEmail(tx, {
       email: "alice@acme.com",
       emailVerified: false,
     });
@@ -95,7 +89,7 @@ describe("resolveWorkspaceFromVerifiedEmail", () => {
   it("returns null when extractDomain returns null (malformed email)", async () => {
     const { tx, workspaceFindFirst } = createMockTx({ id: "ws-acme" });
 
-    const result = await resolveWorkspaceFromVerifiedEmail(tx, {
+    const result = await autoJoin.resolveFromVerifiedEmail(tx, {
       email: "not-an-email",
       emailVerified: true,
     });
@@ -105,11 +99,11 @@ describe("resolveWorkspaceFromVerifiedEmail", () => {
   });
 
   // Parameterized: every personal-domain entry must reject auto-join.
-  for (const domain of PERSONAL_EMAIL_DOMAINS) {
+  for (const domain of autoJoin.PERSONAL_EMAIL_DOMAINS) {
     it(`returns null for personal domain ${domain}`, async () => {
       const { tx, workspaceFindFirst } = createMockTx({ id: "ws-fake" });
 
-      const result = await resolveWorkspaceFromVerifiedEmail(tx, {
+      const result = await autoJoin.resolveFromVerifiedEmail(tx, {
         email: `alice@${domain}`,
         emailVerified: true,
       });
@@ -122,7 +116,7 @@ describe("resolveWorkspaceFromVerifiedEmail", () => {
   it("returns { workspaceId, role: MEMBER } when the domain matches an active workspace", async () => {
     const { tx, workspaceFindFirst } = createMockTx({ id: "ws-acme" });
 
-    const result = await resolveWorkspaceFromVerifiedEmail(tx, {
+    const result = await autoJoin.resolveFromVerifiedEmail(tx, {
       email: "alice@acme.com",
       emailVerified: true,
     });
@@ -141,7 +135,7 @@ describe("resolveWorkspaceFromVerifiedEmail", () => {
   it("returns null when no matching workspace exists", async () => {
     const { tx, workspaceFindFirst } = createMockTx(null);
 
-    const result = await resolveWorkspaceFromVerifiedEmail(tx, {
+    const result = await autoJoin.resolveFromVerifiedEmail(tx, {
       email: "alice@acme.com",
       emailVerified: true,
     });
@@ -152,7 +146,7 @@ describe("resolveWorkspaceFromVerifiedEmail", () => {
 
   it("uses the tx client, not any global prisma singleton", async () => {
     const { tx, workspaceFindFirst } = createMockTx({ id: "ws-acme" });
-    await resolveWorkspaceFromVerifiedEmail(tx, {
+    await autoJoin.resolveFromVerifiedEmail(tx, {
       email: "alice@acme.com",
       emailVerified: true,
     });
@@ -172,7 +166,7 @@ describe("ensureMembership", () => {
     existing?: { id: string } | null;
     createThrows?: unknown;
   }): {
-    tx: WorkspaceAutoJoinTx;
+    tx: autoJoin.WorkspaceAutoJoinTx;
     findFirst: ReturnType<typeof vi.fn>;
     create: ReturnType<typeof vi.fn>;
   } {
@@ -183,7 +177,7 @@ describe("ensureMembership", () => {
       }
       return { id: "membership-new" };
     });
-    const tx: WorkspaceAutoJoinTx = {
+    const tx: autoJoin.WorkspaceAutoJoinTx = {
       workspace: { findFirst: async () => null },
       workspaceMembership: { findFirst, create },
     };
@@ -193,7 +187,7 @@ describe("ensureMembership", () => {
   it("creates a membership when no active row exists", async () => {
     const { tx, findFirst, create } = createMockTx({ existing: null });
 
-    await ensureMembership(tx, {
+    await autoJoin.ensureMembership(tx, {
       workspaceId: "ws-acme",
       userId: "user-alice",
       role: WORKSPACE_ROLE.MEMBER,
@@ -215,7 +209,7 @@ describe("ensureMembership", () => {
       existing: { id: "membership-existing" },
     });
 
-    await ensureMembership(tx, {
+    await autoJoin.ensureMembership(tx, {
       workspaceId: "ws-acme",
       userId: "user-alice",
       role: WORKSPACE_ROLE.MEMBER,
@@ -228,7 +222,7 @@ describe("ensureMembership", () => {
   it("filters findFirst on deletedAt: null so soft-deleted memberships do NOT block create", async () => {
     const { tx, findFirst, create } = createMockTx({ existing: null });
 
-    await ensureMembership(tx, {
+    await autoJoin.ensureMembership(tx, {
       workspaceId: "ws-acme",
       userId: "user-alice",
       role: WORKSPACE_ROLE.MEMBER,
@@ -258,7 +252,7 @@ describe("ensureMembership", () => {
     // Should resolve without throwing — the other request won the race
     // and the membership is already in the DB.
     await expect(
-      ensureMembership(tx, {
+      autoJoin.ensureMembership(tx, {
         workspaceId: "ws-acme",
         userId: "user-alice",
         role: WORKSPACE_ROLE.MEMBER,
@@ -276,7 +270,7 @@ describe("ensureMembership", () => {
     });
 
     await expect(
-      ensureMembership(tx, {
+      autoJoin.ensureMembership(tx, {
         workspaceId: "ws-acme",
         userId: "user-alice",
         role: WORKSPACE_ROLE.MEMBER,

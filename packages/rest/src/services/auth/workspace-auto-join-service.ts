@@ -1,6 +1,20 @@
 import * as workspace from "@shared/rest/services/workspace-service";
 import { WORKSPACE_ROLE, type WorkspaceRole } from "@shared/types";
 
+// ---------------------------------------------------------------------------
+// auto-join service
+//
+// Auth-flow helper: decide whether a newly-authenticated user should be
+// auto-joined to an existing workspace based on their verified email domain.
+// Import as a namespace:
+//
+//   import * as autoJoin from "@shared/rest/services/auth/workspace-auto-join-service";
+//   const match = await autoJoin.resolveFromVerifiedEmail(tx, input);
+//   await autoJoin.ensureMembership(tx, { workspaceId, userId, role });
+//
+// See docs/service-layer-conventions.md for the namespace convention.
+// ---------------------------------------------------------------------------
+
 // Structural transaction client for workspace auto-join. Same pattern as
 // soft-delete-cascade.ts and google-oauth-service.ts — avoids the
 // generic-type surface of Prisma.TransactionClient under the soft-delete
@@ -78,7 +92,7 @@ export function extractDomain(email: string): string | null {
 }
 
 // ---------------------------------------------------------------------------
-// resolveWorkspaceFromVerifiedEmail
+// resolveFromVerifiedEmail
 //
 // Given a profile's email + verification flag, return the workspace a new
 // user should auto-join, or null. This function is load-bearing for security:
@@ -87,7 +101,7 @@ export function extractDomain(email: string): string | null {
 // match alone. If Google says the email is unverified, we bail.
 // ---------------------------------------------------------------------------
 
-export interface ResolveWorkspaceInput {
+export interface ResolveFromVerifiedEmailInput {
   email: string;
   emailVerified: boolean;
 }
@@ -97,9 +111,9 @@ export interface WorkspaceMatch {
   role: WorkspaceRole;
 }
 
-export async function resolveWorkspaceFromVerifiedEmail(
+export async function resolveFromVerifiedEmail(
   tx: WorkspaceAutoJoinTx,
-  input: ResolveWorkspaceInput
+  input: ResolveFromVerifiedEmailInput
 ): Promise<WorkspaceMatch | null> {
   if (input.emailVerified !== true) {
     return null;

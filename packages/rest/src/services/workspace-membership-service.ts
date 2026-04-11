@@ -1,6 +1,20 @@
 import { prisma } from "@shared/database";
 import { WORKSPACE_ROLE, type WorkspaceMember, type WorkspaceRole } from "@shared/types";
 
+// ---------------------------------------------------------------------------
+// memberships service
+//
+// Domain-focused service module for WorkspaceMembership reads. Import as a
+// namespace so call sites read as `memberships.listForUser(userId)`:
+//
+//   import * as memberships from "@shared/rest/services/workspace-membership-service";
+//   const rows = await memberships.listForUser(userId);
+//
+// This module is intentionally separate from workspace-service.ts so that
+// membership changes (security-sensitive) don't share a risk profile with
+// cosmetic workspace metadata changes. See docs/service-layer-conventions.md.
+// ---------------------------------------------------------------------------
+
 type UserWorkspaceMembership = {
   workspaceId: string;
   workspaceName: string;
@@ -32,11 +46,10 @@ const workspaceRoleRank: Record<WorkspaceRole, number> = {
 
 /**
  * List all workspace memberships for a user with workspace display names.
+ * Used by the workspace switcher UI.
  */
-export async function listUserWorkspaceMemberships(
-  userId: string
-): Promise<UserWorkspaceMembership[]> {
-  const memberships = await prisma.workspaceMembership.findMany({
+export async function listForUser(userId: string): Promise<UserWorkspaceMembership[]> {
+  const rows = await prisma.workspaceMembership.findMany({
     where: {
       userId,
     },
@@ -53,17 +66,19 @@ export async function listUserWorkspaceMemberships(
     },
   });
 
-  return memberships.map((membership) => ({
-    workspaceId: membership.workspaceId,
-    workspaceName: membership.workspace.name,
-    role: membership.role,
+  return rows.map((row) => ({
+    workspaceId: row.workspaceId,
+    workspaceName: row.workspace.name,
+    role: row.role,
   }));
 }
 
 /**
  * List a user's workspace roles ordered by membership creation time.
+ * Cheaper than listForUser — no join to workspace.name. Used to compute
+ * activeWorkspaceId on session creation.
  */
-export async function listUserWorkspaceAccess(userId: string): Promise<UserWorkspaceAccess[]> {
+export async function listAccessForUser(userId: string): Promise<UserWorkspaceAccess[]> {
   return prisma.workspaceMembership.findMany({
     where: {
       userId,
@@ -81,8 +96,8 @@ export async function listUserWorkspaceAccess(userId: string): Promise<UserWorks
 /**
  * List and sort members for a workspace by role hierarchy then email.
  */
-export async function listWorkspaceMembers(workspaceId: string): Promise<WorkspaceMember[]> {
-  const memberships = await prisma.workspaceMembership.findMany({
+export async function listForWorkspace(workspaceId: string): Promise<WorkspaceMember[]> {
+  const rows = await prisma.workspaceMembership.findMany({
     where: {
       workspaceId,
     },
@@ -96,12 +111,12 @@ export async function listWorkspaceMembers(workspaceId: string): Promise<Workspa
     },
   });
 
-  return memberships
-    .map((membership) => ({
-      userId: membership.user.id,
-      email: membership.user.email,
-      role: membership.role,
-      joinedAt: membership.createdAt.toISOString(),
+  return rows
+    .map((row) => ({
+      userId: row.user.id,
+      email: row.user.email,
+      role: row.role,
+      joinedAt: row.createdAt.toISOString(),
     }))
     .sort((left, right) => {
       const rankDiff = workspaceRoleRank[right.role] - workspaceRoleRank[left.role];
@@ -116,7 +131,7 @@ export async function listWorkspaceMembers(workspaceId: string): Promise<Workspa
 /**
  * Fetch one membership with user identity for role checks and update flows.
  */
-export async function findWorkspaceMembershipWithUser(
+export async function findWithUser(
   workspaceId: string,
   userId: string
 ): Promise<WorkspaceMembershipWithUser | null> {
@@ -141,7 +156,7 @@ export async function findWorkspaceMembershipWithUser(
 /**
  * Resolve an existing membership id for duplicate-member checks.
  */
-export async function findWorkspaceMembershipId(
+export async function findId(
   workspaceId: string,
   userId: string
 ): Promise<{ id: string } | null> {
@@ -161,8 +176,8 @@ export async function findWorkspaceMembershipId(
 /**
  * Determine whether a user is currently a member of a workspace.
  */
-export async function isUserWorkspaceMember(workspaceId: string, userId: string): Promise<boolean> {
-  const membership = await prisma.workspaceMembership.findUnique({
+export async function isUserMember(workspaceId: string, userId: string): Promise<boolean> {
+  const row = await prisma.workspaceMembership.findUnique({
     where: {
       workspaceId_userId: {
         workspaceId,
@@ -174,5 +189,5 @@ export async function isUserWorkspaceMember(workspaceId: string, userId: string)
     },
   });
 
-  return Boolean(membership);
+  return Boolean(row);
 }

@@ -197,6 +197,29 @@ This convention makes that rule enforceable: if the service name is
 `workspace`, then "is there a workspace helper for this?" is a one-line
 grep, not a hunt.
 
+## Exceptions to the convention
+
+### `soft-delete-cascade.ts`
+
+This module is a **Prisma client extension**, not a classic service. It is
+registered via `.$extends()` on the base Prisma client and intercepts
+`delete` / `deleteMany` calls to convert them into `update` operations
+with a `deletedAt` timestamp. It is never "called" from user code the way
+a normal service is — it is loaded transparently by the Prisma client.
+
+Because it is infrastructure, not domain logic:
+
+- It stays on **named exports**, not the namespace-import convention.
+- It does not live under a per-domain filename even though it sits in
+  `packages/rest/src/services/`.
+- New soft-delete plumbing (new models, new cascade rules) continues to
+  land here regardless of the service-layer rollout status.
+
+If you find yourself writing a new file with a similar shape — Prisma
+extension, globally loaded, no domain per se — you can skip the
+namespace-import rule for that file too, but **document the exception**
+here and in the rollout status table in `AGENTS.md`.
+
 ## What NOT to do
 
 ### Do not use classes

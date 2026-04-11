@@ -1,9 +1,5 @@
 import { prisma } from "@shared/database";
-// NOTE: workspace-membership-service has not yet been converted to the
-// namespace pattern. See docs/service-layer-conventions.md — the rollout
-// is staged, so this is a plain named import for now. When that service is
-// migrated, this will become `import * as memberships from "..."`.
-import { isUserWorkspaceMember } from "@shared/rest/services/workspace-membership-service";
+import * as memberships from "@shared/rest/services/workspace-membership-service";
 
 // ---------------------------------------------------------------------------
 // workspace service
@@ -42,7 +38,7 @@ export async function canAccess(userId: string, workspaceId: string): Promise<bo
   if (!(await exists(workspaceId))) {
     return false;
   }
-  return isUserWorkspaceMember(workspaceId, userId);
+  return memberships.isUserMember(workspaceId, userId);
 }
 
 /**

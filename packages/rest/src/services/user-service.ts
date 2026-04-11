@@ -1,5 +1,17 @@
 import { prisma } from "@shared/database";
 
+// ---------------------------------------------------------------------------
+// users service
+//
+// Domain-focused service module for User reads and creates. Import as a
+// namespace so call sites read as `users.findIdentityByEmail(email)`:
+//
+//   import * as users from "@shared/rest/services/user-service";
+//   const user = await users.findIdentityByEmail(email);
+//
+// See docs/service-layer-conventions.md for the full rationale.
+// ---------------------------------------------------------------------------
+
 export type UserIdentityRecord = {
   id: string;
   email: string;
@@ -15,15 +27,15 @@ export type UserAuthRecord = UserIdentityRecord & {
 /**
  * Normalize user-provided email input for stable lookups and uniqueness checks.
  */
-export function normalizeUserEmail(email: string): string {
+export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
 /**
  * Fetch a user identity record by email for membership and ownership checks.
  */
-export async function findUserIdentityByEmail(email: string): Promise<UserIdentityRecord | null> {
-  const normalizedEmail = normalizeUserEmail(email);
+export async function findIdentityByEmail(email: string): Promise<UserIdentityRecord | null> {
+  const normalizedEmail = normalizeEmail(email);
   return prisma.user.findUnique({
     where: {
       email: normalizedEmail,
@@ -38,8 +50,8 @@ export async function findUserIdentityByEmail(email: string): Promise<UserIdenti
 /**
  * Fetch the auth payload required for password verification during login.
  */
-export async function findUserAuthByEmail(email: string): Promise<UserAuthRecord | null> {
-  const normalizedEmail = normalizeUserEmail(email);
+export async function findAuthByEmail(email: string): Promise<UserAuthRecord | null> {
+  const normalizedEmail = normalizeEmail(email);
   return prisma.user.findUnique({
     where: {
       email: normalizedEmail,
@@ -55,11 +67,11 @@ export async function findUserAuthByEmail(email: string): Promise<UserAuthRecord
 /**
  * Create a user with a pre-hashed password and return the public identity fields.
  */
-export async function createUserWithPassword(
+export async function createWithPassword(
   email: string,
   passwordHash: string
 ): Promise<UserIdentityRecord> {
-  const normalizedEmail = normalizeUserEmail(email);
+  const normalizedEmail = normalizeEmail(email);
   return prisma.user.create({
     data: {
       email: normalizedEmail,

@@ -79,11 +79,11 @@ vi.mock("@shared/rest/services/auth/google-oauth-service", () => ({
 vi.mock("@shared/rest/services/auth/workspace-auto-join-service", () => ({
   ensureMembership: ensureMembershipMock,
   extractDomain: vi.fn((email: string) => email.split("@")[1] ?? null),
-  resolveWorkspaceFromVerifiedEmail: resolveWorkspaceFromVerifiedEmailMock,
+  resolveFromVerifiedEmail: resolveWorkspaceFromVerifiedEmailMock,
 }));
 
 vi.mock("@shared/rest/services/workspace-membership-service", () => ({
-  listUserWorkspaceAccess: listUserWorkspaceAccessMock,
+  listAccessForUser: listUserWorkspaceAccessMock,
 }));
 
 const { handleGoogleOAuthCallback, handleGoogleOAuthStart } = await import(

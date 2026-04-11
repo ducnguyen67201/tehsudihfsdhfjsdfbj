@@ -217,16 +217,16 @@ Non-negotiable rules (summary):
 
 Incremental migration. Each service + all its call sites land in one commit.
 
-| Service                                  | Status     | Notes                                                                              |
-| ---------------------------------------- | ---------- | ---------------------------------------------------------------------------------- |
-| `workspace-service.ts`                   | ✅ migrated | Pilot. 3 fns, 2 external call sites. Reference implementation.                     |
-| `workspace-membership-service.ts`        | ⏳ pending  | Named imports still in use. Referenced from `workspace-service.ts` with a TODO.    |
-| `user-service.ts`                        | ⏳ pending  | Small file, low blast radius. Next candidate.                                      |
-| `auth/google-oauth-service.ts`           | ⏳ pending  | Large (417 lines). May split into `auth/google/{token,verify,profile}.ts` on move. |
-| `auth/workspace-auto-join-service.ts`    | ⏳ pending  | Already calls the migrated `workspace-service` as `workspace.findByEmailDomain`.   |
-| `codex/embedding.ts`                     | ⏳ pending  |                                                                                    |
-| `soft-delete-cascade.ts`                 | ⏳ pending  | Infrastructure module, may stay as-is.                                             |
-| `support/*` (12 files)                   | ⏳ pending  | Largest surface. Stage by sub-concern (ingress, analysis, slack adapters).         |
+| Service                                  | Status      | Notes                                                                              |
+| ---------------------------------------- | ----------- | ---------------------------------------------------------------------------------- |
+| `workspace-service.ts`                   | ✅ migrated  | Pilot. 3 fns, 2 external call sites. Reference implementation.                     |
+| `workspace-membership-service.ts`        | ✅ migrated  | Imported as `memberships`. 6 fns renamed (dropped the `Workspace`/`User` prefix).  |
+| `user-service.ts`                        | ✅ migrated  | Imported as `users`. 4 fns renamed.                                                |
+| `auth/workspace-auto-join-service.ts`    | ✅ migrated  | Imported as `autoJoin`. Only `resolveWorkspaceFromVerifiedEmail` was renamed.      |
+| `auth/google-oauth-service.ts`           | ⏳ pending   | Large (417 lines). May split into `auth/google/{token,verify,profile}.ts` on move. |
+| `codex/embedding.ts`                     | ⏳ pending   |                                                                                    |
+| `soft-delete-cascade.ts`                 | ⚪ exception | Prisma client extension, not a classic service. Stays on named exports.            |
+| `support/*` (12 files)                   | ⏳ pending   | Largest surface. Stage by sub-concern (ingress, analysis, slack adapters).         |
 
 Migration rules: pilot first, migrate a service + all call sites in one commit, never leave a service half-converted, run `vitest run <file>` and `tsgo --noEmit` on `apps/web` and `packages/rest` before handoff.
 

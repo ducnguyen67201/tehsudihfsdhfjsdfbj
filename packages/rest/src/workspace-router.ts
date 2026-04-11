@@ -2,14 +2,8 @@ import { prisma, softUpsert } from "@shared/database";
 import { writeAuditEvent } from "@shared/rest/security/audit";
 import { canAssignWorkspaceRole, canManageWorkspaceMember } from "@shared/rest/security/rbac";
 import { setActiveWorkspaceForSession } from "@shared/rest/security/session";
-import { findUserIdentityByEmail, normalizeUserEmail } from "@shared/rest/services/user-service";
-import {
-  findWorkspaceMembershipId,
-  findWorkspaceMembershipWithUser,
-  isUserWorkspaceMember,
-  listUserWorkspaceMemberships,
-  listWorkspaceMembers,
-} from "@shared/rest/services/workspace-membership-service";
+import * as users from "@shared/rest/services/user-service";
+import * as memberships from "@shared/rest/services/workspace-membership-service";
 import { authenticatedProcedure, router } from "@shared/rest/trpc";
 import { workspaceRoleProcedure } from "@shared/rest/trpc";
 import {
@@ -86,10 +80,10 @@ export const workspaceRouter = router({
     }),
 
   listMyMemberships: authenticatedProcedure.query(async ({ ctx }) => {
-    const memberships = await listUserWorkspaceMemberships(ctx.user.id);
+    const rows = await memberships.listForUser(ctx.user.id);
 
     return workspaceMembershipListSchema.parse({
-      memberships,
+      memberships: rows,
       activeWorkspaceId: ctx.activeWorkspaceId,
     });
   }),
@@ -107,7 +101,7 @@ export const workspaceRouter = router({
       });
     }
 
-    const members = await listWorkspaceMembers(ctx.workspaceId);
+    const members = await memberships.listForWorkspace(ctx.workspaceId);
 
     return workspaceMemberListResponseSchema.parse({
       workspaceId: ctx.workspaceId,
@@ -131,8 +125,8 @@ export const workspaceRouter = router({
         });
       }
 
-      const normalizedEmail = normalizeUserEmail(input.email);
-      const targetUser = await findUserIdentityByEmail(normalizedEmail);
+      const normalizedEmail = users.normalizeEmail(input.email);
+      const targetUser = await users.findIdentityByEmail(normalizedEmail);
 
       if (!targetUser) {
         throw new TRPCError({
@@ -142,7 +136,7 @@ export const workspaceRouter = router({
       }
 
       // Check active membership (auto-filtered by soft-delete extension)
-      const existing = await findWorkspaceMembershipId(ctx.workspaceId, targetUser.id);
+      const existing = await memberships.findId(ctx.workspaceId, targetUser.id);
 
       if (existing) {
         throw new TRPCError({
@@ -194,7 +188,7 @@ export const workspaceRouter = router({
         });
       }
 
-      const targetMembership = await findWorkspaceMembershipWithUser(ctx.workspaceId, input.userId);
+      const targetMembership = await memberships.findWithUser(ctx.workspaceId, input.userId);
 
       if (!targetMembership) {
         throw new TRPCError({
@@ -274,7 +268,7 @@ export const workspaceRouter = router({
         });
       }
 
-      const targetMembership = await findWorkspaceMembershipWithUser(ctx.workspaceId, input.userId);
+      const targetMembership = await memberships.findWithUser(ctx.workspaceId, input.userId);
 
       if (!targetMembership) {
         throw new TRPCError({
@@ -318,7 +312,7 @@ export const workspaceRouter = router({
   switchActive: authenticatedProcedure
     .input(workspaceSwitchRequestSchema)
     .mutation(async ({ ctx, input }) => {
-      const hasMembership = await isUserWorkspaceMember(input.workspaceId, ctx.user.id);
+      const hasMembership = await memberships.isUserMember(input.workspaceId, ctx.user.id);
       if (!hasMembership) {
         throw new TRPCError({
           code: "FORBIDDEN",
