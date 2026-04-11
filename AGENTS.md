@@ -198,6 +198,38 @@ Do not manually maintain parallel OpenAPI and TS contracts for the same payload.
 - Before writing new Prisma/business logic in a router, first search for an existing reusable service under `packages/rest/src/services/**` (and related domain modules) and reuse it when possible.
 - If no suitable service exists, create a focused service module and move reusable query/orchestration logic there; keep routers focused on auth/context checks, validation, and response mapping.
 
+## Service Layer Conventions
+
+Full spec: [`docs/service-layer-conventions.md`](docs/service-layer-conventions.md).
+
+Non-negotiable rules (summary):
+
+- All Prisma reads/writes, external API calls, and cross-domain composition live in `packages/rest/src/services/**`. Routers, HTTP handlers, UI server components, and Temporal activities **call services** — they do not talk to Prisma or external SDKs directly.
+- Services are plain ES modules of pure functions, imported as a namespace: `import * as workspace from "@shared/rest/services/workspace-service"`. No classes, no DI containers, no base `Service` abstract.
+- Function names drop the domain prefix so they read correctly through the namespace: `workspace.exists(id)`, not `workspaceExists(id)`.
+- One file per domain concern. Do not collapse related concerns into a god-file — `workspace-service.ts` and `workspace-membership-service.ts` are intentionally separate.
+- Transaction-aware helpers take a structural client as their first parameter, not `Prisma.TransactionClient`. This keeps them callable from both inside and outside `$transaction` and trivially mockable.
+- Policy (e.g. personal-domain reject list) lives at the **caller**, not inside the lookup. Services enforce database-level invariants (soft-delete scoping, multi-tenancy) and return raw results.
+- Size budget: ~300 lines per service file, then split into `services/<domain>/{find,mutate,access}.ts` with an `index.ts` that re-exports a single namespace.
+- When a local variable would shadow the namespace (`const workspace = ...`), rename the local variable (`match`, `row`, `record`), not the namespace.
+
+### Rollout status
+
+Incremental migration. Each service + all its call sites land in one commit.
+
+| Service                                  | Status     | Notes                                                                              |
+| ---------------------------------------- | ---------- | ---------------------------------------------------------------------------------- |
+| `workspace-service.ts`                   | ✅ migrated | Pilot. 3 fns, 2 external call sites. Reference implementation.                     |
+| `workspace-membership-service.ts`        | ⏳ pending  | Named imports still in use. Referenced from `workspace-service.ts` with a TODO.    |
+| `user-service.ts`                        | ⏳ pending  | Small file, low blast radius. Next candidate.                                      |
+| `auth/google-oauth-service.ts`           | ⏳ pending  | Large (417 lines). May split into `auth/google/{token,verify,profile}.ts` on move. |
+| `auth/workspace-auto-join-service.ts`    | ⏳ pending  | Already calls the migrated `workspace-service` as `workspace.findByEmailDomain`.   |
+| `codex/embedding.ts`                     | ⏳ pending  |                                                                                    |
+| `soft-delete-cascade.ts`                 | ⏳ pending  | Infrastructure module, may stay as-is.                                             |
+| `support/*` (12 files)                   | ⏳ pending  | Largest surface. Stage by sub-concern (ingress, analysis, slack adapters).         |
+
+Migration rules: pilot first, migrate a service + all call sites in one commit, never leave a service half-converted, run `vitest run <file>` and `tsgo --noEmit` on `apps/web` and `packages/rest` before handoff.
+
 ## Environment + Secrets Rules
 
 - Use `@shared/env` for env access in app code.
@@ -294,6 +326,8 @@ A feature is done only when:
   - `docs/foundation-setup-and-conventions.md`
 - Implementation plan (MVP):
   - `docs/impl-plan-first-customer-happy-path-mvp.md`
+- Service layer conventions (namespace imports, naming rules, rollout status):
+  - `docs/service-layer-conventions.md`
 
 ## Skills + Doc Hygiene
 

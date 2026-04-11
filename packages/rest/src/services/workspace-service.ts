@@ -1,26 +1,45 @@
 import { prisma } from "@shared/database";
+// NOTE: workspace-membership-service has not yet been converted to the
+// namespace pattern. See docs/service-layer-conventions.md — the rollout
+// is staged, so this is a plain named import for now. When that service is
+// migrated, this will become `import * as memberships from "..."`.
 import { isUserWorkspaceMember } from "@shared/rest/services/workspace-membership-service";
 
+// ---------------------------------------------------------------------------
+// workspace service
+//
+// Domain-focused service module for Workspace reads. Import this file as a
+// namespace so call sites read as `workspace.findById(...)` rather than
+// `findWorkspaceById(...)`:
+//
+//   import * as workspace from "@shared/rest/services/workspace-service";
+//   if (await workspace.exists(id)) { ... }
+//   const match = await workspace.findByEmailDomain(tx, domain);
+//
+// See docs/service-layer-conventions.md for the full rationale, naming
+// rules, and the "split a file at ~300 lines" guidance.
+// ---------------------------------------------------------------------------
+
 // Structural client so callers can pass either the live prisma client or
-// a transaction client from $transaction(). Same pattern as
-// workspace-auto-join-service.ts — avoids depending on Prisma.TransactionClient
-// under the soft-delete .$extends wrapper, and keeps unit tests mockable.
+// a transaction client from $transaction(). Avoids depending on
+// Prisma.TransactionClient under the soft-delete .$extends wrapper and
+// keeps unit tests mockable.
 // biome-ignore lint/suspicious/noExplicitAny: Prisma delegate methods have model-specific generic args
 type DelegateFn = (args: any) => Promise<any>;
 export interface WorkspaceLookupClient {
   workspace: { findFirst: DelegateFn };
 }
 
-export async function workspaceExists(workspaceId: string): Promise<boolean> {
-  const workspace = await prisma.workspace.findUnique({
+export async function exists(workspaceId: string): Promise<boolean> {
+  const row = await prisma.workspace.findUnique({
     where: { id: workspaceId },
     select: { id: true },
   });
-  return workspace !== null;
+  return row !== null;
 }
 
-export async function canAccessWorkspace(userId: string, workspaceId: string): Promise<boolean> {
-  if (!(await workspaceExists(workspaceId))) {
+export async function canAccess(userId: string, workspaceId: string): Promise<boolean> {
+  if (!(await exists(workspaceId))) {
     return false;
   }
   return isUserWorkspaceMember(workspaceId, userId);
@@ -41,7 +60,7 @@ export async function canAccessWorkspace(userId: string, workspaceId: string): P
  *   - Admin workspace setup: "is this domain already claimed?"
  *   - Future SSO/SAML flows that map email → workspace
  */
-export async function findWorkspaceByEmailDomain(
+export async function findByEmailDomain(
   client: WorkspaceLookupClient,
   domain: string
 ): Promise<{ id: string } | null> {

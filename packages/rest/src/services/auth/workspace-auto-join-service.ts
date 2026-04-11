@@ -1,4 +1,4 @@
-import { findWorkspaceByEmailDomain } from "@shared/rest/services/workspace-service";
+import * as workspace from "@shared/rest/services/workspace-service";
 import { WORKSPACE_ROLE, type WorkspaceRole } from "@shared/types";
 
 // Structural transaction client for workspace auto-join. Same pattern as
@@ -114,16 +114,16 @@ export async function resolveWorkspaceFromVerifiedEmail(
     return null;
   }
 
-  // Shared lookup — see findWorkspaceByEmailDomain in workspace-service.ts.
+  // Shared lookup — see workspace.findByEmailDomain in workspace-service.ts.
   // WorkspaceAutoJoinTx structurally satisfies WorkspaceLookupClient, so the
   // transaction client is passed through untouched.
-  const workspace = await findWorkspaceByEmailDomain(tx, domain);
+  const match = await workspace.findByEmailDomain(tx, domain);
 
-  if (!workspace) {
+  if (!match) {
     return null;
   }
 
-  return { workspaceId: workspace.id, role: WORKSPACE_ROLE.MEMBER };
+  return { workspaceId: match.id, role: WORKSPACE_ROLE.MEMBER };
 }
 
 // ---------------------------------------------------------------------------
