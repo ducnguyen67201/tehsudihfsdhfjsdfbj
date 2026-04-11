@@ -53,7 +53,7 @@ export async function purgeDeletedRecords(
   const results: PurgeResult[] = [];
 
   for (const model of PURGE_ORDER) {
-    const delegate = rawClient[lowerFirst(model) as keyof typeof rawClient] as {
+    const delegate = rawClient[lowerFirst(model) as keyof typeof rawClient] as unknown as {
       deleteMany: (args: { where: Record<string, unknown> }) => Promise<{ count: number }>;
       count: (args: { where: Record<string, unknown> }) => Promise<number>;
     };
@@ -86,7 +86,7 @@ export async function hardDeleteById(
   model: (typeof SOFT_DELETE_MODELS)[number],
   id: string
 ): Promise<void> {
-  const delegate = rawClient[lowerFirst(model) as keyof typeof rawClient] as {
+  const delegate = rawClient[lowerFirst(model) as keyof typeof rawClient] as unknown as {
     findFirst: (args: { where: Record<string, unknown> }) => Promise<{
       id: string;
       deletedAt: Date | null;
