@@ -436,12 +436,34 @@ describe("findOrCreateUserFromGoogleProfile", () => {
 
   it("returns existing user when identity already exists (created: false)", async () => {
     const { tx, calls } = createMockTx({
-      existingIdentity: { user: { id: "user-abc", email: "alice@acme.com" } },
+      existingIdentity: {
+        user: { id: "user-abc", email: "alice@acme.com", deletedAt: null },
+      },
     });
 
     const result = await findOrCreateUserFromGoogleProfile(tx, verifiedProfile);
     expect(result.user.id).toBe("user-abc");
     expect(result.created).toBe(false);
+    expect(calls.identityFindUnique).toBe(1);
+    expect(calls.userFindFirst).toBe(0);
+    expect(calls.userCreate).toBe(0);
+  });
+
+  it("rejects sign-in when the matched identity belongs to a deactivated user", async () => {
+    const { tx, calls } = createMockTx({
+      existingIdentity: {
+        user: {
+          id: "user-deactivated",
+          email: "alice@acme.com",
+          deletedAt: new Date("2026-01-01T00:00:00.000Z"),
+        },
+      },
+    });
+
+    await expect(findOrCreateUserFromGoogleProfile(tx, verifiedProfile)).rejects.toBeInstanceOf(
+      ValidationError
+    );
+
     expect(calls.identityFindUnique).toBe(1);
     expect(calls.userFindFirst).toBe(0);
     expect(calls.userCreate).toBe(0);

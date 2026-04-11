@@ -1,24 +1,31 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const prismaTransactionMock = vi.fn();
+const exchangeCodeForTokensMock = vi.fn();
+const findOrCreateUserFromGoogleProfileMock = vi.fn();
+const verifyIdTokenMock = vi.fn();
+const resolveWorkspaceFromVerifiedEmailMock = vi.fn();
+const ensureMembershipMock = vi.fn();
+const listUserWorkspaceAccessMock = vi.fn();
+const createUserSessionMock = vi.fn();
+const writeAuditEventMock = vi.fn();
+const consumeLoginAttemptMock = vi.fn();
 
 // ── Mocks (must be set up before the handler import) ──────────────
-// The handler transitively imports @shared/database, which reads
-// env.DATABASE_URL at module-load time. Vitest doesn't provide real env,
-// so we stub both modules. The tests under this file only exercise the
-// error branches that never reach the database, so empty mocks are fine.
 vi.mock("@shared/database", () => ({
   prisma: {
-    $transaction: vi.fn(),
-    workspaceMembership: {
-      findMany: vi.fn().mockResolvedValue([]),
-    },
+    $transaction: prismaTransactionMock,
   },
 }));
 
+// APP_PUBLIC_URL is deliberately set to a distinctive host so the
+// buildRedirectUri regression test can catch any future accidental
+// "just fall back to APP_PUBLIC_URL" refactor.
 vi.mock("@shared/env", () => ({
   env: {
     NODE_ENV: "test",
     APP_BASE_URL: "http://localhost:3000",
-    APP_PUBLIC_URL: undefined,
+    APP_PUBLIC_URL: "https://tunnel.example.com",
     SESSION_SECRET: "dev-only-trustloop-session-secret",
     SESSION_COOKIE_NAME: "tl_session",
     SESSION_TTL_HOURS: 24,
@@ -32,9 +39,100 @@ vi.mock("@shared/env/shared", () => ({
   NODE_ENV: { DEVELOPMENT: "development", TEST: "test", PRODUCTION: "production" },
 }));
 
-const { handleGoogleOAuthCallback } = await import(
+vi.mock("@shared/rest/security/audit", () => ({
+  writeAuditEvent: writeAuditEventMock,
+}));
+
+vi.mock("@shared/rest/security/rate-limit", () => ({
+  consumeLoginAttempt: consumeLoginAttemptMock,
+}));
+
+vi.mock("@shared/rest/security/session", () => ({
+  createUserSession: createUserSessionMock,
+  getSessionRequestMeta: vi.fn(() => ({ ip: "127.0.0.1", userAgent: "vitest" })),
+}));
+
+vi.mock("@shared/rest/services/auth/google-oauth-service", () => ({
+  buildGoogleAuthorizationUrl: vi.fn(
+    ({
+      state,
+      nonce,
+      codeChallenge,
+      redirectUri,
+    }: {
+      state: string;
+      nonce: string;
+      codeChallenge: string;
+      redirectUri: string;
+    }) =>
+      `https://accounts.google.com/o/oauth2/v2/auth?state=${encodeURIComponent(
+        state
+      )}&nonce=${encodeURIComponent(nonce)}&code_challenge=${encodeURIComponent(
+        codeChallenge
+      )}&redirect_uri=${encodeURIComponent(redirectUri)}`
+  ),
+  exchangeCodeForTokens: exchangeCodeForTokensMock,
+  findOrCreateUserFromGoogleProfile: findOrCreateUserFromGoogleProfileMock,
+  verifyIdToken: verifyIdTokenMock,
+}));
+
+vi.mock("@shared/rest/services/auth/workspace-auto-join-service", () => ({
+  ensureMembership: ensureMembershipMock,
+  extractDomain: vi.fn((email: string) => email.split("@")[1] ?? null),
+  resolveWorkspaceFromVerifiedEmail: resolveWorkspaceFromVerifiedEmailMock,
+}));
+
+vi.mock("@shared/rest/services/workspace-membership-service", () => ({
+  listUserWorkspaceAccess: listUserWorkspaceAccessMock,
+}));
+
+const { handleGoogleOAuthCallback, handleGoogleOAuthStart } = await import(
   "../src/server/http/rest/auth/google-oauth-handlers"
 );
+const oauthStateModule = await import("@shared/rest/security/oauth-state");
+
+beforeEach(() => {
+  prismaTransactionMock.mockReset();
+  prismaTransactionMock.mockImplementation(async (callback) => callback({}));
+
+  exchangeCodeForTokensMock.mockReset();
+  exchangeCodeForTokensMock.mockResolvedValue({ idToken: "id-token", accessToken: "access-token" });
+
+  findOrCreateUserFromGoogleProfileMock.mockReset();
+  findOrCreateUserFromGoogleProfileMock.mockResolvedValue({
+    user: { id: "user-123", email: "alice@acme.com" },
+    created: false,
+  });
+
+  verifyIdTokenMock.mockReset();
+  verifyIdTokenMock.mockResolvedValue({
+    sub: "google-sub-123",
+    email: "alice@acme.com",
+    emailVerified: true,
+    name: "Alice",
+    picture: "https://example.com/alice.png",
+  });
+
+  resolveWorkspaceFromVerifiedEmailMock.mockReset();
+  resolveWorkspaceFromVerifiedEmailMock.mockResolvedValue(null);
+
+  ensureMembershipMock.mockReset();
+  ensureMembershipMock.mockResolvedValue(undefined);
+
+  listUserWorkspaceAccessMock.mockReset();
+  listUserWorkspaceAccessMock.mockResolvedValue([]);
+
+  createUserSessionMock.mockReset();
+  createUserSessionMock.mockResolvedValue({
+    cookie: "tl_session=session-cookie; Path=/; HttpOnly",
+  });
+
+  writeAuditEventMock.mockReset();
+  writeAuditEventMock.mockResolvedValue(undefined);
+
+  consumeLoginAttemptMock.mockReset();
+  consumeLoginAttemptMock.mockReturnValue({ allowed: true });
+});
 
 // ---------------------------------------------------------------------------
 // Scoped integration tests for handleGoogleOAuthCallback error branches.
@@ -47,8 +145,8 @@ const { handleGoogleOAuthCallback } = await import(
 //
 // The happy path (successful find-or-create + session write) is covered by
 // unit tests on google-oauth-service.ts and workspace-auto-join-service.ts.
-// A full-stack integration test against a real test database is a follow-up;
-// see the PR description for the deferred work.
+// This file keeps one callback success-path regression test so handler-only
+// orchestration bugs still get caught without a real database.
 // ---------------------------------------------------------------------------
 
 function buildRequest(url: string, cookie: string | null = null): Request {
@@ -129,5 +227,67 @@ describe("handleGoogleOAuthCallback — error branches", () => {
     expect(setCookie).not.toBeNull();
     expect(setCookie).toContain("tl_oauth_state=");
     expect(setCookie).toContain("Max-Age=0");
+  });
+});
+
+describe("handleGoogleOAuthCallback — returning-user auto join", () => {
+  const CALLBACK_URL = "http://localhost:3000/api/auth/google/callback";
+
+  it("auto-joins an existing user when they still have no workspace memberships", async () => {
+    const consumeOauthStateCookieSpy = vi
+      .spyOn(oauthStateModule, "consumeOauthStateCookie")
+      .mockReturnValue({ codeVerifier: "verifier", nonce: "nonce" });
+
+    resolveWorkspaceFromVerifiedEmailMock.mockResolvedValue({
+      workspaceId: "ws_auto",
+      role: "MEMBER",
+    });
+
+    try {
+      const request = buildRequest(`${CALLBACK_URL}?code=oauth-code&state=state-123`);
+      const response = await handleGoogleOAuthCallback(request);
+
+      expect(response.status).toBe(307);
+      expect(locationOf(response)).toBe("http://localhost:3000/ws_auto");
+      expect(listUserWorkspaceAccessMock).toHaveBeenCalledWith("user-123");
+      expect(resolveWorkspaceFromVerifiedEmailMock).toHaveBeenCalledTimes(1);
+      expect(ensureMembershipMock).toHaveBeenCalledWith({}, {
+        workspaceId: "ws_auto",
+        userId: "user-123",
+        role: "MEMBER",
+      });
+      expect(createUserSessionMock).toHaveBeenCalledWith(
+        "user-123",
+        expect.objectContaining({ ip: "127.0.0.1" }),
+        "ws_auto"
+      );
+      expect(writeAuditEventMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "auth.google.auto_joined",
+          actorUserId: "user-123",
+          workspaceId: "ws_auto",
+        })
+      );
+    } finally {
+      consumeOauthStateCookieSpy.mockRestore();
+    }
+  });
+});
+
+describe("handleGoogleOAuthStart — redirect URI source", () => {
+  // Regression guard for the Google Cloud Console redirect_uri_mismatch bug:
+  // the start handler must build its redirect URI from APP_BASE_URL even
+  // when APP_PUBLIC_URL is set (e.g. during ngrok-tunneled dev sessions
+  // where the tunnel is used for webhooks but not for the auth callback).
+  it("uses APP_BASE_URL for the Google authorize redirect_uri, not APP_PUBLIC_URL", async () => {
+    const request = buildRequest("http://localhost:3000/api/auth/google/start");
+    const response = await handleGoogleOAuthStart(request);
+
+    expect(response.status).toBe(307);
+    const authUrl = new URL(locationOf(response));
+    const redirectUri = authUrl.searchParams.get("redirect_uri");
+
+    expect(redirectUri).toBe("http://localhost:3000/api/auth/google/callback");
+    expect(redirectUri).not.toContain("tunnel.example.com");
   });
 });

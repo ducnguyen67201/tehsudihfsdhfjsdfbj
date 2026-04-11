@@ -7,26 +7,26 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuthSession } from "@/hooks/use-auth-session";
 import { workspaceRootPath } from "@/lib/workspace-paths";
+import { AUTH_MODE, type AuthMode } from "@shared/types";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { FormEvent } from "react";
 
 interface LoginFormProps {
   googleBanner: string | null;
+  googleEnabled: boolean;
 }
 
 /**
- * Unified auth form. Google sign-in is the primary CTA for every user;
- * email/password is the secondary path, collapsed behind a disclosure
- * link. If the Google credentials aren't configured server-side the
- * /api/auth/google/start handler short-circuits to /login?google=error,
- * which is an acceptable fallback for a misconfigured environment.
+ * Unified auth form. When Google OAuth is configured it stays the primary
+ * CTA; otherwise the password form is shown immediately so the login page
+ * never advertises a provider that cannot complete.
  */
-export function LoginForm({ googleBanner }: LoginFormProps) {
+export function LoginForm({ googleBanner, googleEnabled }: LoginFormProps) {
   const router = useRouter();
   const { login, register, isLoading } = useAuthSession();
-  const [mode, setMode] = useState<"sign-in" | "register">("sign-in");
-  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [mode, setMode] = useState<AuthMode>(AUTH_MODE.SIGN_IN);
+  const [showPasswordForm, setShowPasswordForm] = useState(!googleEnabled);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -39,13 +39,13 @@ export function LoginForm({ googleBanner }: LoginFormProps) {
     setError(null);
 
     try {
-      if (mode === "register" && password !== confirmPassword) {
+      if (mode === AUTH_MODE.REGISTER && password !== confirmPassword) {
         setError("Passwords do not match");
         return;
       }
 
       const session =
-        mode === "sign-in" ? await login({ email, password }) : await register({ email, password });
+        mode === AUTH_MODE.SIGN_IN ? await login({ email, password }) : await register({ email, password });
 
       router.replace(
         session.activeWorkspaceId ? workspaceRootPath(session.activeWorkspaceId) : "/no-workspace"
@@ -55,7 +55,7 @@ export function LoginForm({ googleBanner }: LoginFormProps) {
       setError(
         submitError instanceof Error
           ? submitError.message
-          : mode === "sign-in"
+          : mode === AUTH_MODE.SIGN_IN
             ? "Login failed"
             : "Registration failed"
       );
@@ -68,10 +68,12 @@ export function LoginForm({ googleBanner }: LoginFormProps) {
     <Card className="w-full max-w-md">
       <CardHeader>
         <CardTitle>
-          {mode === "sign-in" ? "Sign in to TrustLoop" : "Create your TrustLoop account"}
+          {mode === AUTH_MODE.SIGN_IN ? "Sign in to TrustLoop" : "Create your TrustLoop account"}
         </CardTitle>
         <CardDescription>
-          Continue with your Google account, or use email and password.
+          {googleEnabled
+            ? "Continue with your Google account, or use email and password."
+            : "Sign in or create an account with email and password."}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -84,22 +86,24 @@ export function LoginForm({ googleBanner }: LoginFormProps) {
 
         {error ? (
           <Alert variant="destructive" className="mb-4">
-            <AlertTitle>{mode === "sign-in" ? "Login failed" : "Registration failed"}</AlertTitle>
+            <AlertTitle>{mode === AUTH_MODE.SIGN_IN ? "Login failed" : "Registration failed"}</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         ) : null}
 
-        {/* Google as primary CTA. Full-page navigation (not fetch) so the
-            browser follows the redirect chain to Google and back. */}
-        <Button
-          type="button"
-          className="mb-4 w-full"
-          onClick={() => {
-            window.location.href = "/api/auth/google/start";
-          }}
-        >
-          <GoogleGlyph /> Continue with Google
-        </Button>
+        {/* Google as primary CTA only when the deployment has the OAuth
+            credentials required to complete the redirect flow. */}
+        {googleEnabled ? (
+          <Button
+            type="button"
+            className="mb-4 w-full"
+            onClick={() => {
+              window.location.href = "/api/auth/google/start";
+            }}
+          >
+            <GoogleGlyph /> Continue with Google
+          </Button>
+        ) : null}
 
         {/* Tab switcher stays visible for register/sign-in on the password
             path. Hidden when the password form is collapsed so the page
@@ -108,9 +112,9 @@ export function LoginForm({ googleBanner }: LoginFormProps) {
           <div className="mb-4 grid grid-cols-2 gap-2">
             <Button
               type="button"
-              variant={mode === "sign-in" ? "default" : "outline"}
+              variant={mode === AUTH_MODE.SIGN_IN ? "default" : "outline"}
               onClick={() => {
-                setMode("sign-in");
+                setMode(AUTH_MODE.SIGN_IN);
                 setError(null);
                 setConfirmPassword("");
               }}
@@ -119,9 +123,9 @@ export function LoginForm({ googleBanner }: LoginFormProps) {
             </Button>
             <Button
               type="button"
-              variant={mode === "register" ? "default" : "outline"}
+              variant={mode === AUTH_MODE.REGISTER ? "default" : "outline"}
               onClick={() => {
-                setMode("register");
+                setMode(AUTH_MODE.REGISTER);
                 setError(null);
               }}
             >
@@ -131,7 +135,7 @@ export function LoginForm({ googleBanner }: LoginFormProps) {
         ) : null}
 
         {/* Collapsed disclosure: show a muted link that expands the form. */}
-        {!showPasswordForm ? (
+        {googleEnabled && !showPasswordForm ? (
           <button
             type="button"
             className="mx-auto mb-4 block text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
@@ -164,12 +168,12 @@ export function LoginForm({ googleBanner }: LoginFormProps) {
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 placeholder="••••••••"
-                autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
+                autoComplete={mode === AUTH_MODE.SIGN_IN ? "current-password" : "new-password"}
                 required
               />
             </div>
 
-            {mode === "register" ? (
+            {mode === AUTH_MODE.REGISTER ? (
               <div className="space-y-2">
                 <Label htmlFor="confirm-password">Confirm password</Label>
                 <Input
@@ -191,10 +195,10 @@ export function LoginForm({ googleBanner }: LoginFormProps) {
               disabled={submitting || isLoading}
             >
               {submitting
-                ? mode === "sign-in"
+                ? mode === AUTH_MODE.SIGN_IN
                   ? "Signing in..."
                   : "Creating account..."
-                : mode === "sign-in"
+                : mode === AUTH_MODE.SIGN_IN
                   ? "Sign in"
                   : "Create account"}
             </Button>

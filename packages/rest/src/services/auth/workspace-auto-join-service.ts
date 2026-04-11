@@ -1,3 +1,4 @@
+import { findWorkspaceByEmailDomain } from "@shared/rest/services/workspace-service";
 import { WORKSPACE_ROLE, type WorkspaceRole } from "@shared/types";
 
 // Structural transaction client for workspace auto-join. Same pattern as
@@ -113,14 +114,10 @@ export async function resolveWorkspaceFromVerifiedEmail(
     return null;
   }
 
-  // findFirst with explicit deletedAt:null — the DB constraint on
-  // Workspace.emailDomain is a partial unique index
-  // (WHERE emailDomain IS NOT NULL AND deletedAt IS NULL), so findUnique
-  // cannot be used. Same pattern as User.email lookups.
-  const workspace: { id: string } | null = await tx.workspace.findFirst({
-    where: { emailDomain: domain, deletedAt: null },
-    select: { id: true },
-  });
+  // Shared lookup — see findWorkspaceByEmailDomain in workspace-service.ts.
+  // WorkspaceAutoJoinTx structurally satisfies WorkspaceLookupClient, so the
+  // transaction client is passed through untouched.
+  const workspace = await findWorkspaceByEmailDomain(tx, domain);
 
   if (!workspace) {
     return null;

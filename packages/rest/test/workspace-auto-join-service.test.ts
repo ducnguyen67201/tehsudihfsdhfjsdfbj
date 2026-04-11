@@ -8,6 +8,15 @@ import {
 import { WORKSPACE_ROLE } from "@shared/types";
 import { describe, expect, it, vi } from "vitest";
 
+// The service imports findWorkspaceByEmailDomain from workspace-service.ts,
+// which imports { prisma } from @shared/database at module-load time and
+// triggers env validation. Empty mock is enough — the tests pass mock
+// transaction clients to the functions directly, never through real prisma.
+// Vitest hoists vi.mock above the imports so this takes effect at load time.
+vi.mock("@shared/database", () => ({
+  prisma: {},
+}));
+
 // ---------------------------------------------------------------------------
 // extractDomain
 // ---------------------------------------------------------------------------

@@ -165,7 +165,7 @@ export const authRouter = router({
   // as a fallback.
   providers: publicProcedure.query(() => {
     return authProvidersSchema.parse({
-      google: Boolean(env.GOOGLE_OAUTH_CLIENT_ID),
+      google: Boolean(env.GOOGLE_OAUTH_CLIENT_ID && env.GOOGLE_OAUTH_CLIENT_SECRET),
     });
   }),
   me: authenticatedProcedure.query(({ ctx }) => {

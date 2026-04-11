@@ -294,14 +294,18 @@ export interface FindOrCreateResult {
  * User create and AuthIdentity create either both land or neither does.
  *
  * Branches:
- *   1. AuthIdentity exists for (google, sub) → reuse user, { created: false }
- *   2. No identity, email matches an existing user, email_verified=true →
+ *   1. AuthIdentity exists for (google, sub) and points at an active user
+ *      → reuse user, { created: false }
+ *   2. AuthIdentity exists for (google, sub) but the linked user is
+ *      soft-deleted → reject sign-in. This fails closed instead of issuing
+ *      a session for an account that later auth checks will reject.
+ *   3. No identity, email matches an existing user, email_verified=true →
  *      link: create a new AuthIdentity pointing at the existing user.
  *      If name/avatarUrl were null on the existing user, populate them.
  *      { created: false }
- *   3. No identity, email matches but email_verified=false → ConflictError.
+ *   4. No identity, email matches but email_verified=false → ConflictError.
  *      Prevents account takeover via unverified Google email.
- *   4. No identity, no matching email → create a fresh User +
+ *   5. No identity, no matching email → create a fresh User +
  *      AuthIdentity. passwordHash is null. { created: true }
  *
  * `created` is the signal the callback handler uses to decide whether to
@@ -311,7 +315,9 @@ export async function findOrCreateUserFromGoogleProfile(
   tx: GoogleOauthTx,
   profile: GoogleProfile
 ): Promise<FindOrCreateResult> {
-  const existingIdentity = await tx.authIdentity.findUnique({
+  const existingIdentity: {
+    user: { id: string; email: string; deletedAt: Date | null };
+  } | null = await tx.authIdentity.findUnique({
     where: {
       provider_providerAccountId: {
         provider: AUTH_PROVIDER.GOOGLE,
@@ -320,12 +326,16 @@ export async function findOrCreateUserFromGoogleProfile(
     },
     select: {
       user: {
-        select: { id: true, email: true },
+        select: { id: true, email: true, deletedAt: true },
       },
     },
   });
 
   if (existingIdentity) {
+    if (existingIdentity.user.deletedAt !== null) {
+      throw new ValidationError("Cannot sign in with Google: account is deactivated");
+    }
+
     return { user: existingIdentity.user, created: false };
   }
 
