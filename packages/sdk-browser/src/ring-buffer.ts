@@ -1,4 +1,4 @@
-import type { StructuredEvent } from "./types.js";
+import type { StructuredEvent } from "./types";
 
 export interface RingBuffer {
   push(event: StructuredEvent): void;

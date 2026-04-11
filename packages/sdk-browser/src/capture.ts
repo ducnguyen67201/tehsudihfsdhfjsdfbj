@@ -1,6 +1,6 @@
-import { debugLog, warnLog } from "./logger.js";
-import type { RingBuffer } from "./ring-buffer.js";
-import type { StructuredEvent } from "./types.js";
+import { debugLog, warnLog } from "./logger";
+import type { RingBuffer } from "./ring-buffer";
+import type { StructuredEvent } from "./types";
 
 type CleanupFn = () => void;
 

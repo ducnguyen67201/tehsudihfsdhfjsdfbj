@@ -1,18 +1,18 @@
-import { startCapture } from "./capture.js";
-import type { CaptureHandle } from "./capture.js";
-import { extractWorkspaceId, resolveConfig } from "./config.js";
-import { createConsentManager } from "./consent.js";
-import type { ConsentManager } from "./consent.js";
-import { debugLog, setDebug, warnLog } from "./logger.js";
-import { createRecorder } from "./recorder.js";
-import type { RecorderHandle } from "./recorder.js";
-import { createRingBuffer } from "./ring-buffer.js";
-import type { RingBuffer } from "./ring-buffer.js";
-import { createSessionManager } from "./session.js";
-import type { SessionManager } from "./session.js";
-import { createTransport } from "./transport.js";
-import type { TransportHandle } from "./transport.js";
-import type { FlushPayload, ResolvedConfig, TrustLoopConfig, UserInfo } from "./types.js";
+import { startCapture } from "./capture";
+import type { CaptureHandle } from "./capture";
+import { extractWorkspaceId, resolveConfig } from "./config";
+import { createConsentManager } from "./consent";
+import type { ConsentManager } from "./consent";
+import { debugLog, setDebug, warnLog } from "./logger";
+import { createRecorder } from "./recorder";
+import type { RecorderHandle } from "./recorder";
+import { createRingBuffer } from "./ring-buffer";
+import type { RingBuffer } from "./ring-buffer";
+import { createSessionManager } from "./session";
+import type { SessionManager } from "./session";
+import { createTransport } from "./transport";
+import type { TransportHandle } from "./transport";
+import type { FlushPayload, ResolvedConfig, TrustLoopConfig, UserInfo } from "./types";
 
 // ── Internal SDK State ───────────────────────────────────────────────
 

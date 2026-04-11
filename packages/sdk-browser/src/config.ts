@@ -1,4 +1,4 @@
-import type { ResolvedConfig, TrustLoopConfig } from "./types.js";
+import type { ResolvedConfig, TrustLoopConfig } from "./types";
 
 const DEFAULT_INGEST_PATH = "/api/rest/session-replay/ingest";
 const DEFAULT_BUFFER_MINUTES = 5;

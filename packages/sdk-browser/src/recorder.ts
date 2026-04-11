@@ -1,4 +1,4 @@
-import { debugLog, warnLog } from "./logger.js";
+import { debugLog, warnLog } from "./logger";
 
 interface RrwebRecordOptions {
   maskAllText?: boolean;

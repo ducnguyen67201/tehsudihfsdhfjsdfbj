@@ -1,4 +1,4 @@
-import { debugLog } from "./logger.js";
+import { debugLog } from "./logger";
 
 const SESSION_STORAGE_KEY = "trustloop_recording";
 const INDICATOR_ATTR = "data-trustloop-indicator";

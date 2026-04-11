@@ -1,5 +1,5 @@
-import { debugLog, warnLog } from "./logger.js";
-import type { FlushPayload, StructuredEvent } from "./types.js";
+import { debugLog, warnLog } from "./logger";
+import type { FlushPayload, StructuredEvent } from "./types";
 
 const MAX_RETRY_ATTEMPTS = 3;
 const BASE_RETRY_DELAY_MS = 1000;
