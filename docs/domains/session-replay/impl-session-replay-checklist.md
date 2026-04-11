@@ -80,8 +80,8 @@
 - [ ] Consent framework: visual recording indicator styling
 
 ## Docs
-- [x] `docs/spec-session-replay-sdk.md`
-- [x] `docs/impl-session-replay-checklist.md`
+- [x] `docs/domains/session-replay/spec-session-replay-sdk.md`
+- [x] `docs/domains/session-replay/impl-session-replay-checklist.md`
 
 ## Architecture Decisions
 

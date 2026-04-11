@@ -12,7 +12,7 @@ Define the implementation spec for the first reliable support inbox loop:
 
 This spec is the execution source of truth for section **B. Slack Ingestion + Thread Grouping (P0)** in:
 
-- `docs/impl-plan-first-customer-happy-path-mvp.md`
+- `docs/plans/impl-plan-first-customer-happy-path-mvp.md`
 
 ## 2) Inputs and Locked Review Decisions
 
@@ -433,4 +433,4 @@ Parallel lanes:
 
 Implementation task list and file-by-file execution order:
 
-- `docs/impl-slack-ingestion-thread-grouping-p0-checklist.md`
+- `docs/domains/support/impl-slack-ingestion-thread-grouping-p0-checklist.md`

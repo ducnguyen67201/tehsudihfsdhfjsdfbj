@@ -54,7 +54,7 @@ Why fourth:
 
 ## A. Auth, Workspace Isolation, and Security (P0)
 
-- Focused execution spec: `docs/spec-auth-workspace-security-p0.md`
+- Focused execution spec: `docs/domains/auth/spec-auth-workspace-security-p0.md`
 
 - [x] Replace unsigned session cookie with signed/encrypted server session.
 - [x] Enforce authenticated procedures for sensitive mutations.
@@ -98,7 +98,7 @@ Definition of done:
 
 ## D. AI Analysis + Draft Generation (P0)
 
-- Focused execution spec: `docs/spec-ai-analysis-draft-generation.md`
+- Focused execution spec: `docs/domains/ai-analysis/spec-ai-analysis-draft-generation.md`
 
 - [x] Thread analysis prompt pipeline (severity, category, component, summary).
 - [x] Sentry context fetch and attach to analysis input.

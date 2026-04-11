@@ -374,6 +374,6 @@ Call sites:
 
 - `AGENTS.md` — project operating rules, skill routing, and service
   layer status table.
-- `docs/foundation-setup-and-conventions.md` — broader architectural
+- `docs/conventions/foundation-setup-and-conventions.md` — broader architectural
   conventions.
-- `docs/ui-conventions.md` — the UI-side analog of this doc.
+- `docs/conventions/ui-conventions.md` — the UI-side analog of this doc.

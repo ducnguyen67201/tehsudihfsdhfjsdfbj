@@ -3,13 +3,13 @@
 **Status:** Draft
 **Date:** 2026-04-11
 **Branch:** `anh/ai-analysis-draft-generation`
-**Parent:** `docs/impl-plan-first-customer-happy-path-mvp.md` § D
+**Parent:** `docs/plans/impl-plan-first-customer-happy-path-mvp.md` § D
 
 ---
 
 ## 1. Problem Statement
 
-The current analysis pipeline (spec: `docs/spec-ai-analysis-pipeline.md`) can search the codebase and produce drafts, but:
+The current analysis pipeline (spec: `docs/domains/ai-analysis/spec-ai-analysis-pipeline.md`) can search the codebase and produce drafts, but:
 
 1. **No Sentry context.** The agent investigates blind — it doesn't know which errors the customer is actually hitting. Sentry issues, stack traces, and breadcrumbs are the strongest signal for triaging bugs.
 2. **No PR tool.** When the agent identifies a clear fix, it can only describe it in prose. It should be able to propose a code change via a GitHub PR.
@@ -39,6 +39,129 @@ This spec adds Sentry integration, a PR tool, and formalizes both the analysis a
 
 ---
 
+## 3.5 System Overview
+
+Before diving into the state machines (§4), here is the end-to-end picture — how a user click in the inbox turns into a PR suggestion. The pieces that follow (state machines, Sentry, PR tool, tone config) plug into this skeleton.
+
+### 3.5.1 Request flow — UI to agent to external APIs
+
+```
+┌──────────────┐
+│   Web UI     │  user clicks "Analyze this thread"
+│ analysis-    │
+│ panel.tsx    │
+└──────┬───────┘
+       │ tRPC
+       ▼
+┌──────────────┐
+│  apps/web    │  dispatches Temporal workflow
+│    (API)     │
+└──────┬───────┘
+       │
+       ▼
+┌─────────────────────────────────────────────────────────┐
+│  Temporal  →  supportAnalysisWorkflow                   │
+│                                                         │
+│  ┌─────────────────────┐   GATHERING_CONTEXT            │
+│  │ buildThreadSnapshot │   • fetch conversation+events  │
+│  │   (30s timeout)     │   • resolve customer email     │
+│  └──────────┬──────────┘     (from Slack profile)       │
+│             │                                           │
+│             ▼                                           │
+│  ┌─────────────────────┐   still GATHERING_CONTEXT      │
+│  │  sentry.fetchContext│   • Sentry issues by email     │
+│  │   (non-fatal)       │   • skip if env not configured │
+│  └──────────┬──────────┘                                │
+│             │                                           │
+│             ▼                                           │
+│  ┌─────────────────────┐   → ANALYZING                  │
+│  │   markAnalyzing     │                                │
+│  └──────────┬──────────┘                                │
+│             │                                           │
+│             ▼                                           │
+│  ┌─────────────────────┐   5min timeout, heartbeat 45s  │
+│  │  runAnalysisAgent   │   calls apps/agents HTTP       │
+│  └──────────┬──────────┘                                │
+└─────────────┼───────────────────────────────────────────┘
+              │
+              ▼
+┌─────────────────────────────────────────────────────────┐
+│  apps/agents  (Mastra agent loop)                       │
+│                                                         │
+│   system prompt  ◄── workspace tone config (DB)         │
+│        │                                                │
+│        ▼                                                │
+│   ┌─────────┐   ┌─────────────┐   ┌──────────────────┐  │
+│   │ search  │   │   search    │   │   createPull     │  │
+│   │  Code   │   │   Sentry    │   │   Request        │  │
+│   └────┬────┘   └──────┬──────┘   └────────┬─────────┘  │
+│        │               │                   │           │
+│        ▼               ▼                   ▼           │
+│   codex index     Sentry REST        GitHub API        │
+│                                     (draft PR, max     │
+│                                      5 files)          │
+│                                                         │
+│   returns: { analysis, draft?, prUrl? }                 │
+└──────────────┬──────────────────────────────────────────┘
+               │
+               ▼
+        persist → ANALYZED / NEEDS_CONTEXT / FAILED
+               │
+               ▼
+        UI streams status via SSE
+```
+
+Two timeout buckets are deliberate: the context-gathering activities run with a 30-second `startToCloseTimeout` and retry twice, while `runAnalysisAgent` gets 5 minutes with a 45-second heartbeat because agent loops are unbounded in practice. Keeping them in separate `proxyActivities` blocks (see `apps/queue/src/domains/support/analysis.workflow.ts`) prevents one slow agent call from starving fast activities of retry budget.
+
+The agent's three tools fan out to independent systems — searching code never blocks Sentry, Sentry failure never blocks PR creation — so one flaky integration degrades gracefully instead of failing the whole analysis.
+
+### 3.5.2 Data model — what this branch adds
+
+```
+┌─────────────────────────┐
+│      Workspace          │
+└───────────┬─────────────┘
+            │ 1:1 (new)
+            ▼
+┌─────────────────────────┐
+│  WorkspaceAiSettings    │  ◄── NEW MODEL
+│  • defaultTone          │
+│  • responseStyle        │
+│  • signatureLine        │
+│  • maxDraftLength       │
+│  • includeCodeRefs      │
+└─────────────────────────┘
+
+┌─────────────────────────┐
+│   SupportConversation   │
+└───────────┬─────────────┘
+            │ 1:N
+            ▼
+┌─────────────────────────┐
+│    SupportAnalysis      │
+│  ─────────────────────  │
+│  status ◄── + GATHERING_CONTEXT
+│  + sentryContext  Json  │  ◄── NEW
+│  + customerEmail  Text  │  ◄── NEW
+│  + retryCount     Int   │  ◄── NEW
+└───────────┬─────────────┘
+            │ 1:1
+            ▼
+┌─────────────────────────┐
+│     SupportDraft        │
+│  ─────────────────────  │
+│  status ◄── + GENERATING
+│  + prUrl     Text       │  ◄── NEW
+│  + prNumber  Int        │  ◄── NEW
+└─────────────────────────┘
+```
+
+`WorkspaceAiSettings` is split from `Workspace` so tone config can evolve independently of core workspace fields (and so the workspace row stays narrow for the hot-path inbox queries). `retryCount` lives on `SupportAnalysis` rather than being derived from event history because the state machine reads it on every `retry` transition — the `FailedState` uses it as a guard against exceeding `MAX_ANALYSIS_RETRIES` (§6).
+
+The full Prisma definitions are in §10; this diagram only shows the shape.
+
+---
+
 ## 4. State Machine Design
 
 Reference: [refactoring.guru/design-patterns/state](https://refactoring.guru/design-patterns/state)
@@ -54,7 +177,7 @@ The State pattern encapsulates each status as an object with its own transition 
                              │ trigger()
                              v
                     ┌─────────────────┐
-                    │   GATHERING     │  buildThreadSnapshot + fetchSentryContext
+                    │   GATHERING     │  buildThreadSnapshot + sentry.fetchContext
                     │    CONTEXT      │
                     └────────┬────────┘
                              │ contextReady()
@@ -207,10 +330,13 @@ model WorkspaceAiSettings {
 
 ```
 Workspace settings (DB)
-    → passed in analyzeRequest.config.toneConfig
-        → injected into agent system prompt at runtime
-            → agent uses tone/style when writing draft
+    → workspace-ai-settings-service (aiSettings.getToneConfig)
+        → passed in analyzeRequest.config.toneConfig
+            → injected into agent system prompt at runtime
+                → agent uses tone/style when writing draft
 ```
+
+All reads/writes go through `packages/rest/src/services/workspace-ai-settings-service.ts`, imported as `import * as aiSettings from "@shared/rest/services/workspace-ai-settings-service"`. Both the tRPC router (§5.4) and the `runAnalysisAgent` activity use the same service — no direct `prisma.workspaceAiSettings` access outside the service file and the seed script.
 
 The system prompt gains a dynamic section:
 
@@ -354,7 +480,7 @@ buildThreadSnapshot (existing activity)
     ├── resolve customer email from Slack user profile (NEW)
     │
     v
-fetchSentryContext (NEW activity, 30s timeout)
+fetchSentryContextActivity (NEW activity, 30s timeout — wraps `sentry.fetchContext`)
     │
     ├── Sentry Issues API: recent issues for user email
     ├── Sentry Events API: latest event per top-3 issues
@@ -412,12 +538,18 @@ interface SentryContext {
   fetchedAt: string;
 }
 
-async function fetchSentryIssuesForUser(email: string): Promise<SentryIssue[]>
-async function fetchLatestEvent(issueId: string): Promise<SentryEvent>
-async function fetchSentryContext(email: string): Promise<SentryContext | null>
+// namespace import: `import * as sentry from "@shared/rest/services/sentry/sentry-service"`
+function isConfigured(): boolean
+async function fetchIssuesForUser(email: string): Promise<SentryIssue[]>
+async function fetchIssuesByQuery(query: string): Promise<SentryIssue[]>
+async function fetchLatestEvent(issueId: string): Promise<SentryEvent | null>
+async function fetchContext(email: string): Promise<SentryContext | null>
+function truncateStackTrace(event: SentryEvent, maxFrames?: number): string[]
 ```
 
-The service returns `null` when env vars are not configured (graceful degradation).
+Per the service-layer namespace convention (see `docs/conventions/service-layer-conventions.md`), functions drop the `Sentry` domain prefix — call sites read as `sentry.isConfigured()`, `sentry.fetchContext(email)`, etc.
+
+The service returns `null` / `false` / `[]` when env vars are not configured (graceful degradation — no throws at the boundary).
 
 ### 7.5 New Agent Tool: `searchSentry`
 
@@ -491,14 +623,16 @@ createPullRequest({
 
 ### 8.3 Implementation
 
-Uses the existing GitHub App installation token (already stored per workspace).
+All GitHub + Prisma access lives behind the codex namespace, not in the agent tool. The tool is a thin wrapper over `codex.createDraftPullRequest(input)` in `packages/rest/src/codex/github/draft-pr.ts`, which:
 
-1. Create a new branch: `trustloop/fix-{analysisId}-{timestamp}`
-2. For each change: create/update file via GitHub Contents API
-3. Create PR via GitHub API
-4. Return PR URL
+1. Resolves the selected `Repository` row and `GitHubInstallation` for the workspace (rejects unindexed or unselected repos).
+2. Creates an Octokit via the shared installation factory.
+3. Creates a new branch off the repo default: `trustloop/fix-{timestamp}`.
+4. For each change: creates or updates the file via the GitHub Contents API (reusing the file SHA when present).
+5. Opens the PR in **draft mode** — requires human approval to merge.
+6. Returns a discriminated union: `{ success: true, prUrl, prNumber, branchName }` or `{ success: false, error }`.
 
-The PR is created in **draft mode** — requires human approval to merge.
+The agent tool at `apps/agents/src/tools/create-pr.ts` imports `* as codex from "@shared/rest/codex"` and just forwards the input — no direct Prisma or Octokit in the agents package.
 
 ### 8.4 Guard Rails
 
@@ -626,7 +760,7 @@ supportAnalysisWorkflow(input)
     │       - fetch conversation + events
     │       - resolve customer email from Slack profile
     │
-    ├── 2. fetchSentryContext()          // still GATHERING_CONTEXT
+    ├── 2. fetchSentryContextActivity()  // still GATHERING_CONTEXT
     │       - query Sentry for user email (optional, skip if not configured)
     │       - attach to snapshot
     │
@@ -640,7 +774,7 @@ supportAnalysisWorkflow(input)
     └── 5. final transition             // → ANALYZED / NEEDS_CONTEXT / FAILED
 ```
 
-### 11.2 New Activity: `fetchSentryContext`
+### 11.2 New Activity: `fetchSentryContextActivity`
 
 ```typescript
 interface FetchSentryContextInput {
@@ -653,6 +787,8 @@ interface FetchSentryContextResult {
   sentryContext: SentryContext | null;
 }
 ```
+
+The activity is a thin wrapper around `sentry.fetchContext(email)` from the namespace-imported sentry service (§7.4) — no direct Prisma or fetch calls in the activity body except the `supportAnalysis.update` that persists the result on the analysis row.
 
 Timeout: 30 seconds. Non-fatal — if Sentry is unreachable, analysis continues without it.
 
@@ -764,15 +900,15 @@ Following the project's bottom-up commit convention:
 | 2 | Schema migration (new enum values, fields, WorkspaceAiSettings) | `packages/database/prisma/schema/analysis.prisma` + migration | §10 |
 | 3 | Update shared type schemas (statuses, tone config, Sentry types) | `packages/types/src/support/support-analysis.schema.ts` | §10.5 |
 | 4 | Sentry env vars | `packages/env/src/shared.ts` | §7.3 |
-| 5 | Sentry service | `packages/rest/src/services/sentry/sentry-service.ts` | §7.4 |
-| 6 | `fetchSentryContext` activity | `apps/queue/src/domains/support/analysis.activity.ts` | §11.2 |
+| 5 | Sentry service (namespace-import convention) | `packages/rest/src/services/sentry/sentry-service.ts` | §7.4 |
+| 6 | `fetchSentryContextActivity` | `apps/queue/src/domains/support/analysis.activity.ts` | §11.2 |
 | 7 | `escalateToManualHandling` activity | `apps/queue/src/domains/support/analysis.activity.ts` | §6, §11.3 |
-| 8 | `searchSentry` agent tool | `apps/agents/src/tools/search-sentry.ts` | §7.5 |
-| 9 | `createPullRequest` agent tool | `apps/agents/src/tools/create-pr.ts` | §8 |
+| 8 | `searchSentry` agent tool (via `sentry.*` namespace) | `apps/agents/src/tools/search-sentry.ts` | §7.5 |
+| 9 | `createDraftPullRequest` codex helper + `createPullRequest` agent tool | `packages/rest/src/codex/github/draft-pr.ts`, `apps/agents/src/tools/create-pr.ts` | §8 |
 | 10 | Register new tools in agent factory | `apps/agents/src/agent.ts` | §9 |
 | 11 | Update agent system prompt (Sentry, PR, tone injection) | `apps/agents/src/prompts/support-analysis.ts` | §9 |
 | 12 | Wire state machine into workflow + activities | `apps/queue/src/domains/support/analysis.workflow.ts` | §11.1 |
-| 13 | Workspace AI settings tRPC router + service | `packages/rest/src/workspace-ai-settings-router.ts` | §5 |
+| 13 | Workspace AI settings service + tRPC router | `packages/rest/src/services/workspace-ai-settings-service.ts`, `packages/rest/src/workspace-ai-settings-router.ts` | §5 |
 | 14 | Update seed script | `packages/database/prisma/seed.ts` | §12 |
 | 15 | UI: gathering context state + Sentry badge + PR link + escalation | `apps/web/src/components/support/` | §13.1–§13.4 |
 | 16 | UI: AI settings page | `apps/web/src/app/(workspace)/settings/ai-analysis/` | §13.5 |
