@@ -135,20 +135,21 @@ async function main() {
   const existingSlack = await prisma.supportInstallation.findFirst({
     where: { workspaceId: workspace.id, provider: "SLACK", deletedAt: null },
   });
-  const slackInstallation = existingSlack
-    ?? await prisma.supportInstallation.create({
-        data: {
-          workspaceId: workspace.id,
-          provider: "SLACK",
-          providerInstallationId: "local-dev-slack",
-          teamId: "T0AQB0129QD",
-          botUserId: "U0BOTLOCAL",
-          metadata: {
-            groupingWindowMinutes: 5,
-            maxGroupingWindowMinutes: 60,
-          },
+  const slackInstallation =
+    existingSlack ??
+    (await prisma.supportInstallation.create({
+      data: {
+        workspaceId: workspace.id,
+        provider: "SLACK",
+        providerInstallationId: "local-dev-slack",
+        teamId: "T0AQB0129QD",
+        botUserId: "U0BOTLOCAL",
+        metadata: {
+          groupingWindowMinutes: 5,
+          maxGroupingWindowMinutes: 60,
         },
-      });
+      },
+    }));
   console.log(`Slack Installation: ${slackInstallation.teamId} (${slackInstallation.id})`);
 
   // 7. Workspace AI Settings (default tone)
@@ -168,19 +169,20 @@ async function main() {
   const existingConvo = await prisma.supportConversation.findFirst({
     where: { workspaceId: workspace.id, channelId: "C0TEST001", threadTs: "1712345678.000100" },
   });
-  const conversation = existingConvo
-    ?? await prisma.supportConversation.create({
-        data: {
-          workspaceId: workspace.id,
-          installationId: slackInstallation.id,
-          canonicalConversationKey: "T0AQB0129QD:C0TEST001:1712345678.000100",
-          teamId: "T0AQB0129QD",
-          channelId: "C0TEST001",
-          threadTs: "1712345678.000100",
-          status: "UNREAD",
-          lastCustomerMessageAt: new Date(),
-        },
-      });
+  const conversation =
+    existingConvo ??
+    (await prisma.supportConversation.create({
+      data: {
+        workspaceId: workspace.id,
+        installationId: slackInstallation.id,
+        canonicalConversationKey: "T0AQB0129QD:C0TEST001:1712345678.000100",
+        teamId: "T0AQB0129QD",
+        channelId: "C0TEST001",
+        threadTs: "1712345678.000100",
+        status: "UNREAD",
+        lastCustomerMessageAt: new Date(),
+      },
+    }));
   console.log(`Conversation: ${conversation.id} (${existingConvo ? "existing" : "UNREAD"})`);
 
   // 9. Sample conversation events (only seed if conversation is new)
