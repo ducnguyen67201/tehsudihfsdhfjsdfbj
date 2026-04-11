@@ -132,7 +132,12 @@ describe("analysis state machine", () => {
     const failedRetryable = restoreAnalysisContext("an_1", ANALYSIS_STATUS.failed, "err", 1);
     expect(canRetryAnalysis(failedRetryable)).toBe(true);
 
-    const failedMaxed = restoreAnalysisContext("an_1", ANALYSIS_STATUS.failed, "err", MAX_ANALYSIS_RETRIES);
+    const failedMaxed = restoreAnalysisContext(
+      "an_1",
+      ANALYSIS_STATUS.failed,
+      "err",
+      MAX_ANALYSIS_RETRIES
+    );
     expect(canRetryAnalysis(failedMaxed)).toBe(false);
 
     const analyzed = restoreAnalysisContext("an_1", ANALYSIS_STATUS.analyzed, null, 0);
@@ -237,25 +242,21 @@ describe("draft state machine", () => {
     ctx = transitionDraft(ctx, { type: "generated" });
     ctx = transitionDraft(ctx, { type: "approve", approvedBy: "user_1" });
     ctx = transitionDraft(ctx, { type: "send" });
-    expect(() => transitionDraft(ctx, { type: "retry" })).toThrow(
-      InvalidDraftTransitionError
-    );
+    expect(() => transitionDraft(ctx, { type: "retry" })).toThrow(InvalidDraftTransitionError);
   });
 
   it("DISMISSED is terminal", () => {
     let ctx = createDraftContext("dr_1");
     ctx = transitionDraft(ctx, { type: "generated" });
     ctx = transitionDraft(ctx, { type: "dismiss" });
-    expect(() => transitionDraft(ctx, { type: "retry" })).toThrow(
-      InvalidDraftTransitionError
-    );
+    expect(() => transitionDraft(ctx, { type: "retry" })).toThrow(InvalidDraftTransitionError);
   });
 
   it("rejects invalid transitions", () => {
     const ctx = createDraftContext("dr_1");
-    expect(() =>
-      transitionDraft(ctx, { type: "approve", approvedBy: "user_1" })
-    ).toThrow(InvalidDraftTransitionError);
+    expect(() => transitionDraft(ctx, { type: "approve", approvedBy: "user_1" })).toThrow(
+      InvalidDraftTransitionError
+    );
   });
 
   it("getAllowedDraftEvents reflects current state", () => {
