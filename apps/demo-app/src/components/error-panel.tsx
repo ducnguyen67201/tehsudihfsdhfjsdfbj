@@ -52,31 +52,32 @@ export function ErrorPanel() {
     <div className="card">
       <h2>Error Simulation</h2>
       <p className="text-muted" style={{ marginBottom: "0.75rem" }}>
-        Each button triggers a different SDK event type. Check the browser console for [TrustLoop] debug logs.
+        Each button triggers a different SDK event type. Check the browser console for [TrustLoop]
+        debug logs.
       </p>
       <div className="btn-grid">
         <div className="btn-row">
-          <button className="btn-danger" onClick={throwUncaughtError}>
+          <button type="button" className="btn-danger" onClick={throwUncaughtError}>
             Throw Uncaught Error
           </button>
         </div>
         <div className="btn-row">
-          <button className="btn-danger" onClick={triggerConsoleError}>
+          <button type="button" className="btn-danger" onClick={triggerConsoleError}>
             Console Error
           </button>
         </div>
         <div className="btn-row">
-          <button className="btn-warning" onClick={triggerConsoleWarn}>
+          <button type="button" className="btn-warning" onClick={triggerConsoleWarn}>
             Console Warning
           </button>
         </div>
         <div className="btn-row">
-          <button className="btn-danger" onClick={fetchNotFound}>
+          <button type="button" className="btn-danger" onClick={fetchNotFound}>
             Fetch 404
           </button>
         </div>
         <div className="btn-row">
-          <button className="btn-danger" onClick={fetchUnreachable}>
+          <button type="button" className="btn-danger" onClick={fetchUnreachable}>
             Fetch Unreachable Host
           </button>
         </div>

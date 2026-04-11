@@ -1,7 +1,7 @@
 "use client";
 
 import { loginUser } from "@/lib/sdk";
-import { useState, type FormEvent } from "react";
+import { type FormEvent, useState } from "react";
 
 interface UserInfo {
   id: string;

@@ -199,7 +199,6 @@ export function MessageList({
             }
 
             if (INLINE_ANNOTATION_TYPES.has(event.eventType)) {
-
               nodes.push(
                 <SystemAnnotation
                   key={event.id}
@@ -232,7 +231,6 @@ export function MessageList({
                   </MessageBlock>
                 </div>
               );
-
 
               return nodes;
             }

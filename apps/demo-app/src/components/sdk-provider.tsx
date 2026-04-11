@@ -1,7 +1,7 @@
 "use client";
 
 import { initSDK } from "@/lib/sdk";
-import { useEffect, type ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 
 export function SDKProvider({ children }: { children: ReactNode }) {
   useEffect(() => {

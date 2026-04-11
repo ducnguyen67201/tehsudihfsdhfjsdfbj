@@ -12,9 +12,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en">
       <body>
         <SDKProvider>
-          <main style={{ maxWidth: 640, margin: "0 auto", padding: "2rem" }}>
-            {children}
-          </main>
+          <main style={{ maxWidth: 640, margin: "0 auto", padding: "2rem" }}>{children}</main>
         </SDKProvider>
       </body>
     </html>

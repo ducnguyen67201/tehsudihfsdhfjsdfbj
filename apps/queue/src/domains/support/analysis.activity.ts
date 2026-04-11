@@ -1,11 +1,11 @@
 import { prisma } from "@shared/database";
 import { env } from "@shared/env";
+import { fetchSlackUserEmail } from "@shared/rest/services/support/adapters/slack/slack-user-service";
 import {
   compileSessionDigest,
   extractEmailsFromEvents,
   findCorrelatedSession,
 } from "@shared/rest/services/support/session-correlation-service";
-import { fetchSlackUserEmail } from "@shared/rest/services/support/adapters/slack/slack-user-service";
 import {
   ANALYSIS_RESULT_STATUS,
   ANALYSIS_STATUS,

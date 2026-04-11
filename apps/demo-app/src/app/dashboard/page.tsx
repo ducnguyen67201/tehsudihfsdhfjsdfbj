@@ -16,14 +16,15 @@ export default function DashboardPage() {
     <>
       <h1>Dashboard</h1>
       <p className="text-muted" style={{ marginBottom: "1rem" }}>
-        This page exists to test route change capture. Navigating here from Home generates a ROUTE event.
+        This page exists to test route change capture. Navigating here from Home generates a ROUTE
+        event.
       </p>
 
       <div className="card">
         <h2>Dashboard Actions</h2>
         <div className="btn-grid">
           <div className="btn-row">
-            <button className="btn-danger" onClick={fetchData}>
+            <button type="button" className="btn-danger" onClick={fetchData}>
               Load Data (triggers 404)
             </button>
             {flash && <span className="flash">Triggered!</span>}

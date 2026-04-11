@@ -10,9 +10,7 @@ interface EventWithDetails {
   detailsJson: unknown;
 }
 
-function extractCustomerSlackUserId(
-  events: EventWithDetails[]
-): string | null {
+function extractCustomerSlackUserId(events: EventWithDetails[]): string | null {
   for (const event of events) {
     if (event.eventType !== "MESSAGE_RECEIVED") continue;
 

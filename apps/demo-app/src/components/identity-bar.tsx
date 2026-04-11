@@ -16,7 +16,11 @@ export function IdentityBar({ name, email, userId, onLogout }: IdentityBarProps)
       <strong>{name}</strong>
       <span>({email})</span>
       <span className="text-muted">{userId}</span>
-      <button onClick={onLogout} style={{ marginLeft: "auto", padding: "0.25rem 0.5rem", fontSize: "0.75rem" }}>
+      <button
+        type="button"
+        onClick={onLogout}
+        style={{ marginLeft: "auto", padding: "0.25rem 0.5rem", fontSize: "0.75rem" }}
+      >
         Logout
       </button>
     </div>

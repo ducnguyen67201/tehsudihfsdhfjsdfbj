@@ -1,10 +1,10 @@
 import {
+  type CompressedSessionDigest,
+  POSITIONAL_SESSION_DIGEST_FORMAT_INSTRUCTIONS,
+  SESSION_ACTION_TYPE_CODES,
+  SESSION_ERROR_TYPE_CODES,
   compressedSessionDigestSchema,
   reconstructSessionDigest,
-  POSITIONAL_SESSION_DIGEST_FORMAT_INSTRUCTIONS,
-  SESSION_ERROR_TYPE_CODES,
-  SESSION_ACTION_TYPE_CODES,
-  type CompressedSessionDigest,
 } from "@shared/types/positional-format/session-digest";
 import { describe, expect, it } from "vitest";
 
@@ -139,15 +139,11 @@ describe("compressedSessionDigestSchema", () => {
   });
 
   it("rejects non-integer page count", () => {
-    expect(() =>
-      compressedSessionDigestSchema.parse({ ...VALID_COMPRESSED, p: 2.5 })
-    ).toThrow();
+    expect(() => compressedSessionDigestSchema.parse({ ...VALID_COMPRESSED, p: 2.5 })).toThrow();
   });
 
   it("rejects non-string sessionId", () => {
-    expect(() =>
-      compressedSessionDigestSchema.parse({ ...VALID_COMPRESSED, s: 123 })
-    ).toThrow();
+    expect(() => compressedSessionDigestSchema.parse({ ...VALID_COMPRESSED, s: 123 })).toThrow();
   });
 
   it("rejects non-array routes", () => {
@@ -248,9 +244,7 @@ describe("reconstructSessionDigest", () => {
       l: ["12:00:00|0|Clicked button | with pipe | in description"],
     };
     const result = reconstructSessionDigest(compressed);
-    expect(result.lastActions[0]?.description).toBe(
-      "Clicked button | with pipe | in description"
-    );
+    expect(result.lastActions[0]?.description).toBe("Clicked button | with pipe | in description");
   });
 
   it("handles action with missing fields gracefully", () => {
@@ -432,9 +426,8 @@ describe("POSITIONAL_SESSION_DIGEST_FORMAT_INSTRUCTIONS", () => {
   });
 
   it("contains at least two examples (per positional format spec)", () => {
-    const exampleCount = (
-      POSITIONAL_SESSION_DIGEST_FORMAT_INSTRUCTIONS.match(/Example/g) ?? []
-    ).length;
+    const exampleCount = (POSITIONAL_SESSION_DIGEST_FORMAT_INSTRUCTIONS.match(/Example/g) ?? [])
+      .length;
     expect(exampleCount).toBeGreaterThanOrEqual(2);
   });
 

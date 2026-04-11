@@ -59,7 +59,10 @@ export function SessionReplayModal({
     }
   }, [isOpen, onClose]);
 
-  // Initialize rrweb player when chunks are loaded
+  // Initialize rrweb player when chunks are loaded. playbackSpeed is intentionally
+  // omitted — a dedicated effect below propagates speed changes via setConfig so we
+  // don't tear down and rebuild the player every time the user changes speed.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: see comment above
   useEffect(() => {
     if (!isOpen || chunks.length === 0 || !playerContainerRef.current) return;
 
@@ -185,9 +188,9 @@ export function SessionReplayModal({
   if (!isOpen) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-background/95"
-      role="dialog"
+    <dialog
+      open
+      className="fixed inset-0 z-50 block h-full w-full max-w-none bg-background/95 p-0"
       aria-label="Session replay player"
       aria-modal="true"
     >
@@ -281,7 +284,7 @@ export function SessionReplayModal({
           />
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }
 

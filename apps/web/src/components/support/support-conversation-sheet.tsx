@@ -276,7 +276,8 @@ export function SupportConversationSheet({
                     <div>
                       <h2 className="font-medium">Done override</h2>
                       <p className="text-muted-foreground text-xs">
-                        Use only when the customer was informed outside the tracked Slack reply path.
+                        Use only when the customer was informed outside the tracked Slack reply
+                        path.
                       </p>
                     </div>
                     <Textarea
@@ -304,7 +305,9 @@ export function SupportConversationSheet({
                     <Separator />
 
                     {isTimelineLoading ? (
-                      <p className="text-muted-foreground text-sm">Loading conversation timeline...</p>
+                      <p className="text-muted-foreground text-sm">
+                        Loading conversation timeline...
+                      </p>
                     ) : null}
 
                     <div className="space-y-3">

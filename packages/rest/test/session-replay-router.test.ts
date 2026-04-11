@@ -23,10 +23,9 @@ vi.mock("@shared/database", () => ({
 }));
 
 // We import these after the mock so the module picks up our fakes
-const {
-  extractEmailsFromEvents,
-  compileSessionDigest,
-} = await import("@shared/rest/services/support/session-correlation-service");
+const { extractEmailsFromEvents, compileSessionDigest } = await import(
+  "@shared/rest/services/support/session-correlation-service"
+);
 
 describe("session-replay-router query patterns", () => {
   describe("getEvents", () => {
@@ -136,9 +135,7 @@ describe("extractEmailsFromEvents", () => {
   });
 
   it("returns empty array when no emails found", () => {
-    const events = [
-      { summary: "No emails here", detailsJson: { text: "just some data" } },
-    ];
+    const events = [{ summary: "No emails here", detailsJson: { text: "just some data" } }];
 
     const emails = extractEmailsFromEvents(events);
     expect(emails).toEqual([]);

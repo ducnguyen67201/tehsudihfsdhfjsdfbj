@@ -1,8 +1,7 @@
 import { TrustLoop } from "@trustloop/sdk";
 
 const INGEST_URL =
-  process.env.NEXT_PUBLIC_TRUSTLOOP_INGEST_URL ??
-  "http://localhost:3000/api/rest/sessions/ingest";
+  process.env.NEXT_PUBLIC_TRUSTLOOP_INGEST_URL ?? "http://localhost:3000/api/rest/sessions/ingest";
 
 const API_KEY =
   process.env.NEXT_PUBLIC_TRUSTLOOP_API_KEY ??
@@ -14,9 +13,7 @@ export function initSDK(): void {
   if (initialized || typeof window === "undefined") return;
 
   if (!API_KEY) {
-    console.warn(
-      "[demo-app] NEXT_PUBLIC_TRUSTLOOP_API_KEY is not set. SDK will not send data."
-    );
+    console.warn("[demo-app] NEXT_PUBLIC_TRUSTLOOP_API_KEY is not set. SDK will not send data.");
     return;
   }
 

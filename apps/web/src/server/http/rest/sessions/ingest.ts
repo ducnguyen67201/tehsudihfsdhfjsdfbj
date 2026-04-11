@@ -107,12 +107,14 @@ const innerHandler = withWorkspaceApiKeyAuth(async (request, ctx) => {
     try {
       // Use actual event timestamps instead of flush time for accuracy
       const eventTimestamps = payload.structuredEvents.map((e) => e.timestamp);
-      const earliestEventTime = eventTimestamps.length > 0
-        ? new Date(Math.min(...eventTimestamps))
-        : new Date(payload.timestamp);
-      const latestEventTime = eventTimestamps.length > 0
-        ? new Date(Math.max(...eventTimestamps))
-        : new Date(payload.timestamp);
+      const earliestEventTime =
+        eventTimestamps.length > 0
+          ? new Date(Math.min(...eventTimestamps))
+          : new Date(payload.timestamp);
+      const latestEventTime =
+        eventTimestamps.length > 0
+          ? new Date(Math.max(...eventTimestamps))
+          : new Date(payload.timestamp);
       const hasRrweb = payload.rrwebEvents !== undefined;
 
       await prisma.$transaction(async (tx) => {

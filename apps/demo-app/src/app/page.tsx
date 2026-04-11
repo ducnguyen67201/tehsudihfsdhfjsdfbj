@@ -19,7 +19,8 @@ export default function HomePage() {
     <>
       <h1>TrustLoop Demo App</h1>
       <p className="text-muted" style={{ marginBottom: "1rem" }}>
-        Simulates a customer app with the @trustloop/sdk installed. Triggers events that flow to the TrustLoop ingest endpoint.
+        Simulates a customer app with the @trustloop/sdk installed. Triggers events that flow to the
+        TrustLoop ingest endpoint.
       </p>
 
       {user ? (
