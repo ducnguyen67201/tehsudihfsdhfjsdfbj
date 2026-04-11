@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-const HEADLINE = "Slack support that reads your code.";
+const HEADLINE = "Slack support that reads your code. Then drafts the fix.";
 
 export function Hero() {
   const [text, setText] = useState("");
@@ -32,10 +32,13 @@ export function Hero() {
 
   return (
     <div className="max-w-4xl z-10 relative text-center mx-auto">
-      {/* Tag pill */}
-      <div className="inline-flex items-center gap-2 border border-[#EAE5E0] rounded-full px-5 py-2 mb-10 bg-white/60 backdrop-blur-sm">
-        <span className="w-2 h-2 rounded-full bg-[#D4A017]" />
-        <span className="text-[11px] uppercase tracking-widest text-[#8B7E74]">
+      {/* Tag pill — frosted glass, pulsing accent dot */}
+      <div className="relative inline-flex items-center gap-2.5 rounded-full px-5 py-2.5 mb-10 bg-white/70 backdrop-blur-md border border-white ring-1 ring-[#EAE5E0] shadow-[0_4px_32px_rgba(232,89,37,0.12)]">
+        <span className="relative flex h-2 w-2">
+          <span className="absolute inline-flex h-full w-full rounded-full bg-[#E85925] opacity-75 animate-ping" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-[#E85925]" />
+        </span>
+        <span className="text-[11px] uppercase tracking-widest text-[#1C1917] font-semibold">
           Now in Early Access
         </span>
       </div>
