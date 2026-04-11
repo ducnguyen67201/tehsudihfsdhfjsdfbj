@@ -13,10 +13,13 @@ async function main() {
   const connection = await Connection.connect({ address: env.TEMPORAL_ADDRESS });
   const client = new Client({ connection, namespace: env.TEMPORAL_NAMESPACE });
 
-  const existingSchedules = await client.schedule.list().next();
-  const alreadyExists = existingSchedules.value?.some(
-    (s: { scheduleId: string }) => s.scheduleId === SCHEDULE_ID
-  );
+  let alreadyExists = false;
+  for await (const schedule of client.schedule.list()) {
+    if (schedule.scheduleId === SCHEDULE_ID) {
+      alreadyExists = true;
+      break;
+    }
+  }
 
   if (alreadyExists) {
     const handle = client.schedule.getHandle(SCHEDULE_ID);
