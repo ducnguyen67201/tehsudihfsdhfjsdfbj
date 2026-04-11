@@ -1,8 +1,8 @@
-import { sendSlackThreadReply } from "@shared/rest/services/support/adapters/slack/slack-delivery-service";
+import * as slackDelivery from "@shared/rest/services/support/adapters/slack/slack-delivery-service";
 import { PermanentExternalError, TransientExternalError } from "@shared/types";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-describe("sendSlackThreadReply", () => {
+describe("slackDelivery.sendThreadReply", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
@@ -16,7 +16,7 @@ describe("sendSlackThreadReply", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await sendSlackThreadReply({
+    const result = await slackDelivery.sendThreadReply({
       provider: "SLACK",
       workspaceId: "ws_1",
       installationId: "inst_1",
@@ -66,7 +66,7 @@ describe("sendSlackThreadReply", () => {
     );
 
     await expect(
-      sendSlackThreadReply({
+      slackDelivery.sendThreadReply({
         provider: "SLACK",
         workspaceId: "ws_1",
         installationId: "inst_1",
@@ -96,7 +96,7 @@ describe("sendSlackThreadReply", () => {
     );
 
     await expect(
-      sendSlackThreadReply({
+      slackDelivery.sendThreadReply({
         provider: "SLACK",
         workspaceId: "ws_1",
         installationId: "inst_1",

@@ -8,10 +8,24 @@ import {
 } from "@shared/types";
 import { TRPCError } from "@trpc/server";
 
+// ---------------------------------------------------------------------------
+// supportProjection service
+//
+// Read-side projections over SupportConversation for the inbox UI and the
+// conversation detail view. Write-side mutations live in
+// support-command-service.ts (CQRS-lite). Import as a namespace:
+//
+//   import * as supportProjection from "@shared/rest/services/support/support-projection-service";
+//   const page = await supportProjection.listConversations(input);
+//   const timeline = await supportProjection.getConversationTimeline(ws, conv);
+//
+// See docs/service-layer-conventions.md.
+// ---------------------------------------------------------------------------
+
 /**
  * Read the inbox projection using the queue hot-path sort order.
  */
-export async function listSupportConversations(
+export async function listConversations(
   input: SupportConversationListRequest
 ): Promise<SupportConversationListResponse> {
   const conversations = await prisma.supportConversation.findMany({
@@ -58,7 +72,7 @@ export async function listSupportConversations(
 /**
  * Load a conversation plus its event timeline for the operator detail view.
  */
-export async function getSupportConversationTimeline(
+export async function getConversationTimeline(
   workspaceId: string,
   conversationId: string
 ): Promise<SupportConversationTimeline> {

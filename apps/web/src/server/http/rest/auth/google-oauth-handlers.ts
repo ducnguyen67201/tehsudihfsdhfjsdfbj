@@ -8,26 +8,15 @@ import {
 } from "@shared/rest/security/oauth-state";
 import { consumeLoginAttempt } from "@shared/rest/security/rate-limit";
 import { createUserSession, getSessionRequestMeta } from "@shared/rest/security/session";
-import {
-  type GoogleProfile,
-  buildGoogleAuthorizationUrl,
-  exchangeCodeForTokens,
-  findOrCreateUserFromGoogleProfile,
-  verifyIdToken,
-} from "@shared/rest/services/auth/google-oauth-service";
+import * as googleOauth from "@shared/rest/services/auth/google-oauth";
+import * as autoJoin from "@shared/rest/services/auth/workspace-auto-join-service";
+import * as memberships from "@shared/rest/services/workspace-membership-service";
 import {
   GOOGLE_OAUTH_OUTCOME,
   GOOGLE_OAUTH_STATUS,
   type GoogleOAuthOutcome,
   type GoogleOAuthStatus,
 } from "@shared/types";
-import {
-  ensureMembership,
-  extractDomain,
-  resolveWorkspaceFromVerifiedEmail,
-  type WorkspaceAutoJoinTx,
-} from "@shared/rest/services/auth/workspace-auto-join-service";
-import { listUserWorkspaceAccess } from "@shared/rest/services/workspace-membership-service";
 import { NextResponse } from "next/server";
 
 // ---------------------------------------------------------------------------
@@ -47,7 +36,7 @@ export async function handleGoogleOAuthStart(_request: Request): Promise<NextRes
 
   const issued = issueOauthStateCookie();
   const redirectUri = buildRedirectUri();
-  const authUrl = buildGoogleAuthorizationUrl({
+  const authUrl = googleOauth.buildAuthorizationUrl({
     state: issued.state,
     nonce: issued.nonce,
     codeChallenge: issued.codeChallenge,
@@ -122,10 +111,10 @@ export async function handleGoogleOAuthCallback(request: Request): Promise<NextR
   }
 
   const redirectUri = buildRedirectUri();
-  let profile: GoogleProfile;
+  let profile: googleOauth.GoogleProfile;
   try {
-    const tokens = await exchangeCodeForTokens({ code, codeVerifier, redirectUri });
-    profile = await verifyIdToken(tokens.idToken, nonce);
+    const tokens = await googleOauth.exchangeCode({ code, codeVerifier, redirectUri });
+    profile = await googleOauth.verifyIdToken(tokens.idToken, nonce);
   } catch (err) {
     console.warn("[google-oauth] token exchange or id_token verify failed", {
       error: err instanceof Error ? err.message : String(err),
@@ -138,7 +127,7 @@ export async function handleGoogleOAuthCallback(request: Request): Promise<NextR
   // before trying again, rather than thinking TrustLoop is broken.
   if (!profile.emailVerified) {
     console.warn("[google-oauth] refusing unverified email", {
-      domain: extractDomain(profile.email),
+      domain: autoJoin.extractDomain(profile.email),
     });
     return redirectToLogin(GOOGLE_OAUTH_STATUS.UNVERIFIED);
   }
@@ -151,10 +140,8 @@ export async function handleGoogleOAuthCallback(request: Request): Promise<NextR
   let autoJoinedWorkspaceId: string | null;
   try {
     const txResult = await prisma.$transaction(async (tx) => {
-      const { user: foundUser, created: wasCreated } = await findOrCreateUserFromGoogleProfile(
-        tx,
-        profile
-      );
+      const { user: foundUser, created: wasCreated } =
+        await googleOauth.findOrCreateUserFromProfile(tx, profile);
 
       const autoJoined = wasCreated
         ? await autoJoinUserFromVerifiedGoogleProfile(tx, foundUser.id, profile)
@@ -192,7 +179,7 @@ export async function handleGoogleOAuthCallback(request: Request): Promise<NextR
   //   - auth.login.success: always
   //   - auth.google.first_sign_in: on first ever Google sign-in for this user
   //   - auth.google.auto_joined: when auto-join actually fired
-  const domain = extractDomain(profile.email);
+  const domain = autoJoin.extractDomain(profile.email);
   const outcome = determineOutcome({ created, autoJoinedWorkspaceId, activeWorkspaceId });
   console.info("[google-oauth] callback complete", {
     event: "google_oauth_callback",
@@ -275,7 +262,7 @@ function buildRedirectUri(): string {
 
 async function resolveWorkspaceAfterLogin(input: {
   userId: string;
-  profile: GoogleProfile;
+  profile: googleOauth.GoogleProfile;
   autoJoinedWorkspaceId: string | null;
 }): Promise<{
   activeWorkspaceId: string | null;
@@ -288,10 +275,10 @@ async function resolveWorkspaceAfterLogin(input: {
     };
   }
 
-  const memberships = await listUserWorkspaceAccess(input.userId);
-  if (memberships.length > 0) {
+  const access = await memberships.listAccessForUser(input.userId);
+  if (access.length > 0) {
     return {
-      activeWorkspaceId: memberships[0]?.workspaceId ?? null,
+      activeWorkspaceId: access[0]?.workspaceId ?? null,
       autoJoinedWorkspaceId: null,
     };
   }
@@ -307,11 +294,11 @@ async function resolveWorkspaceAfterLogin(input: {
 }
 
 async function autoJoinUserFromVerifiedGoogleProfile(
-  tx: WorkspaceAutoJoinTx,
+  tx: autoJoin.WorkspaceAutoJoinTx,
   userId: string,
-  profile: GoogleProfile
+  profile: googleOauth.GoogleProfile
 ): Promise<string | null> {
-  const match = await resolveWorkspaceFromVerifiedEmail(tx, {
+  const match = await autoJoin.resolveFromVerifiedEmail(tx, {
     email: profile.email,
     emailVerified: profile.emailVerified,
   });
@@ -319,7 +306,7 @@ async function autoJoinUserFromVerifiedGoogleProfile(
     return null;
   }
 
-  await ensureMembership(tx, {
+  await autoJoin.ensureMembership(tx, {
     workspaceId: match.workspaceId,
     userId,
     role: match.role,

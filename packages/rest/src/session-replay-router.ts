@@ -98,10 +98,8 @@ export const sessionReplayRouter = router({
           orderBy: { createdAt: "desc" },
         });
 
-        const { extractEmailsFromEvents } = await import(
-          "./services/support/session-correlation-service"
-        );
-        const emails = extractEmailsFromEvents(events);
+        const { extractEmails } = await import("./services/support/session-correlation");
+        const emails = extractEmails(events);
         if (emails.length > 0) {
           resolvedEmail = emails[0];
         }

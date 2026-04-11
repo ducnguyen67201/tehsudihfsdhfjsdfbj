@@ -6,6 +6,19 @@ import type {
 } from "@shared/types";
 import { PermanentExternalError, TransientExternalError } from "@shared/types";
 
+// ---------------------------------------------------------------------------
+// slackDelivery service (adapter)
+//
+// Sends outbound support replies back into the originating Slack thread.
+// Classifies Slack API failures as transient (retryable) or permanent so
+// Temporal retry policies can decide. Import as a namespace:
+//
+//   import * as slackDelivery from "@shared/rest/services/support/adapters/slack/slack-delivery-service";
+//   const result = await slackDelivery.sendThreadReply(input);
+//
+// See docs/service-layer-conventions.md.
+// ---------------------------------------------------------------------------
+
 interface SlackSendRequest extends SupportAdapterSendRequest {
   installationMetadata?: unknown;
 }
@@ -72,9 +85,7 @@ function isTransientSlackError(errorCode: string | null): boolean {
 /**
  * Send one reply into the source Slack thread and classify failures for retry policy.
  */
-export async function sendSlackThreadReply(
-  input: SlackSendRequest
-): Promise<SupportAdapterSendResult> {
+export async function sendThreadReply(input: SlackSendRequest): Promise<SupportAdapterSendResult> {
   const token = resolveSlackBotToken(input.installationMetadata);
   const response = await fetch("https://slack.com/api/chat.postMessage", {
     method: "POST",

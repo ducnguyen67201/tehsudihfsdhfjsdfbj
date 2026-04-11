@@ -1,12 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * Unit tests for findCorrelatedSession — the DB correlation query
- * in session-correlation-service.
+ * Unit tests for sessionCorrelation.findByEmails — the DB correlation query.
  *
- * extractEmailsFromEvents and compileSessionDigest are covered in
- * session-replay-router.test.ts; this file focuses exclusively on
- * the Prisma interaction layer.
+ * extractEmails and compileDigest are covered in session-replay-router.test.ts;
+ * this file focuses exclusively on the Prisma interaction layer.
  */
 
 const mockFindFirst = vi.fn();
@@ -19,11 +17,10 @@ vi.mock("@shared/database", () => ({
   },
 }));
 
-const { findCorrelatedSession } = await import(
-  "@shared/rest/services/support/session-correlation-service"
-);
+const sessionCorrelation = await import("@shared/rest/services/support/session-correlation");
+const { findByEmails } = sessionCorrelation;
 
-describe("findCorrelatedSession", () => {
+describe("sessionCorrelation.findByEmails", () => {
   beforeEach(() => {
     mockFindFirst.mockReset();
     mockFindMany.mockReset();
@@ -32,7 +29,7 @@ describe("findCorrelatedSession", () => {
   it("returns null when no matching session exists", async () => {
     mockFindFirst.mockResolvedValue(null);
 
-    const result = await findCorrelatedSession({
+    const result = await findByEmails({
       workspaceId: "ws-1",
       emails: ["nobody@example.com"],
     });
@@ -71,7 +68,7 @@ describe("findCorrelatedSession", () => {
     mockFindFirst.mockResolvedValue(mockRecord);
     mockFindMany.mockResolvedValue(mockEvents);
 
-    const result = await findCorrelatedSession({
+    const result = await findByEmails({
       workspaceId: "ws-1",
       emails: ["user@example.com"],
     });
@@ -94,7 +91,7 @@ describe("findCorrelatedSession", () => {
     mockFindFirst.mockResolvedValue(null);
 
     const before = Date.now();
-    await findCorrelatedSession({
+    await findByEmails({
       workspaceId: "ws-1",
       emails: ["a@test.com", "b@test.com"],
     });
@@ -123,7 +120,7 @@ describe("findCorrelatedSession", () => {
     mockFindFirst.mockResolvedValue(null);
 
     const before = Date.now();
-    await findCorrelatedSession({
+    await findByEmails({
       workspaceId: "ws-1",
       emails: ["user@example.com"],
       windowMinutes: 60,
@@ -145,7 +142,7 @@ describe("findCorrelatedSession", () => {
   it("excludes soft-deleted records via deletedAt: null in the where clause", async () => {
     mockFindFirst.mockResolvedValue(null);
 
-    await findCorrelatedSession({
+    await findByEmails({
       workspaceId: "ws-1",
       emails: ["user@example.com"],
     });
@@ -160,7 +157,7 @@ describe("findCorrelatedSession", () => {
   it("picks the most recent session via orderBy lastEventAt desc", async () => {
     mockFindFirst.mockResolvedValue(null);
 
-    await findCorrelatedSession({
+    await findByEmails({
       workspaceId: "ws-1",
       emails: ["user@example.com"],
     });

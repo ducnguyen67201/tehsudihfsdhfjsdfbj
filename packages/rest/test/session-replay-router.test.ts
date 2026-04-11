@@ -23,8 +23,8 @@ vi.mock("@shared/database", () => ({
 }));
 
 // We import these after the mock so the module picks up our fakes
-const { extractEmailsFromEvents, compileSessionDigest } = await import(
-  "@shared/rest/services/support/session-correlation-service"
+const { extractEmails, compileDigest } = await import(
+  "@shared/rest/services/support/session-correlation"
 );
 
 describe("session-replay-router query patterns", () => {
@@ -98,14 +98,14 @@ describe("session-replay-router query patterns", () => {
   });
 });
 
-describe("extractEmailsFromEvents", () => {
+describe("sessionCorrelation.extractEmails", () => {
   it("finds emails in event summaries", () => {
     const events = [
       { summary: "Message from user@example.com about billing", detailsJson: null },
       { summary: "Reply sent to admin@test.org", detailsJson: null },
     ];
 
-    const emails = extractEmailsFromEvents(events);
+    const emails = extractEmails(events);
     expect(emails).toContain("user@example.com");
     expect(emails).toContain("admin@test.org");
     expect(emails).toHaveLength(2);
@@ -119,7 +119,7 @@ describe("extractEmailsFromEvents", () => {
       },
     ];
 
-    const emails = extractEmailsFromEvents(events);
+    const emails = extractEmails(events);
     expect(emails).toContain("hidden@corp.io");
     expect(emails).toContain("other@place.com");
   });
@@ -130,25 +130,25 @@ describe("extractEmailsFromEvents", () => {
       { summary: "Also from user@example.com", detailsJson: null },
     ];
 
-    const emails = extractEmailsFromEvents(events);
+    const emails = extractEmails(events);
     expect(emails).toEqual(["user@example.com"]);
   });
 
   it("returns empty array when no emails found", () => {
     const events = [{ summary: "No emails here", detailsJson: { text: "just some data" } }];
 
-    const emails = extractEmailsFromEvents(events);
+    const emails = extractEmails(events);
     expect(emails).toEqual([]);
   });
 
   it("handles null summary and null detailsJson", () => {
     const events = [{ summary: null, detailsJson: null }];
-    const emails = extractEmailsFromEvents(events);
+    const emails = extractEmails(events);
     expect(emails).toEqual([]);
   });
 });
 
-describe("compileSessionDigest", () => {
+describe("sessionCorrelation.compileDigest", () => {
   const baseRecord = {
     id: "rec-1",
     sessionId: "sess-abc",
@@ -169,7 +169,7 @@ describe("compileSessionDigest", () => {
       },
     ];
 
-    const digest = compileSessionDigest(baseRecord, events);
+    const digest = compileDigest(baseRecord, events);
 
     expect(digest.sessionId).toBe("sess-abc");
     expect(digest.userId).toBe("user-1");
@@ -200,7 +200,7 @@ describe("compileSessionDigest", () => {
       },
     ];
 
-    const digest = compileSessionDigest(baseRecord, events);
+    const digest = compileDigest(baseRecord, events);
     expect(digest.duration).toBe("3m 30s");
   });
 
@@ -226,7 +226,7 @@ describe("compileSessionDigest", () => {
       },
     ];
 
-    const digest = compileSessionDigest(baseRecord, events);
+    const digest = compileDigest(baseRecord, events);
     expect(digest.routeHistory).toEqual(["/dashboard", "/settings"]);
     expect(digest.pageCount).toBe(2);
   });
@@ -257,7 +257,7 @@ describe("compileSessionDigest", () => {
       },
     ];
 
-    const digest = compileSessionDigest(baseRecord, events);
+    const digest = compileDigest(baseRecord, events);
     expect(digest.failurePoint).not.toBeNull();
     expect(digest.failurePoint?.type).toBe("EXCEPTION");
     expect(digest.failurePoint?.description).toContain("TypeError");
@@ -275,7 +275,7 @@ describe("compileSessionDigest", () => {
       },
     ];
 
-    const digest = compileSessionDigest(baseRecord, events);
+    const digest = compileDigest(baseRecord, events);
     expect(digest.failurePoint).not.toBeNull();
     expect(digest.failurePoint?.type).toBe("NETWORK_ERROR");
     expect(digest.failurePoint?.description).toContain("POST");
@@ -305,7 +305,7 @@ describe("compileSessionDigest", () => {
       },
     ];
 
-    const digest = compileSessionDigest(baseRecord, events);
+    const digest = compileDigest(baseRecord, events);
     expect(digest.errors).toHaveLength(2);
     const repeatedError = digest.errors.find((e) => e.message === "Something broke");
     expect(repeatedError?.count).toBe(2);
@@ -327,7 +327,7 @@ describe("compileSessionDigest", () => {
       },
     ];
 
-    const digest = compileSessionDigest(baseRecord, events);
+    const digest = compileDigest(baseRecord, events);
     expect(digest.networkFailures).toHaveLength(2);
     const first = digest.networkFailures[0]!;
     const second = digest.networkFailures[1]!;
@@ -353,7 +353,7 @@ describe("compileSessionDigest", () => {
       },
     ];
 
-    const digest = compileSessionDigest(baseRecord, events);
+    const digest = compileDigest(baseRecord, events);
     expect(digest.consoleErrors).toHaveLength(1);
     const entry = digest.consoleErrors[0]!;
     expect(entry.count).toBe(2);
@@ -368,7 +368,7 @@ describe("compileSessionDigest", () => {
       payload: { selector: `#btn-${i}`, tag: "button", text: `Button ${i}`, x: 0, y: 0 },
     }));
 
-    const digest = compileSessionDigest(baseRecord, events);
+    const digest = compileDigest(baseRecord, events);
     // lastActions should be the most recent 30
     expect(digest.lastActions).toHaveLength(30);
     const firstAction = digest.lastActions[0]!;

@@ -1,11 +1,7 @@
 import { prisma } from "@shared/database";
 import { env } from "@shared/env";
-import { fetchSlackUserEmail } from "@shared/rest/services/support/adapters/slack/slack-user-service";
-import {
-  compileSessionDigest,
-  extractEmailsFromEvents,
-  findCorrelatedSession,
-} from "@shared/rest/services/support/session-correlation-service";
+import * as slackUser from "@shared/rest/services/support/adapters/slack/slack-user-service";
+import * as sessionCorrelation from "@shared/rest/services/support/session-correlation";
 import {
   ANALYSIS_RESULT_STATUS,
   ANALYSIS_STATUS,
@@ -86,7 +82,7 @@ export async function buildThreadSnapshot(
     // 1. Resolve email from Slack user ID (strongest signal)
     const customerSlackUserId = extractCustomerSlackUserId(conversation.events);
     if (customerSlackUserId) {
-      const slackEmail = await fetchSlackUserEmail(
+      const slackEmail = await slackUser.fetchEmail(
         customerSlackUserId,
         conversation.installation.metadata
       );
@@ -97,18 +93,18 @@ export async function buildThreadSnapshot(
 
     // 2. Fall back to regex-scraped emails from message text
     if (correlationEmails.length === 0) {
-      correlationEmails.push(...extractEmailsFromEvents(conversation.events));
+      correlationEmails.push(...sessionCorrelation.extractEmails(conversation.events));
     }
 
     if (correlationEmails.length > 0) {
-      const correlation = await findCorrelatedSession({
+      const correlation = await sessionCorrelation.findByEmails({
         workspaceId: input.workspaceId,
         emails: correlationEmails,
         windowMinutes: 30,
       });
 
       if (correlation) {
-        sessionDigest = compileSessionDigest(correlation.record, correlation.events);
+        sessionDigest = sessionCorrelation.compileDigest(correlation.record, correlation.events);
       }
     }
   } catch (error) {

@@ -198,6 +198,56 @@ Do not manually maintain parallel OpenAPI and TS contracts for the same payload.
 - Before writing new Prisma/business logic in a router, first search for an existing reusable service under `packages/rest/src/services/**` (and related domain modules) and reuse it when possible.
 - If no suitable service exists, create a focused service module and move reusable query/orchestration logic there; keep routers focused on auth/context checks, validation, and response mapping.
 
+## Service Layer Conventions
+
+Full spec: [`docs/service-layer-conventions.md`](docs/service-layer-conventions.md).
+
+Non-negotiable rules (summary):
+
+- All Prisma reads/writes, external API calls, and cross-domain composition live in `packages/rest/src/services/**`. Routers, HTTP handlers, UI server components, and Temporal activities **call services** — they do not talk to Prisma or external SDKs directly.
+- Services are plain ES modules of pure functions, imported as a namespace: `import * as workspace from "@shared/rest/services/workspace-service"`. No classes, no DI containers, no base `Service` abstract.
+- Function names drop the domain prefix so they read correctly through the namespace: `workspace.exists(id)`, not `workspaceExists(id)`.
+- One file per domain concern. Do not collapse related concerns into a god-file — `workspace-service.ts` and `workspace-membership-service.ts` are intentionally separate.
+- Transaction-aware helpers take a structural client as their first parameter, not `Prisma.TransactionClient`. This keeps them callable from both inside and outside `$transaction` and trivially mockable.
+- Policy (e.g. personal-domain reject list) lives at the **caller**, not inside the lookup. Services enforce database-level invariants (soft-delete scoping, multi-tenancy) and return raw results.
+- Size budget: ~300 lines per service file, then split into `services/<domain>/{find,mutate,access}.ts` with an `index.ts` that re-exports a single namespace.
+- When a local variable would shadow the namespace (`const workspace = ...`), rename the local variable (`match`, `row`, `record`), not the namespace.
+
+### Rollout status
+
+Incremental migration. Each service + all its call sites land in one commit.
+
+| Service                                  | Status      | Notes                                                                              |
+| ---------------------------------------- | ----------- | ---------------------------------------------------------------------------------- |
+| `workspace-service.ts`                   | ✅ migrated  | Pilot. 3 fns, 2 external call sites. Reference implementation.                     |
+| `workspace-membership-service.ts`        | ✅ migrated  | Imported as `memberships`. 6 fns renamed (dropped the `Workspace`/`User` prefix).  |
+| `user-service.ts`                        | ✅ migrated  | Imported as `users`. 4 fns renamed.                                                |
+| `auth/workspace-auto-join-service.ts`    | ✅ migrated  | Imported as `autoJoin`. Only `resolveWorkspaceFromVerifiedEmail` was renamed.      |
+| `auth/google-oauth-service.ts`           | ⏳ pending   | Large (417 lines). May split into `auth/google/{token,verify,profile}.ts` on move. |
+| `codex/embedding.ts`                     | ✅ migrated  | Imported as `embeddings` (plural — avoids `embedding` loop-var collision).         |
+| `support/slack-signature-service.ts`     | ✅ migrated  | Imported as `slackSignature`. HMAC request verifier.                               |
+| `support/adapters/slack/slack-user-service.ts` | ✅ migrated | Imported as `slackUser`. `users.info` resolver.                                  |
+| `support/analysis-stream-service.ts`     | ✅ migrated  | Imported as `analysisStream`. SSE poll-based event stream.                         |
+| `support/adapters/slack/slack-delivery-service.ts` | ✅ migrated | Imported as `slackDelivery`. Outbound `chat.postMessage` adapter.              |
+| `support/support-projection-service.ts`  | ✅ migrated  | Imported as `supportProjection`. CQRS read-side for the inbox UI.                  |
+| `support/support-analysis-service.ts`    | ✅ migrated  | Imported as `supportAnalysis`. tRPC procedure names unchanged (public API).        |
+| `support/support-ingress-service.ts`     | ✅ migrated  | Imported as `supportIngress`. Wrapper `processSlackWebhookFromHttpRequest` unchanged. |
+| `support/slack-oauth-service.ts`         | ✅ migrated  | Imported as `slackOauth`. End-to-end Slack OAuth install flow.                     |
+| `support/session-correlation-service.ts` | ✅ migrated  | 333 lines split into `session-correlation/{extract, digest, find}.ts` + shim.      |
+| `auth/google-oauth-service.ts`           | ✅ migrated  | 417 lines split into `google-oauth/{authorize, token, verify, identity}.ts` + shim. |
+| `support/support-command-service.ts`     | ✅ migrated  | 637 lines split into `support-command/{_shared, assign, reply, status}.ts` + shim.  |
+| `soft-delete-cascade.ts`                 | ⚪ exception | Prisma client extension, not a classic service. Stays on named exports.            |
+
+**Rollout status: 16/17 services migrated (1 documented exception). ✅ Complete.**
+
+Folder-split services use a re-export **shim file** at the parent level
+(e.g. `session-correlation.ts` alongside `session-correlation/`) because
+the `@shared/rest` package.json uses `"./*": "./src/*"` for subpath exports,
+which does not fall back to `<dir>/index.ts` for directory imports. The
+shim keeps call-site paths stable across the split.
+
+Migration rules: pilot first, migrate a service + all call sites in one commit, never leave a service half-converted, run `vitest run <file>` and `tsgo --noEmit` on `apps/web` and `packages/rest` before handoff.
+
 ## Environment + Secrets Rules
 
 - Use `@shared/env` for env access in app code.
@@ -294,6 +344,8 @@ A feature is done only when:
   - `docs/foundation-setup-and-conventions.md`
 - Implementation plan (MVP):
   - `docs/impl-plan-first-customer-happy-path-mvp.md`
+- Service layer conventions (namespace imports, naming rules, rollout status):
+  - `docs/service-layer-conventions.md`
 
 ## Skills + Doc Hygiene
 

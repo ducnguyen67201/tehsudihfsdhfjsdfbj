@@ -8,13 +8,8 @@ import {
   createUserSession,
   getSessionRequestMeta,
 } from "@shared/rest/security/session";
-import {
-  createUserWithPassword,
-  findUserAuthByEmail,
-  findUserIdentityByEmail,
-  normalizeUserEmail,
-} from "@shared/rest/services/user-service";
-import { listUserWorkspaceAccess } from "@shared/rest/services/workspace-membership-service";
+import * as users from "@shared/rest/services/user-service";
+import * as memberships from "@shared/rest/services/workspace-membership-service";
 import { authenticatedProcedure, publicProcedure, router } from "@shared/rest/trpc";
 import {
   authProvidersSchema,
@@ -29,10 +24,10 @@ import { TRPCError } from "@trpc/server";
 
 export const authRouter = router({
   register: publicProcedure.input(registerRequestSchema).mutation(async ({ ctx, input }) => {
-    const normalizedEmail = normalizeUserEmail(input.email);
+    const normalizedEmail = users.normalizeEmail(input.email);
     const requestMeta = getSessionRequestMeta(ctx.req);
 
-    const existingUser = await findUserIdentityByEmail(normalizedEmail);
+    const existingUser = await users.findIdentityByEmail(normalizedEmail);
 
     if (existingUser) {
       await writeAuditEvent({
@@ -51,7 +46,7 @@ export const authRouter = router({
     }
 
     const passwordHash = await hashPassword(input.password);
-    const user = await createUserWithPassword(normalizedEmail, passwordHash);
+    const user = await users.createWithPassword(normalizedEmail, passwordHash);
 
     const createdSession = await createUserSession(user.id, requestMeta, null);
     ctx.resHeaders.append("set-cookie", createdSession.cookie);
@@ -77,7 +72,7 @@ export const authRouter = router({
     });
   }),
   login: publicProcedure.input(loginRequestSchema).mutation(async ({ ctx, input }) => {
-    const normalizedEmail = normalizeUserEmail(input.email);
+    const normalizedEmail = users.normalizeEmail(input.email);
     const requestMeta = getSessionRequestMeta(ctx.req);
     const rateLimitKey = `${requestMeta.ip ?? "unknown"}:${normalizedEmail}`;
     const rateLimit = consumeLoginAttempt(rateLimitKey);
@@ -89,7 +84,7 @@ export const authRouter = router({
       });
     }
 
-    const user = await findUserAuthByEmail(normalizedEmail);
+    const user = await users.findAuthByEmail(normalizedEmail);
 
     // Null passwordHash means the account is Google-only (no password was ever set).
     // Treat identically to "user doesn't exist" or "wrong password" so the response
@@ -114,10 +109,10 @@ export const authRouter = router({
       });
     }
 
-    const memberships = await listUserWorkspaceAccess(user.id);
+    const access = await memberships.listAccessForUser(user.id);
 
-    const activeWorkspaceId = memberships[0]?.workspaceId ?? null;
-    const role = memberships[0]?.role ?? null;
+    const activeWorkspaceId = access[0]?.workspaceId ?? null;
+    const role = access[0]?.role ?? null;
 
     const createdSession = await createUserSession(user.id, requestMeta, activeWorkspaceId);
     ctx.resHeaders.append("set-cookie", createdSession.cookie);
