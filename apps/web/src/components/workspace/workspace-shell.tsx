@@ -21,8 +21,8 @@ import {
 import { DarkModeToggle } from "@/components/workspace/dark-mode-toggle";
 import { useAuthSession } from "@/hooks/use-auth-session";
 import {
-  workspaceApiKeysPath,
   workspaceRootPath,
+  workspaceSessionsPath,
   workspaceSettingsPath,
   workspaceSupportPath,
 } from "@/lib/workspace-paths";
@@ -35,8 +35,8 @@ import {
   RiLineChartLine,
   RiLogoutBoxRLine,
   RiPieChartLine,
+  RiPlayCircleLine,
   RiSettings3Line,
-  RiSparkling2Line,
 } from "@remixicon/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -60,8 +60,8 @@ export function WorkspaceShell({ workspaceId, children }: WorkspaceShellProps) {
 
   const rootPath = workspaceRootPath(workspaceId);
   const settingsPath = workspaceSettingsPath(workspaceId);
-  const apiKeysPath = workspaceApiKeysPath(workspaceId);
   const supportPath = workspaceSupportPath(workspaceId);
+  const sessionsPath = workspaceSessionsPath(workspaceId);
 
   const mainNavItems: NavItem[] = [
     {
@@ -75,6 +75,12 @@ export function WorkspaceShell({ workspaceId, children }: WorkspaceShellProps) {
       label: "Support",
       icon: RiCustomerService2Line,
       isActive: pathname === supportPath || pathname.startsWith(`${supportPath}/`),
+    },
+    {
+      href: sessionsPath,
+      label: "Sessions",
+      icon: RiPlayCircleLine,
+      isActive: pathname === sessionsPath || pathname.startsWith(`${sessionsPath}/`),
     },
   ];
 
@@ -236,12 +242,6 @@ export function WorkspaceShell({ workspaceId, children }: WorkspaceShellProps) {
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="h-4" />
             <p className="text-muted-foreground min-w-0 flex-1 truncate text-xs">{workspaceId}</p>
-            <Button size="sm" asChild>
-              <Link href={apiKeysPath}>
-                <RiSparkling2Line />
-                Quick Create
-              </Link>
-            </Button>
           </div>
         </header>
 

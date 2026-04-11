@@ -13,6 +13,13 @@ export function workspaceSupportPath(workspaceId: string): string {
 }
 
 /**
+ * Returns the session replay list path for a workspace.
+ */
+export function workspaceSessionsPath(workspaceId: string): string {
+  return `/${workspaceId}/sessions`;
+}
+
+/**
  * Returns the settings landing path for a workspace.
  */
 export function workspaceSettingsPath(workspaceId: string): string {

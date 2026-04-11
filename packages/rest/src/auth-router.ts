@@ -1,3 +1,4 @@
+import { env } from "@shared/env";
 import { writeAuditEvent } from "@shared/rest/security/audit";
 import { hashPassword, verifyPassword } from "@shared/rest/security/password";
 import { consumeLoginAttempt } from "@shared/rest/security/rate-limit";
@@ -7,15 +8,11 @@ import {
   createUserSession,
   getSessionRequestMeta,
 } from "@shared/rest/security/session";
-import {
-  createUserWithPassword,
-  findUserAuthByEmail,
-  findUserIdentityByEmail,
-  normalizeUserEmail,
-} from "@shared/rest/services/user-service";
-import { listUserWorkspaceAccess } from "@shared/rest/services/workspace-membership-service";
+import * as users from "@shared/rest/services/user-service";
+import * as memberships from "@shared/rest/services/workspace-membership-service";
 import { authenticatedProcedure, publicProcedure, router } from "@shared/rest/trpc";
 import {
+  authProvidersSchema,
   loginRequestSchema,
   loginResponseSchema,
   logoutResponseSchema,
@@ -27,10 +24,10 @@ import { TRPCError } from "@trpc/server";
 
 export const authRouter = router({
   register: publicProcedure.input(registerRequestSchema).mutation(async ({ ctx, input }) => {
-    const normalizedEmail = normalizeUserEmail(input.email);
+    const normalizedEmail = users.normalizeEmail(input.email);
     const requestMeta = getSessionRequestMeta(ctx.req);
 
-    const existingUser = await findUserIdentityByEmail(normalizedEmail);
+    const existingUser = await users.findIdentityByEmail(normalizedEmail);
 
     if (existingUser) {
       await writeAuditEvent({
@@ -49,7 +46,7 @@ export const authRouter = router({
     }
 
     const passwordHash = await hashPassword(input.password);
-    const user = await createUserWithPassword(normalizedEmail, passwordHash);
+    const user = await users.createWithPassword(normalizedEmail, passwordHash);
 
     const createdSession = await createUserSession(user.id, requestMeta, null);
     ctx.resHeaders.append("set-cookie", createdSession.cookie);
@@ -75,7 +72,7 @@ export const authRouter = router({
     });
   }),
   login: publicProcedure.input(loginRequestSchema).mutation(async ({ ctx, input }) => {
-    const normalizedEmail = normalizeUserEmail(input.email);
+    const normalizedEmail = users.normalizeEmail(input.email);
     const requestMeta = getSessionRequestMeta(ctx.req);
     const rateLimitKey = `${requestMeta.ip ?? "unknown"}:${normalizedEmail}`;
     const rateLimit = consumeLoginAttempt(rateLimitKey);
@@ -87,9 +84,15 @@ export const authRouter = router({
       });
     }
 
-    const user = await findUserAuthByEmail(normalizedEmail);
+    const user = await users.findAuthByEmail(normalizedEmail);
 
-    const isValid = user ? await verifyPassword(user.passwordHash, input.password) : false;
+    // Null passwordHash means the account is Google-only (no password was ever set).
+    // Treat identically to "user doesn't exist" or "wrong password" so the response
+    // never leaks which accounts exist or which provider they're linked to.
+    const isValid =
+      user && user.passwordHash !== null
+        ? await verifyPassword(user.passwordHash, input.password)
+        : false;
 
     if (!user || !isValid) {
       await writeAuditEvent({
@@ -106,10 +109,10 @@ export const authRouter = router({
       });
     }
 
-    const memberships = await listUserWorkspaceAccess(user.id);
+    const access = await memberships.listAccessForUser(user.id);
 
-    const activeWorkspaceId = memberships[0]?.workspaceId ?? null;
-    const role = memberships[0]?.role ?? null;
+    const activeWorkspaceId = access[0]?.workspaceId ?? null;
+    const role = access[0]?.role ?? null;
 
     const createdSession = await createUserSession(user.id, requestMeta, activeWorkspaceId);
     ctx.resHeaders.append("set-cookie", createdSession.cookie);
@@ -147,6 +150,17 @@ export const authRouter = router({
 
     return logoutResponseSchema.parse({
       success: true,
+    });
+  }),
+  // Which external sign-in providers are enabled for this deployment.
+  // Driven by env vars so ops can toggle without a rebuild. publicProcedure
+  // because /login needs to read it pre-authentication. Zero side effects.
+  // The Next.js login page reads env directly via a Server Component for
+  // its primary render path; this query exists for CLI / test clients and
+  // as a fallback.
+  providers: publicProcedure.query(() => {
+    return authProvidersSchema.parse({
+      google: Boolean(env.GOOGLE_OAUTH_CLIENT_ID && env.GOOGLE_OAUTH_CLIENT_SECRET),
     });
   }),
   me: authenticatedProcedure.query(({ ctx }) => {

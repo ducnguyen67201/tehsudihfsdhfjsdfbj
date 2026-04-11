@@ -81,7 +81,7 @@ Core lock-ins:
 
 - Uses existing `SupportInstallation` model — no schema changes required.
 - HMAC-signed state parameter for CSRF protection — avoids a DB-backed nonce table.
-- Bot scopes: `chat:write`, `channels:history`, `groups:history` (matching current Slack app config).
+- Bot scopes: `chat:write`, `channels:history`, `groups:history`, `users:read`, `users:read.email` (matching current Slack app config).
 - ADMIN-only role gate for connect/disconnect, matching the API key management pattern.
 - Hybrid API design: tRPC for authenticated queries/mutations, plain HTTP route for the OAuth callback redirect.
 - Settings UI follows the existing `api-keys` page pattern with shadcn/ui components.
@@ -184,7 +184,7 @@ Export from `packages/types/src/support/index.ts`.
 - Constructs redirect URI: `${APP_BASE_URL}/api/slack/oauth/callback`.
 - Builds state payload: `{ workspaceId, nonce: randomBytes(16).hex(), expiresAt: Date.now() + 10min }`.
 - Signs state: `base64url(JSON.stringify(payload)) + '.' + hmac_sha256(SESSION_SECRET, payload_b64)`.
-- Bot scopes: `chat:write,channels:history,groups:history`.
+- Bot scopes: `chat:write,channels:history,groups:history,users:read,users:read.email`.
 - Returns: `https://slack.com/oauth/v2/authorize?client_id=...&scope=...&redirect_uri=...&state=...`.
 
 ### 6.2 `verifyAndDecodeOAuthState(state: string): { workspaceId: string }`

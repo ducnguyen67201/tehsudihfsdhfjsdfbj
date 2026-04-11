@@ -1,66 +1,28 @@
 import { randomUUID } from "node:crypto";
 import { prisma } from "@shared/database";
-import { writeAuditEvent } from "@shared/rest/security/audit";
-import { sendSlackThreadReply } from "@shared/rest/services/support/adapters/slack/slack-delivery-service";
+import * as slackDelivery from "@shared/rest/services/support/adapters/slack/slack-delivery-service";
 import {
   PermanentExternalError,
   SUPPORT_CONVERSATION_EVENT_SOURCE,
   SUPPORT_CONVERSATION_STATUS,
-  type SupportAssignCommand,
   type SupportCommandResponse,
-  type SupportMarkDoneWithOverrideCommand,
   type SupportRetryDeliveryCommand,
   type SupportSendReplyCommand,
-  type SupportUpdateStatusCommand,
   TransientExternalError,
   ValidationError,
-  supportCommandResponseSchema,
 } from "@shared/types";
 import { TRPCError } from "@trpc/server";
+import { buildCommandResponse } from "./_shared";
 
-async function requireConversation(workspaceId: string, conversationId: string) {
-  const conversation = await prisma.supportConversation.findFirst({
-    where: {
-      id: conversationId,
-      workspaceId,
-    },
-  });
-
-  if (!conversation) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Support conversation not found",
-    });
-  }
-
-  return conversation;
-}
-
-async function hasDeliveryEvidence(workspaceId: string, conversationId: string): Promise<boolean> {
-  const deliveryAttempt = await prisma.supportDeliveryAttempt.findFirst({
-    where: {
-      workspaceId,
-      conversationId,
-      state: "SUCCEEDED",
-    },
-    select: {
-      id: true,
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
-
-  return Boolean(deliveryAttempt);
-}
-
-function buildCommandResponse(commandId: string): SupportCommandResponse {
-  return supportCommandResponseSchema.parse({
-    accepted: true,
-    commandId,
-    workflowId: null,
-  });
-}
+// ---------------------------------------------------------------------------
+// supportCommand/reply — operator reply delivery + retry
+//
+// Both sendReply and retryDelivery share the sendReplyWithRecordedAttempt
+// core, which persists the delivery attempt, calls the Slack adapter, and
+// writes the success/failure timeline events atomically. Transient failures
+// get scheduled for retry (up to 3 attempts, 5-minute backoff); permanent
+// failures go straight to DEAD_LETTERED.
+// ---------------------------------------------------------------------------
 
 interface SupportReplyPayload {
   attachments: SupportSendReplyCommand["attachments"];
@@ -198,6 +160,7 @@ async function sendReplyWithRecordedAttempt(
     commandId: string;
     conversationId: string;
     payload: SupportReplyPayload;
+    replyToEventId?: string;
     workspaceId: string;
   },
   sender: SupportDeliverySender,
@@ -251,12 +214,33 @@ async function sendReplyWithRecordedAttempt(
           commandId: params.commandId,
           deliveryAttemptId: attempt.id,
           messageText: params.payload.messageText,
+          ...(params.replyToEventId ? { replyToEventId: params.replyToEventId } : {}),
         },
       },
     });
 
     return attempt;
   });
+
+  // Resolve the Slack thread_ts: use the target event's messageTs if replying
+  // to a specific message, otherwise fall back to the conversation root.
+  let resolvedThreadTs = conversation.threadTs;
+  if (params.replyToEventId) {
+    const targetEvent = await prisma.supportConversationEvent.findUnique({
+      where: { id: params.replyToEventId },
+      select: { detailsJson: true },
+    });
+    const messageTs =
+      typeof targetEvent?.detailsJson === "object" &&
+      targetEvent.detailsJson !== null &&
+      "messageTs" in targetEvent.detailsJson &&
+      typeof targetEvent.detailsJson.messageTs === "string"
+        ? targetEvent.detailsJson.messageTs
+        : null;
+    if (messageTs) {
+      resolvedThreadTs = messageTs;
+    }
+  }
 
   try {
     const delivery = await sender({
@@ -267,7 +251,7 @@ async function sendReplyWithRecordedAttempt(
       thread: {
         teamId: conversation.teamId,
         channelId: conversation.channelId,
-        threadTs: conversation.threadTs,
+        threadTs: resolvedThreadTs,
       },
       messageText: params.payload.messageText,
       attachments: params.payload.attachments,
@@ -376,51 +360,11 @@ async function sendReplyWithRecordedAttempt(
 }
 
 /**
- * Change conversation ownership and record the operator-visible timeline event.
- */
-export async function assignSupportConversation(
-  input: SupportAssignCommand
-): Promise<SupportCommandResponse> {
-  const commandId = randomUUID();
-  await requireConversation(input.workspaceId, input.conversationId);
-
-  await prisma.$transaction(async (tx) => {
-    await tx.supportConversation.update({
-      where: {
-        id: input.conversationId,
-      },
-      data: {
-        assigneeUserId: input.assigneeUserId,
-        lastActivityAt: new Date(),
-      },
-    });
-
-    await tx.supportConversationEvent.create({
-      data: {
-        workspaceId: input.workspaceId,
-        conversationId: input.conversationId,
-        eventType: "ASSIGNEE_CHANGED",
-        eventSource: SUPPORT_CONVERSATION_EVENT_SOURCE.operator,
-        summary: input.assigneeUserId
-          ? `Assigned to ${input.assigneeUserId}`
-          : "Conversation unassigned",
-        detailsJson: {
-          commandId,
-          assigneeUserId: input.assigneeUserId,
-        },
-      },
-    });
-  });
-
-  return buildCommandResponse(commandId);
-}
-
-/**
  * Send an operator reply into Slack, persisting delivery evidence for done-policy enforcement.
  */
-export async function sendSupportConversationReply(
+export async function sendReply(
   input: SupportSendReplyCommand,
-  sender: SupportDeliverySender = sendSlackThreadReply
+  sender: SupportDeliverySender = slackDelivery.sendThreadReply
 ): Promise<SupportCommandResponse> {
   const commandId = randomUUID();
   const conversation = await loadConversationDeliveryContext(
@@ -439,6 +383,7 @@ export async function sendSupportConversationReply(
         messageText: input.messageText,
         attachments: input.attachments,
       },
+      replyToEventId: input.replyToEventId,
       workspaceId: input.workspaceId,
     },
     sender
@@ -448,112 +393,11 @@ export async function sendSupportConversationReply(
 }
 
 /**
- * Update status when the transition is valid for the current evidence state.
- */
-export async function updateSupportConversationStatus(
-  input: SupportUpdateStatusCommand
-): Promise<SupportCommandResponse> {
-  const commandId = randomUUID();
-  await requireConversation(input.workspaceId, input.conversationId);
-
-  if (input.status === SUPPORT_CONVERSATION_STATUS.done) {
-    const hasEvidence = await hasDeliveryEvidence(input.workspaceId, input.conversationId);
-    if (!hasEvidence) {
-      throw new TRPCError({
-        code: "PRECONDITION_FAILED",
-        message: "Done requires delivery evidence or an audited override",
-      });
-    }
-  }
-
-  await prisma.$transaction(async (tx) => {
-    await tx.supportConversation.update({
-      where: {
-        id: input.conversationId,
-      },
-      data: {
-        status: input.status,
-        staleAt: input.status === SUPPORT_CONVERSATION_STATUS.done ? null : undefined,
-        lastActivityAt: new Date(),
-      },
-    });
-
-    await tx.supportConversationEvent.create({
-      data: {
-        workspaceId: input.workspaceId,
-        conversationId: input.conversationId,
-        eventType: "STATUS_CHANGED",
-        eventSource: SUPPORT_CONVERSATION_EVENT_SOURCE.operator,
-        summary: `Status changed to ${input.status}`,
-        detailsJson: {
-          commandId,
-          status: input.status,
-        },
-      },
-    });
-  });
-
-  return buildCommandResponse(commandId);
-}
-
-/**
- * Allow a done transition without Slack delivery evidence only with audit trail.
- */
-export async function markSupportConversationDoneWithOverride(
-  input: SupportMarkDoneWithOverrideCommand
-): Promise<SupportCommandResponse> {
-  const commandId = randomUUID();
-  await requireConversation(input.workspaceId, input.conversationId);
-
-  await prisma.$transaction(async (tx) => {
-    await tx.supportConversation.update({
-      where: {
-        id: input.conversationId,
-      },
-      data: {
-        status: SUPPORT_CONVERSATION_STATUS.done,
-        staleAt: null,
-        lastActivityAt: new Date(),
-      },
-    });
-
-    await tx.supportConversationEvent.create({
-      data: {
-        workspaceId: input.workspaceId,
-        conversationId: input.conversationId,
-        eventType: "STATUS_CHANGED",
-        eventSource: SUPPORT_CONVERSATION_EVENT_SOURCE.operator,
-        summary: "Marked done with override reason",
-        detailsJson: {
-          commandId,
-          overrideReason: input.overrideReason,
-          actorUserId: input.actorUserId,
-        },
-      },
-    });
-  });
-
-  await writeAuditEvent({
-    action: "support.conversation.done_override",
-    workspaceId: input.workspaceId,
-    actorUserId: input.actorUserId,
-    targetType: "support_conversation",
-    targetId: input.conversationId,
-    metadata: {
-      commandId,
-      overrideReason: input.overrideReason,
-    },
-  });
-
-  return buildCommandResponse(commandId);
-}
-
-/**
  * Re-open a failed delivery attempt so an operator can trigger a retry path.
  */
-export async function retrySupportDeliveryAttempt(
+export async function retryDelivery(
   input: SupportRetryDeliveryCommand,
-  sender: SupportDeliverySender = sendSlackThreadReply
+  sender: SupportDeliverySender = slackDelivery.sendThreadReply
 ): Promise<SupportCommandResponse> {
   const operatorCommandId = randomUUID();
   const attempt = await prisma.supportDeliveryAttempt.findFirst({

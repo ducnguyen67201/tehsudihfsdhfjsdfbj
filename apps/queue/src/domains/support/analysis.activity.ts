@@ -1,5 +1,7 @@
 import { prisma } from "@shared/database";
 import { env } from "@shared/env";
+import * as slackUser from "@shared/rest/services/support/adapters/slack/slack-user-service";
+import * as sessionCorrelation from "@shared/rest/services/support/session-correlation";
 import {
   fetchSentryContext,
   isSentryConfigured,
@@ -13,6 +15,7 @@ import {
   DRAFT_STATUS,
   MAX_ANALYSIS_RETRIES,
   type SentryContext,
+  type SessionDigest,
   type SupportAnalysisWorkflowResult,
   analyzeResponseSchema,
 } from "@shared/types";
@@ -28,6 +31,7 @@ interface ThreadSnapshotResult {
   analysisId: string;
   threadSnapshot: string;
   customerEmail: string | null;
+  sessionDigest: SessionDigest | null;
 }
 
 interface FetchSentryContextInput {
@@ -45,6 +49,7 @@ interface AnalysisAgentInput {
   conversationId: string;
   analysisId: string;
   threadSnapshot: string;
+  sessionDigest?: SessionDigest | null;
 }
 
 interface EscalateInput {
@@ -60,6 +65,7 @@ export async function buildThreadSnapshot(
   const conversation = await prisma.supportConversation.findUniqueOrThrow({
     where: { id: input.conversationId },
     include: {
+      installation: { select: { metadata: true } },
       events: {
         orderBy: { createdAt: "asc" },
         select: {
@@ -76,6 +82,44 @@ export async function buildThreadSnapshot(
   const customerEmail = resolveCustomerEmail(conversation.events);
   const snapshot = buildSnapshot(conversation, customerEmail);
 
+  // --- Session Correlation (best-effort) ---
+  // Priority: Slack user email (resolved via API) > regex-scraped emails from messages
+  let sessionDigest: SessionDigest | null = null;
+  try {
+    const correlationEmails: string[] = [];
+
+    // 1. Resolve email from Slack user ID (strongest signal)
+    const customerSlackUserId = extractCustomerSlackUserId(conversation.events);
+    if (customerSlackUserId) {
+      const slackEmail = await slackUser.fetchEmail(
+        customerSlackUserId,
+        conversation.installation.metadata
+      );
+      if (slackEmail) {
+        correlationEmails.push(slackEmail);
+      }
+    }
+
+    // 2. Fall back to regex-scraped emails from message text
+    if (correlationEmails.length === 0) {
+      correlationEmails.push(...sessionCorrelation.extractEmails(conversation.events));
+    }
+
+    if (correlationEmails.length > 0) {
+      const correlation = await sessionCorrelation.findByEmails({
+        workspaceId: input.workspaceId,
+        emails: correlationEmails,
+        windowMinutes: 30,
+      });
+
+      if (correlation) {
+        sessionDigest = sessionCorrelation.compileDigest(correlation.record, correlation.events);
+      }
+    }
+  } catch (error) {
+    console.warn("[analysis] Session correlation failed, continuing without digest:", error);
+  }
+
   const analysis = await prisma.supportAnalysis.create({
     data: {
       workspaceId: input.workspaceId,
@@ -91,6 +135,7 @@ export async function buildThreadSnapshot(
     analysisId: analysis.id,
     threadSnapshot: JSON.stringify(snapshot, null, 2),
     customerEmail,
+    sessionDigest,
   };
 }
 
@@ -173,6 +218,11 @@ export async function escalateToManualHandling(input: EscalateInput): Promise<vo
 
 type EventRow = { detailsJson: unknown };
 
+interface EventWithDetails {
+  eventType: string;
+  detailsJson: unknown;
+}
+
 function resolveCustomerEmail(events: EventRow[]): string | null {
   for (const event of events) {
     const details = event.detailsJson as Record<string, unknown> | null;
@@ -180,6 +230,28 @@ function resolveCustomerEmail(events: EventRow[]): string | null {
       return details.customerEmail;
     }
   }
+  return null;
+}
+
+/**
+ * Extract the first customer Slack user ID from conversation events.
+ * The slackUserId is stored in detailsJson during ingress processing.
+ */
+function extractCustomerSlackUserId(events: EventWithDetails[]): string | null {
+  for (const event of events) {
+    if (event.eventType !== "MESSAGE_RECEIVED") continue;
+
+    const details = event.detailsJson as Record<string, unknown> | null;
+    if (!details) continue;
+
+    if (details.authorRoleBucket !== "customer") continue;
+
+    const slackUserId = details.slackUserId;
+    if (typeof slackUserId === "string" && slackUserId.length > 0) {
+      return slackUserId;
+    }
+  }
+
   return null;
 }
 
@@ -247,6 +319,7 @@ async function callAgentService(
       workspaceId: input.workspaceId,
       conversationId: input.conversationId,
       threadSnapshot: input.threadSnapshot,
+      ...(input.sessionDigest ? { sessionDigest: input.sessionDigest } : {}),
       config,
     }),
     signal: AbortSignal.timeout(AGENT_TIMEOUT_MS),

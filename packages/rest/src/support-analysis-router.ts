@@ -1,9 +1,4 @@
-import {
-  approveSupportDraft,
-  dismissSupportDraft,
-  getLatestAnalysis,
-  triggerSupportAnalysis,
-} from "@shared/rest/services/support/support-analysis-service";
+import * as supportAnalysis from "@shared/rest/services/support/support-analysis-service";
 import type { WorkflowDispatcher } from "@shared/rest/temporal-dispatcher";
 import { router, workspaceProcedure } from "@shared/rest/trpc";
 import {
@@ -12,22 +7,26 @@ import {
   triggerAnalysisInputSchema,
 } from "@shared/types";
 
+// Note: the tRPC procedure names below (triggerAnalysis, approveDraft,
+// dismissDraft, getLatestAnalysis) are the PUBLIC API the frontend calls,
+// and stay unchanged. Only the internal service function calls were
+// renamed under the service-layer convention. See docs/service-layer-conventions.md.
 export function createSupportAnalysisRouter(dispatcher: WorkflowDispatcher) {
   return router({
     triggerAnalysis: workspaceProcedure
       .input(triggerAnalysisInputSchema)
       .mutation(({ ctx, input }) =>
-        triggerSupportAnalysis({ ...input, workspaceId: ctx.workspaceId }, dispatcher)
+        supportAnalysis.trigger({ ...input, workspaceId: ctx.workspaceId }, dispatcher)
       ),
     approveDraft: workspaceProcedure.input(approveDraftInputSchema).mutation(({ ctx, input }) =>
-      approveSupportDraft({
+      supportAnalysis.approveDraft({
         ...input,
         workspaceId: ctx.workspaceId,
         actorUserId: ctx.user?.id ?? ctx.apiKeyAuth?.keyId ?? "system",
       })
     ),
     dismissDraft: workspaceProcedure.input(dismissDraftInputSchema).mutation(({ ctx, input }) =>
-      dismissSupportDraft({
+      supportAnalysis.dismissDraft({
         ...input,
         workspaceId: ctx.workspaceId,
         actorUserId: ctx.user?.id ?? ctx.apiKeyAuth?.keyId ?? "system",
@@ -35,6 +34,6 @@ export function createSupportAnalysisRouter(dispatcher: WorkflowDispatcher) {
     ),
     getLatestAnalysis: workspaceProcedure
       .input(triggerAnalysisInputSchema)
-      .query(({ ctx, input }) => getLatestAnalysis(input.conversationId, ctx.workspaceId)),
+      .query(({ ctx, input }) => supportAnalysis.getLatest(input.conversationId, ctx.workspaceId)),
   });
 }

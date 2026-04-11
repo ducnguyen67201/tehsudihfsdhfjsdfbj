@@ -11,13 +11,33 @@ import {
   ValidationError,
 } from "@shared/types";
 
+// ---------------------------------------------------------------------------
+// supportAnalysis service
+//
+// Commands over SupportAnalysis / SupportDraft: trigger a new analysis,
+// approve or dismiss a drafted reply, read the latest analysis for a
+// conversation. Import as a namespace:
+//
+//   import * as supportAnalysis from "@shared/rest/services/support/support-analysis-service";
+//   await supportAnalysis.trigger(input, dispatcher);
+//   await supportAnalysis.approveDraft(input);
+//   await supportAnalysis.dismissDraft(input);
+//   const latest = await supportAnalysis.getLatest(conversationId, workspaceId);
+//
+// Note: tRPC procedure names in support-analysis-router.ts stay unchanged
+// (they're the public API the frontend calls). Only the internal function
+// names are migrated here.
+//
+// See docs/service-layer-conventions.md.
+// ---------------------------------------------------------------------------
+
 export interface TriggerAnalysisResult {
   analysisId: string | null;
   workflowId: string;
   alreadyInProgress: boolean;
 }
 
-export async function triggerSupportAnalysis(
+export async function trigger(
   input: TriggerAnalysisInput & { workspaceId: string },
   dispatcher: WorkflowDispatcher
 ): Promise<TriggerAnalysisResult> {
@@ -75,7 +95,7 @@ export async function triggerSupportAnalysis(
   };
 }
 
-export async function approveSupportDraft(
+export async function approveDraft(
   input: ApproveDraftInput & { workspaceId: string; actorUserId: string }
 ) {
   const draft = await prisma.supportDraft.findFirst({
@@ -113,7 +133,7 @@ export async function approveSupportDraft(
   return updatedDraft;
 }
 
-export async function dismissSupportDraft(
+export async function dismissDraft(
   input: DismissDraftInput & { workspaceId: string; actorUserId: string }
 ) {
   const draft = await prisma.supportDraft.findFirst({
@@ -148,7 +168,7 @@ export async function dismissSupportDraft(
 /**
  * Get the latest analysis for a conversation (ordered by createdAt DESC).
  */
-export async function getLatestAnalysis(conversationId: string, workspaceId: string) {
+export async function getLatest(conversationId: string, workspaceId: string) {
   return prisma.supportAnalysis.findFirst({
     where: { conversationId, workspaceId },
     orderBy: { createdAt: "desc" },

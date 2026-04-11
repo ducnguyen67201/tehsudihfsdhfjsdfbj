@@ -1,7 +1,7 @@
 import { WorkspaceShell } from "@/components/workspace/workspace-shell";
 import { env } from "@shared/env";
 import { resolveSessionFromToken } from "@shared/rest/security/session";
-import { canAccessWorkspace } from "@shared/rest/services/workspace-service";
+import * as workspace from "@shared/rest/services/workspace-service";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
@@ -30,7 +30,7 @@ export default async function WorkspaceLayout({
     redirect("/login");
   }
 
-  if (!(await canAccessWorkspace(session.userId, workspaceId))) {
+  if (!(await workspace.canAccess(session.userId, workspaceId))) {
     notFound();
   }
 

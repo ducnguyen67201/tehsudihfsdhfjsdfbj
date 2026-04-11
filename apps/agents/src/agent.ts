@@ -6,12 +6,17 @@ import {
   type AnalyzeRequest,
   type AnalyzeResponse,
   type ToneConfig,
+  type SessionDigest,
   agentProviderConfigSchema,
   compressedAnalysisOutputSchema,
   reconstructAnalysisOutput,
 } from "@shared/types";
 
-import { buildSupportAgentSystemPrompt } from "./prompts/support-analysis";
+import {
+  buildSupportAgentSystemPrompt,
+  SUPPORT_AGENT_SYSTEM_PROMPT,
+  buildAnalysisPromptWithContext,
+} from "./prompts/support-analysis";
 import { resolveModel } from "./providers";
 import { createPullRequestTool } from "./tools/create-pr";
 import { searchCodeTool } from "./tools/search-code";
@@ -19,11 +24,36 @@ import { searchSentryTool } from "./tools/search-sentry";
 
 const DEFAULT_MAX_STEPS = 8;
 
-function createSupportAgent(providerConfig: AgentProviderConfig, toneConfig?: ToneConfig) {
+// ── Agent Factory ───────────────────────────────────────────────────
+//
+// Agents are created per-request with the caller's chosen provider/model.
+// Tools and system prompt stay the same regardless of provider.
+// The web app passes { provider: "openai", model: "gpt-4o" } or
+// { provider: "anthropic", model: "claude-sonnet-4-20250514" } and the
+// pipeline builds the right agent.
+//
+//   Web (user picks provider)
+//       → Queue (passes provider in analyze request)
+//           → Agent Service (factory creates agent with chosen LLM)
+//               → Same tools, same prompt, different brain
+
+function createSupportAgent(
+  providerConfig: AgentProviderConfig,
+  options?: { toneConfig?: ToneConfig; sessionDigest?: SessionDigest }
+) {
+  let instructions: string;
+  if (options?.sessionDigest) {
+    instructions = buildAnalysisPromptWithContext({ sessionDigest: options.sessionDigest });
+  } else if (options?.toneConfig) {
+    instructions = buildSupportAgentSystemPrompt(options.toneConfig);
+  } else {
+    instructions = SUPPORT_AGENT_SYSTEM_PROMPT;
+  }
+
   return new Agent({
     id: "trustloop-support-agent",
     name: "TrustLoop Support Agent",
-    instructions: buildSupportAgentSystemPrompt(toneConfig),
+    instructions,
     model: resolveModel(providerConfig),
     tools: {
       searchCode: searchCodeTool,
@@ -46,7 +76,10 @@ export async function runAnalysis(request: AnalyzeRequest): Promise<AnalyzeRespo
     maxSteps,
   });
 
-  const agent = createSupportAgent(providerConfig, request.config?.toneConfig);
+  const agent = createSupportAgent(providerConfig, {
+    toneConfig: request.config?.toneConfig,
+    sessionDigest: request.sessionDigest,
+  });
   const userMessage = `WORKSPACE_ID: ${request.workspaceId}\n\n${request.threadSnapshot}`;
 
   const result = await agent.generate(userMessage, { maxSteps, toolChoice: "auto" });

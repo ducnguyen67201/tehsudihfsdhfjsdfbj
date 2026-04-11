@@ -1,14 +1,5 @@
-import {
-  assignSupportConversation,
-  markSupportConversationDoneWithOverride,
-  retrySupportDeliveryAttempt,
-  sendSupportConversationReply,
-  updateSupportConversationStatus,
-} from "@shared/rest/services/support/support-command-service";
-import {
-  getSupportConversationTimeline,
-  listSupportConversations,
-} from "@shared/rest/services/support/support-projection-service";
+import * as supportCommand from "@shared/rest/services/support/support-command";
+import * as supportProjection from "@shared/rest/services/support/support-projection-service";
 import { router, workspaceProcedure } from "@shared/rest/trpc";
 import {
   SUPPORT_COMMAND_TYPE,
@@ -36,7 +27,7 @@ export const supportInboxRouter = router({
   listConversations: workspaceProcedure
     .input(supportConversationListInputSchema.optional())
     .query(({ ctx, input }) =>
-      listSupportConversations({
+      supportProjection.listConversations({
         workspaceId: ctx.workspaceId,
         statuses: input?.statuses,
         assigneeUserId: input?.assigneeUserId,
@@ -47,14 +38,14 @@ export const supportInboxRouter = router({
   getConversationTimeline: workspaceProcedure
     .input(supportConversationTimelineInputSchema)
     .query(({ ctx, input }) =>
-      getSupportConversationTimeline(ctx.workspaceId, input.conversationId)
+      supportProjection.getConversationTimeline(ctx.workspaceId, input.conversationId)
     ),
   assignConversation: workspaceProcedure
     .input(
       supportAssignCommandSchema.omit({ workspaceId: true, actorUserId: true, commandType: true })
     )
     .mutation(({ ctx, input }) =>
-      assignSupportConversation({
+      supportCommand.assign({
         ...input,
         commandType: SUPPORT_COMMAND_TYPE.assign,
         workspaceId: ctx.workspaceId,
@@ -70,7 +61,7 @@ export const supportInboxRouter = router({
       })
     )
     .mutation(({ ctx, input }) =>
-      updateSupportConversationStatus({
+      supportCommand.updateStatus({
         ...input,
         commandType: SUPPORT_COMMAND_TYPE.updateStatus,
         workspaceId: ctx.workspaceId,
@@ -86,7 +77,7 @@ export const supportInboxRouter = router({
       })
     )
     .mutation(({ ctx, input }) =>
-      markSupportConversationDoneWithOverride({
+      supportCommand.markDoneWithOverride({
         ...input,
         commandType: SUPPORT_COMMAND_TYPE.markDoneWithOverride,
         workspaceId: ctx.workspaceId,
@@ -102,7 +93,7 @@ export const supportInboxRouter = router({
       })
     )
     .mutation(({ ctx, input }) =>
-      retrySupportDeliveryAttempt({
+      supportCommand.retryDelivery({
         ...input,
         commandType: SUPPORT_COMMAND_TYPE.retryDelivery,
         workspaceId: ctx.workspaceId,
@@ -118,7 +109,7 @@ export const supportInboxRouter = router({
       })
     )
     .mutation(({ ctx, input }) =>
-      sendSupportConversationReply({
+      supportCommand.sendReply({
         ...input,
         commandType: SUPPORT_COMMAND_TYPE.sendReply,
         workspaceId: ctx.workspaceId,
