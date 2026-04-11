@@ -233,11 +233,18 @@ Incremental migration. Each service + all its call sites land in one commit.
 | `support/support-analysis-service.ts`    | ✅ migrated  | Imported as `supportAnalysis`. tRPC procedure names unchanged (public API).        |
 | `support/support-ingress-service.ts`     | ✅ migrated  | Imported as `supportIngress`. Wrapper `processSlackWebhookFromHttpRequest` unchanged. |
 | `support/slack-oauth-service.ts`         | ✅ migrated  | Imported as `slackOauth`. End-to-end Slack OAuth install flow.                     |
+| `support/session-correlation-service.ts` | ✅ migrated  | 333 lines split into `session-correlation/{extract, digest, find}.ts` + shim.      |
+| `auth/google-oauth-service.ts`           | ✅ migrated  | 417 lines split into `google-oauth/{authorize, token, verify, identity}.ts` + shim. |
+| `support/support-command-service.ts`     | ✅ migrated  | 637 lines split into `support-command/{_shared, assign, reply, status}.ts` + shim.  |
 | `soft-delete-cascade.ts`                 | ⚪ exception | Prisma client extension, not a classic service. Stays on named exports.            |
-| **Stage E (file splits needed)**         |             | Over 300-line budget — each PR starts with a split-design discussion.              |
-| `support/session-correlation-service.ts` | ⏳ pending   | 333 lines. Candidate split: `{find, compute}.ts`.                                  |
-| `auth/google-oauth-service.ts`           | ⏳ pending   | 417 lines. Candidate split: `auth/google/{token, verify, profile, identity}.ts`.   |
-| `support/support-command-service.ts`     | ⏳ pending   | 637 lines — 2x budget. Needs real design session.                                  |
+
+**Rollout status: 16/17 services migrated (1 documented exception). ✅ Complete.**
+
+Folder-split services use a re-export **shim file** at the parent level
+(e.g. `session-correlation.ts` alongside `session-correlation/`) because
+the `@shared/rest` package.json uses `"./*": "./src/*"` for subpath exports,
+which does not fall back to `<dir>/index.ts` for directory imports. The
+shim keeps call-site paths stable across the split.
 
 Migration rules: pilot first, migrate a service + all call sites in one commit, never leave a service half-converted, run `vitest run <file>` and `tsgo --noEmit` on `apps/web` and `packages/rest` before handoff.
 
