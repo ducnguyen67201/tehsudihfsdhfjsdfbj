@@ -1,43 +1,15 @@
-import { prisma } from "@shared/database";
 import { SESSION_EVENT_TYPE, type SessionDigest } from "@shared/types";
 
-// ── Email Extraction ───────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// sessionCorrelation/digest — session digest compilation
+//
+// Pure functions: no DB. Given a SessionRecord row and its raw event rows,
+// compile a SessionDigest condensed view designed for AI agent consumption:
+// route history, failure points, aggregated errors, network failures, and
+// console errors. All helpers are internal to this module except compileDigest.
+// ---------------------------------------------------------------------------
 
-const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-
-interface ConversationEventSlice {
-  summary: string | null;
-  detailsJson: unknown;
-}
-
-/**
- * Scan conversation event summaries and detailsJson for email addresses.
- * Returns unique emails found across all events.
- */
-export function extractEmailsFromEvents(events: ConversationEventSlice[]): string[] {
-  const emails = new Set<string>();
-
-  for (const event of events) {
-    if (event.summary) {
-      for (const match of event.summary.matchAll(EMAIL_REGEX)) {
-        emails.add(match[0].toLowerCase());
-      }
-    }
-
-    if (event.detailsJson && typeof event.detailsJson === "object") {
-      const jsonStr = JSON.stringify(event.detailsJson);
-      for (const match of jsonStr.matchAll(EMAIL_REGEX)) {
-        emails.add(match[0].toLowerCase());
-      }
-    }
-  }
-
-  return [...emails];
-}
-
-// ── Session Digest Compilation ─────────────────────────────────────
-
-interface SessionRecordRow {
+export interface SessionRecordRow {
   id: string;
   sessionId: string;
   userId: string | null;
@@ -47,7 +19,7 @@ interface SessionRecordRow {
   lastEventAt: Date;
 }
 
-interface SessionEventRow {
+export interface SessionEventRow {
   eventType: string;
   timestamp: Date;
   url: string | null;
@@ -60,7 +32,7 @@ interface SessionEventRow {
  * The digest is a condensed view designed for AI agent consumption:
  * route history, failure points, errors, network failures, and console errors.
  */
-export function compileSessionDigest(
+export function compileDigest(
   record: SessionRecordRow,
   events: SessionEventRow[]
 ): SessionDigest {
@@ -113,52 +85,7 @@ export function compileSessionDigest(
   };
 }
 
-// ── Correlation Query ──────────────────────────────────────────────
-
-interface CorrelationInput {
-  workspaceId: string;
-  emails: string[];
-  windowMinutes?: number;
-}
-
-/**
- * Find the most recent session matching any of the given emails
- * within the time window. Returns the session record and its events,
- * or null if no match found.
- */
-export async function findCorrelatedSession(input: CorrelationInput): Promise<{
-  record: SessionRecordRow;
-  events: SessionEventRow[];
-} | null> {
-  const windowMs = (input.windowMinutes ?? 30) * 60 * 1000;
-
-  const matchingSession = await prisma.sessionRecord.findFirst({
-    where: {
-      workspaceId: input.workspaceId,
-      userEmail: { in: input.emails },
-      lastEventAt: { gte: new Date(Date.now() - windowMs) },
-      deletedAt: null,
-    },
-    orderBy: { lastEventAt: "desc" },
-  });
-
-  if (!matchingSession) {
-    return null;
-  }
-
-  const events = await prisma.sessionEvent.findMany({
-    where: { sessionRecordId: matchingSession.id },
-    orderBy: { timestamp: "asc" },
-    take: 200,
-  });
-
-  return {
-    record: matchingSession,
-    events,
-  };
-}
-
-// ── Internal Helpers ───────────────────────────────────────────────
+// ── Internal helpers ───────────────────────────────────────────────
 
 function formatDuration(ms: number): string {
   const seconds = Math.floor(ms / 1000);
