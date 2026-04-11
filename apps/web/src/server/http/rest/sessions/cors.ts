@@ -4,7 +4,7 @@ export function sessionCorsHeaders(methods = "POST, OPTIONS"): HeadersInit {
   return {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": methods,
-    "Access-Control-Allow-Headers": "Authorization, Content-Type",
+    "Access-Control-Allow-Headers": "Authorization, Content-Type, Content-Encoding",
     "Access-Control-Max-Age": "86400",
   };
 }

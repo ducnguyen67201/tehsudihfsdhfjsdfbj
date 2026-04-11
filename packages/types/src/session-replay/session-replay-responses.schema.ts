@@ -24,6 +24,7 @@ export const replayChunkResponseSchema = z.object({
 
 export const sessionRecordResponseSchema = z.object({
   id: z.string().min(1),
+  workspaceId: z.string().min(1),
   sessionId: z.string().min(1),
   userEmail: z.string().nullable(),
   userId: z.string().nullable(),

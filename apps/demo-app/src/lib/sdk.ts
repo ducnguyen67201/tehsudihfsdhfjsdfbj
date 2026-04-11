@@ -4,7 +4,9 @@ const INGEST_URL =
   process.env.NEXT_PUBLIC_TRUSTLOOP_INGEST_URL ??
   "http://localhost:3000/api/rest/sessions/ingest";
 
-const API_KEY = process.env.NEXT_PUBLIC_TRUSTLOOP_API_KEY ?? "";
+const API_KEY =
+  process.env.NEXT_PUBLIC_TRUSTLOOP_API_KEY ??
+  "tlk_daab3bd45655a724dc45.aa84f54cd104b1bf76695fed136ea713ebd930f86421eee2aca0d3292b391eb6a2ef44c4ce2c63a2";
 
 let initialized = false;
 

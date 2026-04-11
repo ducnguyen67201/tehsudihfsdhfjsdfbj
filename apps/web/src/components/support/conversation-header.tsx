@@ -11,7 +11,7 @@ import {
   type SupportConversation,
   type SupportConversationStatus,
 } from "@shared/types";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 interface ConversationHeaderProps {
   conversation: SupportConversation;
@@ -37,6 +37,17 @@ export function ConversationHeader({
   const [copied, setCopied] = useState(false);
 
   const isDone = conversation.status === SUPPORT_CONVERSATION_STATUS.done;
+
+  const threadDate = useMemo(() => {
+    const epochSeconds = Number.parseFloat(conversation.thread.threadTs);
+    if (Number.isNaN(epochSeconds)) return conversation.thread.threadTs;
+    return new Intl.DateTimeFormat(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(new Date(epochSeconds * 1000));
+  }, [conversation.thread.threadTs]);
 
   const handleCopyLink = useCallback(() => {
     const url = `${window.location.origin}${window.location.pathname}?thread=${conversation.id}`;
@@ -72,9 +83,7 @@ export function ConversationHeader({
             <RiHashtag className="h-4 w-4" />
           </button>
           <h1 className="truncate text-sm font-semibold">{conversation.thread.channelId}</h1>
-          <Badge variant="outline" className="shrink-0 font-mono text-[10px]">
-            {conversation.thread.threadTs}
-          </Badge>
+          <span className="shrink-0 text-xs text-muted-foreground">{threadDate}</span>
         </div>
 
         {/* Right: copy link + mark resolved */}

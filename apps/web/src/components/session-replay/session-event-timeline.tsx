@@ -1,7 +1,6 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -18,6 +17,17 @@ interface SessionEventTimelineProps {
   onEventClick?: (eventId: string, timestamp: string) => void;
   selectedEventId?: string | null;
 }
+
+const skeletonRowKeys = [
+  "skeleton-a",
+  "skeleton-b",
+  "skeleton-c",
+  "skeleton-d",
+  "skeleton-e",
+  "skeleton-f",
+  "skeleton-g",
+  "skeleton-h",
+] as const;
 
 function formatTime(isoTimestamp: string): string {
   const date = new Date(isoTimestamp);
@@ -53,8 +63,8 @@ export function SessionEventTimeline({
   if (isLoading) {
     return (
       <div className="space-y-2 p-2">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <div key={`skeleton-${i}`} className="flex items-center gap-3">
+        {skeletonRowKeys.map((key) => (
+          <div key={key} className="flex items-center gap-3">
             <Skeleton className="h-3 w-16" />
             <Skeleton className="h-3 w-12" />
             <Skeleton className="h-3 w-40" />
@@ -73,8 +83,8 @@ export function SessionEventTimeline({
   }
 
   return (
-    <ScrollArea className="h-[400px]" ref={scrollRef}>
-      <div className="space-y-0.5 p-1" role="list" aria-label="Session events">
+    <div className="h-full min-h-0 w-full overflow-auto" ref={scrollRef}>
+      <ul className="min-w-max space-y-0.5 p-1" aria-label="Session events">
         {events.map((event) => {
           const isFailurePoint = event.id === failurePointId;
           const isSelected = event.id === selectedEventId;
@@ -82,39 +92,40 @@ export function SessionEventTimeline({
           const description = sessionEventDescription(event.eventType, event.payload, event.url);
 
           return (
-            <button
-              key={event.id}
-              type="button"
-              className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted/50 ${
-                isFailurePoint ? "bg-destructive/5 border-l-2 border-destructive" : ""
-              } ${isSelected ? "bg-muted" : ""}`}
-              onClick={() => handleEventClick(event.id, event.timestamp)}
-              aria-label={`${event.eventType} at ${formatTime(event.timestamp)}: ${description}`}
-            >
-              <span className="font-mono text-xs text-muted-foreground w-16 shrink-0">
-                {formatTime(event.timestamp)}
-              </span>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="truncate flex-1">{description}</span>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="max-w-sm">
-                  <p className="font-mono text-xs">{description}</p>
-                  {event.url ? (
-                    <p className="text-muted-foreground text-xs mt-1">{event.url}</p>
-                  ) : null}
-                </TooltipContent>
-              </Tooltip>
-              <Badge variant="outline" className={`shrink-0 text-[10px] ${typeInfo.className}`}>
-                {typeInfo.label}
-              </Badge>
-              {isFailurePoint ? (
-                <span className="text-destructive text-xs shrink-0">failure</span>
-              ) : null}
-            </button>
+            <li key={event.id}>
+              <button
+                type="button"
+                className={`flex min-w-max w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-muted/50 ${
+                  isFailurePoint ? "bg-destructive/5 border-l-2 border-destructive" : ""
+                } ${isSelected ? "bg-muted" : ""}`}
+                onClick={() => handleEventClick(event.id, event.timestamp)}
+                aria-label={`${event.eventType} at ${formatTime(event.timestamp)}: ${description}`}
+              >
+                <span className="text-muted-foreground w-16 shrink-0 font-mono text-xs">
+                  {formatTime(event.timestamp)}
+                </span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="whitespace-nowrap">{description}</span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-sm">
+                    <p className="font-mono text-xs">{description}</p>
+                    {event.url ? (
+                      <p className="text-muted-foreground text-xs mt-1">{event.url}</p>
+                    ) : null}
+                  </TooltipContent>
+                </Tooltip>
+                <Badge variant="outline" className={`shrink-0 text-[10px] ${typeInfo.className}`}>
+                  {typeInfo.label}
+                </Badge>
+                {isFailurePoint ? (
+                  <span className="text-destructive text-xs shrink-0">failure</span>
+                ) : null}
+              </button>
+            </li>
           );
         })}
-      </div>
-    </ScrollArea>
+      </ul>
+    </div>
   );
 }

@@ -14,20 +14,6 @@ export async function handleSessionIngestOptions(): Promise<NextResponse> {
 }
 
 const innerHandler = withWorkspaceApiKeyAuth(async (request, ctx) => {
-  // Check workspace feature gate
-  const workspace = await prisma.workspace.findUnique({
-    where: { id: ctx.workspaceId },
-    select: { sessionCaptureEnabled: true },
-  });
-  if (!workspace?.sessionCaptureEnabled) {
-    return jsonWithCors(
-      {
-        error: { message: "Session capture is not enabled for this workspace", code: "FORBIDDEN" },
-      },
-      403
-    );
-  }
-
   // Rate limit by workspace
   const rateResult = consumeIngestAttempt(ctx.workspaceId);
   if (!rateResult.allowed) {
@@ -45,10 +31,36 @@ const innerHandler = withWorkspaceApiKeyAuth(async (request, ctx) => {
     );
   }
 
-  // Parse raw body (also checks actual size)
+  // Parse raw body — handle both JSON and gzip-compressed payloads
   let rawText: string;
   try {
-    rawText = await request.text();
+    const contentType = request.headers.get("content-type") ?? "";
+    if (contentType.includes("gzip")) {
+      const compressed = await request.arrayBuffer();
+      const ds = new DecompressionStream("gzip");
+      const writer = ds.writable.getWriter();
+      writer.write(new Uint8Array(compressed));
+      writer.close();
+      const reader = ds.readable.getReader();
+      const chunks: Uint8Array[] = [];
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) chunks.push(value);
+      }
+      rawText = new TextDecoder().decode(
+        chunks.length === 1
+          ? chunks[0]
+          : chunks.reduce((acc, c) => {
+              const merged = new Uint8Array(acc.length + c.length);
+              merged.set(acc);
+              merged.set(c, acc.length);
+              return merged;
+            }, new Uint8Array(0))
+      );
+    } else {
+      rawText = await request.text();
+    }
   } catch {
     return jsonWithCors(
       { error: { message: "Failed to read request body", code: "BAD_REQUEST" } },

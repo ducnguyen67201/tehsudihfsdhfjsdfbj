@@ -304,7 +304,7 @@ When the developer clicks "Open Replay", a full-width modal opens:
 ## Privacy & Consent
 
 - `maskAllText: true` and `maskAllInputs: true` by default (rrweb PII masking)
-- Workspace-level toggle: `sessionCaptureEnabled` (default false, opt-in)
+- Session capture is enabled for any workspace with a valid API key (no feature flag)
 - SDK consent API: `startRecording()` / `stopRecording()`
 - Visual recording indicator: small red dot when recording
 - Retention: 7 days default (plan-gated for longer)

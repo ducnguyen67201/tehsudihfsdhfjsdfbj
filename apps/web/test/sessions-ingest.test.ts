@@ -7,11 +7,9 @@ const mockChunkFindFirst = vi.fn().mockResolvedValue(null);
 const mockChunkCreate = vi.fn().mockResolvedValue({ id: "chunk_1" });
 const mockKeyUpdate = vi.fn().mockResolvedValue({});
 const mockKeyFindUnique = vi.fn();
-const mockWorkspaceFindUnique = vi.fn().mockResolvedValue({ sessionCaptureEnabled: true });
 
 vi.mock("@shared/database", () => ({
   prisma: {
-    workspace: { findUnique: (...args: unknown[]) => mockWorkspaceFindUnique(...args) },
     sessionRecord: { upsert: (...args: unknown[]) => mockUpsert(...args) },
     sessionEvent: { createMany: (...args: unknown[]) => mockCreateMany(...args) },
     sessionReplayChunk: {

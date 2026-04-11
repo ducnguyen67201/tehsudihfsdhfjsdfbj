@@ -22,13 +22,12 @@ function inferIngestUrl(apiKey: string): string {
 }
 
 function extractWorkspaceId(apiKey: string): string {
-  // API keys follow format: tlk_<workspaceId>_<secret>
-  // Extract workspace ID from the key structure
-  const parts = apiKey.split("_");
-  if (parts.length >= 3 && parts[0] === "tlk") {
-    return parts[1] ?? "";
-  }
-  return "";
+  // API keys follow format: tlk_<prefixHex>.<secretHex>
+  // Extract the key prefix (everything before the dot) as the workspace identifier.
+  // The server resolves the actual workspaceId via DB lookup on the prefix.
+  const dotIndex = apiKey.indexOf(".");
+  const prefix = dotIndex > 0 ? apiKey.slice(0, dotIndex) : apiKey;
+  return prefix || "unknown";
 }
 
 export function resolveConfig(config: TrustLoopConfig): ResolvedConfig {

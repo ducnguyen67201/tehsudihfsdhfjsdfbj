@@ -22,6 +22,7 @@ import { DarkModeToggle } from "@/components/workspace/dark-mode-toggle";
 import { useAuthSession } from "@/hooks/use-auth-session";
 import {
   workspaceRootPath,
+  workspaceSessionsPath,
   workspaceSettingsPath,
   workspaceSupportPath,
 } from "@/lib/workspace-paths";
@@ -34,6 +35,7 @@ import {
   RiLineChartLine,
   RiLogoutBoxRLine,
   RiPieChartLine,
+  RiPlayCircleLine,
   RiSettings3Line,
 } from "@remixicon/react";
 import Link from "next/link";
@@ -59,6 +61,7 @@ export function WorkspaceShell({ workspaceId, children }: WorkspaceShellProps) {
   const rootPath = workspaceRootPath(workspaceId);
   const settingsPath = workspaceSettingsPath(workspaceId);
   const supportPath = workspaceSupportPath(workspaceId);
+  const sessionsPath = workspaceSessionsPath(workspaceId);
 
   const mainNavItems: NavItem[] = [
     {
@@ -72,6 +75,12 @@ export function WorkspaceShell({ workspaceId, children }: WorkspaceShellProps) {
       label: "Support",
       icon: RiCustomerService2Line,
       isActive: pathname === supportPath || pathname.startsWith(`${supportPath}/`),
+    },
+    {
+      href: sessionsPath,
+      label: "Sessions",
+      icon: RiPlayCircleLine,
+      isActive: pathname === sessionsPath || pathname.startsWith(`${sessionsPath}/`),
     },
   ];
 

@@ -63,15 +63,15 @@ export function SessionReplayModal({
   useEffect(() => {
     if (!isOpen || chunks.length === 0 || !playerContainerRef.current) return;
 
+    let cancelled = false;
+    let resizeObserver: ResizeObserver | null = null;
+
     async function initPlayer() {
       try {
-        // Dynamic import of rrweb-player (only load when needed)
-        // @ts-expect-error rrweb-player may not have types installed
         const { default: rrwebPlayer } = await import("rrweb-player");
         const container = playerContainerRef.current;
-        if (!container) return;
+        if (!container || cancelled) return;
 
-        // Decompress and parse all chunks into rrweb events
         const allEvents: unknown[] = [];
         for (const chunk of chunks) {
           try {
@@ -85,17 +85,19 @@ export function SessionReplayModal({
 
         if (allEvents.length === 0) return;
 
-        // Clear previous player
+        const { width: origWidth, height: origHeight } = extractOriginalViewport(allEvents);
+        const fit = fitInside(origWidth, origHeight, container.clientWidth, container.clientHeight);
+
         container.innerHTML = "";
 
         const player = new rrwebPlayer({
           target: container,
           props: {
             events: allEvents,
-            width: container.clientWidth,
-            height: container.clientHeight - 48, // room for controls
+            width: fit.width,
+            height: fit.height,
             autoPlay: false,
-            showController: false, // we build our own controls
+            showController: false,
             speed: playbackSpeed,
           },
         });
@@ -105,12 +107,34 @@ export function SessionReplayModal({
         const meta = player.getMetaData();
         setDuration(meta.totalTime);
         setCurrentTime(0);
+
+        resizeObserver = new ResizeObserver(() => {
+          const p = playerRef.current as {
+            $set?: (props: { width: number; height: number }) => void;
+            triggerResize?: () => void;
+          } | null;
+          if (!p || !container) return;
+          const next = fitInside(
+            origWidth,
+            origHeight,
+            container.clientWidth,
+            container.clientHeight
+          );
+          p.$set?.({ width: next.width, height: next.height });
+          p.triggerResize?.();
+        });
+        resizeObserver.observe(container);
       } catch (error) {
         console.error("[TrustLoop] Failed to initialize replay player:", error);
       }
     }
 
     void initPlayer();
+
+    return () => {
+      cancelled = true;
+      resizeObserver?.disconnect();
+    };
   }, [isOpen, chunks]);
 
   // Update speed without reinitializing the player
@@ -208,7 +232,10 @@ export function SessionReplayModal({
               </p>
             </div>
           ) : (
-            <div ref={playerContainerRef} className="flex-1 overflow-hidden" />
+            <div
+              ref={playerContainerRef}
+              className="flex flex-1 items-center justify-center overflow-hidden bg-muted/40 p-4"
+            />
           )}
 
           {/* Playback controls */}
@@ -256,6 +283,45 @@ export function SessionReplayModal({
       </div>
     </div>
   );
+}
+
+interface ViewportSize {
+  width: number;
+  height: number;
+}
+
+/**
+ * Pulls the captured viewport size from the first rrweb Meta event (type === 4).
+ * Falls back to a laptop-ish default so the player never renders at zero.
+ */
+function extractOriginalViewport(events: unknown[]): ViewportSize {
+  for (const event of events) {
+    const typed = event as { type?: number; data?: { width?: number; height?: number } };
+    if (typed.type === 4 && typed.data?.width && typed.data?.height) {
+      return { width: typed.data.width, height: typed.data.height };
+    }
+  }
+  return { width: 1280, height: 800 };
+}
+
+/**
+ * Aspect-fit a source box inside a container box — preserves the original
+ * capture aspect ratio so the player never stretches or letterboxes unevenly.
+ */
+function fitInside(
+  srcWidth: number,
+  srcHeight: number,
+  maxWidth: number,
+  maxHeight: number
+): ViewportSize {
+  if (srcWidth <= 0 || srcHeight <= 0 || maxWidth <= 0 || maxHeight <= 0) {
+    return { width: Math.max(1, maxWidth), height: Math.max(1, maxHeight) };
+  }
+  const scale = Math.min(maxWidth / srcWidth, maxHeight / srcHeight);
+  return {
+    width: Math.floor(srcWidth * scale),
+    height: Math.floor(srcHeight * scale),
+  };
 }
 
 function decodeBase64Chunk(base64: string): string {

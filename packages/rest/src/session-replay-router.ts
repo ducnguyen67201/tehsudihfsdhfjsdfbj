@@ -1,9 +1,50 @@
 import { prisma } from "@shared/database";
 import { router, workspaceProcedure } from "@shared/rest/trpc";
-import { SESSION_MATCH_CONFIDENCE } from "@shared/types";
+import { SESSION_MATCH_CONFIDENCE, type SessionRecordResponse } from "@shared/types";
 import { z } from "zod";
 
 export const sessionReplayRouter = router({
+  list: workspaceProcedure
+    .input(
+      z
+        .object({
+          limit: z.number().int().min(1).max(100).default(50),
+          cursor: z.string().datetime().optional(),
+        })
+        .default({ limit: 50 })
+    )
+    .query(async ({ ctx, input }) => {
+      const records = await prisma.sessionRecord.findMany({
+        where: {
+          workspaceId: ctx.workspaceId,
+          deletedAt: null,
+          ...(input.cursor ? { lastEventAt: { lt: new Date(input.cursor) } } : {}),
+        },
+        orderBy: { lastEventAt: "desc" },
+        take: input.limit + 1,
+        select: {
+          id: true,
+          workspaceId: true,
+          sessionId: true,
+          userId: true,
+          userEmail: true,
+          userAgent: true,
+          startedAt: true,
+          lastEventAt: true,
+          eventCount: true,
+          hasReplayData: true,
+        },
+      });
+
+      const hasMore = records.length > input.limit;
+      const items = hasMore ? records.slice(0, input.limit) : records;
+
+      return {
+        items: items.map(toSessionRecordResponse),
+        nextCursor: hasMore ? (items.at(-1)?.lastEventAt.toISOString() ?? null) : null,
+      };
+    }),
+
   getEvents: workspaceProcedure
     .input(
       z.object({
@@ -96,7 +137,7 @@ export const sessionReplayRouter = router({
           ? SESSION_MATCH_CONFIDENCE.confirmed
           : SESSION_MATCH_CONFIDENCE.fuzzy;
 
-      return { session, matchConfidence };
+      return { session: toSessionRecordResponse(session), matchConfidence };
     }),
 
   getSession: workspaceProcedure
@@ -110,7 +151,7 @@ export const sessionReplayRouter = router({
         },
       });
 
-      return session;
+      return session ? toSessionRecordResponse(session) : null;
     }),
 
   getReplayChunks: workspaceProcedure
@@ -141,3 +182,29 @@ export const sessionReplayRouter = router({
       return { chunks: encodedChunks, total: chunks.length };
     }),
 });
+
+function toSessionRecordResponse(record: {
+  id: string;
+  workspaceId: string;
+  sessionId: string;
+  userId: string | null;
+  userEmail: string | null;
+  userAgent: string | null;
+  startedAt: Date;
+  lastEventAt: Date;
+  eventCount: number;
+  hasReplayData: boolean;
+}): SessionRecordResponse {
+  return {
+    id: record.id,
+    workspaceId: record.workspaceId,
+    sessionId: record.sessionId,
+    userId: record.userId,
+    userEmail: record.userEmail,
+    userAgent: record.userAgent,
+    startedAt: record.startedAt.toISOString(),
+    lastEventAt: record.lastEventAt.toISOString(),
+    eventCount: record.eventCount,
+    hasReplayData: record.hasReplayData,
+  };
+}
