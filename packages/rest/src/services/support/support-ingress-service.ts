@@ -1,6 +1,19 @@
 import { prisma } from "@shared/database";
 import type { Prisma } from "@shared/database";
 import * as slackSignature from "@shared/rest/services/support/slack-signature-service";
+
+// ---------------------------------------------------------------------------
+// supportIngress service
+//
+// Inbound side of the support flow: validates Slack webhooks, extracts the
+// event type, dedupes by event_id, and dispatches the temporal workflow
+// that creates/updates the SupportConversation. Import as a namespace:
+//
+//   import * as supportIngress from "@shared/rest/services/support/support-ingress-service";
+//   const result = await supportIngress.processWebhook(rawBody, headers);
+//
+// See docs/service-layer-conventions.md.
+// ---------------------------------------------------------------------------
 import {
   type WorkflowDispatcher,
   temporalWorkflowDispatcher,
@@ -83,7 +96,7 @@ function buildCanonicalIdempotencyKey(
 /**
  * Verify, persist, and enqueue a Slack webhook event using the support queue.
  */
-export async function processSlackWebhook(
+export async function processWebhook(
   rawBody: string,
   headers: SlackWebhookHeaders,
   dispatcher: WorkflowDispatcher = temporalWorkflowDispatcher

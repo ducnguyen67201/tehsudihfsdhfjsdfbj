@@ -7,7 +7,7 @@ import {
   searchRepositoryCode,
   updateRepositorySelection,
 } from "@shared/rest/codex";
-import { processSlackWebhook } from "@shared/rest/services/support/support-ingress-service";
+import * as supportIngress from "@shared/rest/services/support/support-ingress-service";
 import { temporalWorkflowDispatcher } from "@shared/rest/temporal-dispatcher";
 import { dispatchWorkflow } from "@shared/rest/workflow-router";
 import {
@@ -90,5 +90,5 @@ export async function processSlackWebhookFromHttpRequest(
     timestamp: string | null;
   }
 ) {
-  return processSlackWebhook(rawBody, headers);
+  return supportIngress.processWebhook(rawBody, headers);
 }

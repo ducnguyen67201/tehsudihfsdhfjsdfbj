@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { prisma } from "@shared/database";
 import { writeAuditEvent } from "@shared/rest/security/audit";
-import { sendSlackThreadReply } from "@shared/rest/services/support/adapters/slack/slack-delivery-service";
+import * as slackDelivery from "@shared/rest/services/support/adapters/slack/slack-delivery-service";
 import {
   PermanentExternalError,
   SUPPORT_CONVERSATION_EVENT_SOURCE,
@@ -442,7 +442,7 @@ export async function assignSupportConversation(
  */
 export async function sendSupportConversationReply(
   input: SupportSendReplyCommand,
-  sender: SupportDeliverySender = sendSlackThreadReply
+  sender: SupportDeliverySender = slackDelivery.sendThreadReply
 ): Promise<SupportCommandResponse> {
   const commandId = randomUUID();
   const conversation = await loadConversationDeliveryContext(
@@ -576,7 +576,7 @@ export async function markSupportConversationDoneWithOverride(
  */
 export async function retrySupportDeliveryAttempt(
   input: SupportRetryDeliveryCommand,
-  sender: SupportDeliverySender = sendSlackThreadReply
+  sender: SupportDeliverySender = slackDelivery.sendThreadReply
 ): Promise<SupportCommandResponse> {
   const operatorCommandId = randomUUID();
   const attempt = await prisma.supportDeliveryAttempt.findFirst({

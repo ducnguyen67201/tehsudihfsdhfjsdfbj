@@ -226,9 +226,18 @@ Incremental migration. Each service + all its call sites land in one commit.
 | `auth/google-oauth-service.ts`           | ⏳ pending   | Large (417 lines). May split into `auth/google/{token,verify,profile}.ts` on move. |
 | `codex/embedding.ts`                     | ✅ migrated  | Imported as `embeddings` (plural — avoids `embedding` loop-var collision).         |
 | `support/slack-signature-service.ts`     | ✅ migrated  | Imported as `slackSignature`. HMAC request verifier.                               |
-| `support/adapters/slack/slack-user-service.ts` | ✅ migrated | Imported as `slackUser`. `users.info` resolver.                                   |
+| `support/adapters/slack/slack-user-service.ts` | ✅ migrated | Imported as `slackUser`. `users.info` resolver.                                  |
+| `support/analysis-stream-service.ts`     | ✅ migrated  | Imported as `analysisStream`. SSE poll-based event stream.                         |
+| `support/adapters/slack/slack-delivery-service.ts` | ✅ migrated | Imported as `slackDelivery`. Outbound `chat.postMessage` adapter.              |
+| `support/support-projection-service.ts`  | ✅ migrated  | Imported as `supportProjection`. CQRS read-side for the inbox UI.                  |
+| `support/support-analysis-service.ts`    | ✅ migrated  | Imported as `supportAnalysis`. tRPC procedure names unchanged (public API).        |
+| `support/support-ingress-service.ts`     | ✅ migrated  | Imported as `supportIngress`. Wrapper `processSlackWebhookFromHttpRequest` unchanged. |
 | `soft-delete-cascade.ts`                 | ⚪ exception | Prisma client extension, not a classic service. Stays on named exports.            |
-| `support/*` (remaining 9 files)          | ⏳ pending   | Largest surface. Stage by sub-concern (ingress, analysis, slack adapters).         |
+| `support/slack-oauth-service.ts`         | ⏳ pending   | Stage D. 283 lines, 12+ call sites across routers/handlers/tests.                  |
+| **Stage E (file splits needed)**         |             | Over 300-line budget — each PR starts with a split-design discussion.              |
+| `support/session-correlation-service.ts` | ⏳ pending   | 333 lines. Candidate split: `{find, compute}.ts`.                                  |
+| `auth/google-oauth-service.ts`           | ⏳ pending   | 417 lines. Candidate split: `auth/google/{token, verify, profile, identity}.ts`.   |
+| `support/support-command-service.ts`     | ⏳ pending   | 637 lines — 2x budget. Needs real design session.                                  |
 
 Migration rules: pilot first, migrate a service + all call sites in one commit, never leave a service half-converted, run `vitest run <file>` and `tsgo --noEmit` on `apps/web` and `packages/rest` before handoff.
 

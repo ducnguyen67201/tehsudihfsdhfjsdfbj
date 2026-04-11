@@ -5,6 +5,21 @@ import {
   type AnalysisStreamEventType,
 } from "@shared/types/support/support-analysis.schema";
 
+// ---------------------------------------------------------------------------
+// analysisStream service
+//
+// Real-time event bus for SupportAnalysis progress (evidence found, status
+// transitions, completion). Currently polls the DB every 500ms — LISTEN/NOTIFY
+// wiring was attempted but Prisma's connection pool doesn't expose raw PG
+// connections for LISTEN. Import as a namespace:
+//
+//   import * as analysisStream from "@shared/rest/services/support/analysis-stream-service";
+//   await analysisStream.emit(event);
+//   for await (const ev of analysisStream.listen(id, signal)) { ... }
+//
+// See docs/service-layer-conventions.md.
+// ---------------------------------------------------------------------------
+
 const ANALYSIS_STREAM_CHANNEL = "analysis_stream";
 
 export interface AnalysisStreamEvent {
@@ -18,7 +33,7 @@ export interface AnalysisStreamEvent {
  * Emit an analysis event via Postgres NOTIFY.
  * The web server subscribes to these events and pipes them to SSE clients.
  */
-export async function emitAnalysisEvent(event: AnalysisStreamEvent): Promise<void> {
+export async function emit(event: AnalysisStreamEvent): Promise<void> {
   const payload = JSON.stringify(event);
   await prisma.$executeRawUnsafe(
     `NOTIFY ${ANALYSIS_STREAM_CHANNEL}, '${payload.replace(/'/g, "''")}'`
@@ -30,11 +45,11 @@ export async function emitAnalysisEvent(event: AnalysisStreamEvent): Promise<voi
  * Returns an async generator that yields events as they arrive.
  *
  * Usage in SSE endpoint:
- *   for await (const event of listenAnalysisEvents(analysisId, signal)) {
+ *   for await (const event of analysisStream.listen(analysisId, signal)) {
  *     controller.enqueue(`data: ${JSON.stringify(event)}\n\n`);
  *   }
  */
-export async function* listenAnalysisEvents(
+export async function* listen(
   analysisId: string,
   signal?: AbortSignal
 ): AsyncGenerator<AnalysisStreamEvent> {

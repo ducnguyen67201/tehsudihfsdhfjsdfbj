@@ -1,4 +1,4 @@
-import { listenAnalysisEvents } from "@shared/rest/services/support/analysis-stream-service";
+import * as analysisStream from "@shared/rest/services/support/analysis-stream-service";
 import type { NextRequest } from "next/server";
 
 /**
@@ -25,7 +25,7 @@ export async function GET(
       });
 
       try {
-        for await (const event of listenAnalysisEvents(analysisId, abortController.signal)) {
+        for await (const event of analysisStream.listen(analysisId, abortController.signal)) {
           const data = `data: ${JSON.stringify(event)}\n\n`;
           controller.enqueue(encoder.encode(data));
         }
