@@ -9,18 +9,22 @@
 # Railway: referenced from railway.json at the repo root.
 #
 
-FROM node:24-alpine AS base
-RUN apk add --no-cache libc6-compat
+FROM node:24-slim AS base
 WORKDIR /app
 
 # -----------------------------------------------------------------------------
 # Stage: deps — install workspace dependencies only
+#
+# node:24-slim is Debian (glibc). Alpine/musl triggers an npm optional-deps
+# bug with @tailwindcss/oxide native bindings (issue npm/cli#4828). Keep this
+# image as glibc to avoid that rabbit hole. We also drop --ignore-scripts so
+# native addon postinstall hooks can link platform binaries correctly.
 # -----------------------------------------------------------------------------
 FROM base AS deps
 COPY package.json package-lock.json ./
 COPY apps/marketing/package.json ./apps/marketing/
 COPY packages/brand/package.json ./packages/brand/
-RUN npm ci --ignore-scripts
+RUN npm ci
 
 # -----------------------------------------------------------------------------
 # Stage: builder — build marketing with standalone output
@@ -42,8 +46,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
+RUN groupadd --system --gid 1001 nodejs && \
+    useradd --system --uid 1001 --gid nodejs nextjs
 
 # Next's standalone output places a self-contained server tree inside
 # .next/standalone. Static assets live next to it under .next/static and
