@@ -484,9 +484,24 @@ const counts = await countSoftDeletedRecords(prismaRaw, 90);
 // => [{ model: "User", deletedCount: 3 }, ...]
 ```
 
-### 7.4 Wiring into Cron (TODO)
+### 7.4 Temporal Scheduled Workflow
 
-The purge function is ready to be called from a Temporal scheduled workflow or a standalone cron job. Not yet wired — see Phase 4 checklist below.
+**Status:** Implemented in `apps/queue/src/domains/maintenance/`
+
+The purge runs as a Temporal scheduled workflow (`purgeDeletedRecordsWorkflow`) triggered daily at 3:00 AM UTC.
+
+**Files:**
+- `purge.activity.ts` — Temporal activity wrapping `purgeDeletedRecords`
+- `purge.workflow.ts` — Temporal workflow orchestrating the activity
+- `register-purge-schedule.ts` — One-time script to create the Temporal schedule
+
+**Setup:**
+```bash
+# Register the schedule (run once per environment)
+npx tsx apps/queue/src/domains/maintenance/register-purge-schedule.ts
+```
+
+The schedule can be viewed and managed in the Temporal UI at `http://localhost:8233/schedules`.
 
 ---
 
@@ -526,7 +541,8 @@ The purge function is ready to be called from a Temporal scheduled workflow or a
 - [x] Add `hardDeleteById` for single-record hard delete with safety guard
 - [x] Add `countSoftDeletedRecords` for admin monitoring (dry-run mode)
 - [x] Add `includeDeleted` escape hatch for admin tooling (`findIncludingDeleted` in `soft-delete-helpers.ts`)
-- [ ] Wire purge into cron/scheduled task (Temporal or standalone)
+- [x] Wire purge into Temporal scheduled workflow (`apps/queue/src/domains/maintenance/`)
+- [x] Integration tests for purge: retention window, dependency ordering, safety guards, cascade scenario (9 tests)
 
 ---
 
