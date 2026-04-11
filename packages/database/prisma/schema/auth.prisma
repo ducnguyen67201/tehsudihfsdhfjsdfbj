@@ -29,6 +29,9 @@ model Workspace {
   groupingAnchors          SupportGroupingAnchor[]
   supportAnalyses          SupportAnalysis[]
   supportDrafts            SupportDraft[]
+  sessionRecords           SessionRecord[]
+  sessionEvents            SessionEvent[]
+  sessionReplayChunks      SessionReplayChunk[]
   analysisTriggerMode      AnalysisTriggerMode        @default(AUTO)
   createdAt                DateTime                   @default(now())
   updatedAt                DateTime                   @updatedAt

@@ -15,7 +15,7 @@ import {
 import { TRPCError } from "@trpc/server";
 
 /** Bot scopes requested during OAuth. */
-const SLACK_BOT_SCOPES = "chat:write,channels:history,groups:history";
+const SLACK_BOT_SCOPES = "chat:write,channels:history,groups:history,users:read,users:read.email";
 
 /** State token expiry: 10 minutes. */
 const STATE_TTL_MS = 10 * 60 * 1000;
