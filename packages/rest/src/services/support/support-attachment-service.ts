@@ -60,7 +60,7 @@ export async function readFileData(
 export async function createPending(input: {
   workspaceId: string;
   conversationId: string;
-  eventId: string;
+  eventId: string | null;
   provider: "SLACK";
   providerFileId: string | null;
   mimeType: string;

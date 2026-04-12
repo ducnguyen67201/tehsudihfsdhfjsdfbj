@@ -355,6 +355,31 @@ async function sendReplyWithRecordedAttempt(
       agentAvatarUrl: agent?.avatarUrl ?? undefined,
     });
 
+    if (params.payload.attachmentIds && params.payload.attachmentIds.length > 0) {
+      for (const attachmentId of params.payload.attachmentIds) {
+        const attachment = await prisma.supportMessageAttachment.findFirst({
+          where: { id: attachmentId, workspaceId: params.workspaceId, deletedAt: null },
+          select: { fileData: true, originalFilename: true, mimeType: true },
+        });
+        if (attachment?.fileData) {
+          try {
+            await slackDelivery.uploadFileToThread({
+              installationMetadata: conversation.installation.metadata,
+              channelId: conversation.channelId,
+              threadTs: resolvedThreadTs,
+              filename: attachment.originalFilename ?? "attachment",
+              fileData: Buffer.from(attachment.fileData),
+            });
+          } catch (err) {
+            console.warn("[support] file upload to Slack failed", {
+              attachmentId,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }
+      }
+    }
+
     const deliveredAt = new Date(delivery.deliveredAt);
     await prisma.$transaction(async (tx) => {
       await tx.supportDeliveryAttempt.update({

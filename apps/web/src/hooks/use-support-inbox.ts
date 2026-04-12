@@ -158,11 +158,12 @@ export function useSupportInbox() {
   );
 
   const sendReply = useCallback(
-    async (conversationId: string, messageText: string, replyToEventId?: string) =>
+    async (conversationId: string, messageText: string, replyToEventId?: string, attachmentIds?: string[]) =>
       runMutation("supportInbox.sendReply", {
         conversationId,
         messageText,
         attachments: [],
+        attachmentIds: attachmentIds ?? [],
         ...(replyToEventId ? { replyToEventId } : {}),
       }),
     [runMutation]

@@ -28,10 +28,11 @@ function formatFileSize(bytes: number): string {
 
 interface ReplyComposerProps {
   isMutating: boolean;
-  onSendReply: (messageText: string, replyToEventId?: string) => Promise<unknown>;
+  onSendReply: (messageText: string, replyToEventId?: string, attachmentIds?: string[]) => Promise<unknown>;
   replyToEventId: string | null;
   onCancelThreadReply: () => void;
   sendError: string | null;
+  conversationId: string;
 }
 
 export function ReplyComposer({
@@ -40,6 +41,7 @@ export function ReplyComposer({
   replyToEventId,
   onCancelThreadReply,
   sendError,
+  conversationId,
 }: ReplyComposerProps) {
   const [draft, setDraft] = useState("");
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
@@ -85,12 +87,29 @@ export function ReplyComposer({
     const text = draft.trim();
     if (text.length === 0 && attachedFiles.length === 0) return;
 
-    // TODO: upload attachedFiles to /api/support/attachments/upload
-    // and include attachment IDs in the send call. For now, send text only.
-    await onSendReply(text || "(attachment)", replyToEventId ?? undefined);
+    const uploadedIds: string[] = [];
+    for (const af of attachedFiles) {
+      const formData = new FormData();
+      formData.append("file", af.file);
+      formData.append("conversationId", conversationId);
+      const resp = await fetch("/api/support/attachments/upload", {
+        method: "POST",
+        body: formData,
+      });
+      if (resp.ok) {
+        const data = (await resp.json()) as { attachmentId: string };
+        uploadedIds.push(data.attachmentId);
+      }
+    }
+
+    await onSendReply(
+      text || "(attachment)",
+      replyToEventId ?? undefined,
+      uploadedIds.length > 0 ? uploadedIds : undefined
+    );
     setDraft("");
     setAttachedFiles([]);
-  }, [draft, attachedFiles, onSendReply, replyToEventId]);
+  }, [draft, attachedFiles, onSendReply, replyToEventId, conversationId]);
 
   function handleKeyDown(event: React.KeyboardEvent) {
     if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {

@@ -118,6 +118,7 @@ export function ConversationView({ conversationId, workspaceId, onBack }: Conver
             isMutating={isMutating}
             onSendReply={handleSendReply}
             replyToEventId={replyToEventId}
+            conversationId={conversationId}
             onCancelThreadReply={() => setReplyToEventId(null)}
             sendError={sendError}
           />

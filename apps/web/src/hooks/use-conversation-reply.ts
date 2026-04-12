@@ -37,7 +37,7 @@ export interface UseConversationReplyResult {
   clearSendError: () => void;
 
   // Handlers
-  handleSendReply: (messageText: string, replyToId?: string) => Promise<void>;
+  handleSendReply: (messageText: string, replyToId?: string, attachmentIds?: string[]) => Promise<void>;
   handleRetryDelivery: (deliveryAttemptId: string) => void;
 
   // Shared mutation flag from the inbox hook
@@ -51,10 +51,10 @@ export function useConversationReply(conversationId: string): UseConversationRep
   const [sendError, setSendError] = useState<string | null>(null);
 
   const handleSendReply = useCallback(
-    async (messageText: string, replyToId?: string) => {
+    async (messageText: string, replyToId?: string, attachmentIds?: string[]) => {
       setSendError(null);
       try {
-        await inbox.sendReply(conversationId, messageText, replyToId);
+        await inbox.sendReply(conversationId, messageText, replyToId, attachmentIds);
         setReplyToEventId(null);
         await polling.refresh();
       } catch (err) {
