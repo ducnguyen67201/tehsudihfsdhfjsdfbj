@@ -128,6 +128,40 @@ function extractEventThreadTs(detailsJson: unknown): string | null {
   return typeof threadTs === "string" && threadTs.length > 0 ? threadTs : null;
 }
 
+/**
+ * Find the thread-root event whose messageTs matches the given threadTs
+ * within this conversation, then walk up if that event is itself a
+ * thread child. Used to populate parentEventId at event creation time
+ * so the inbox UI can group replies under the true root without any
+ * ts matching at render time.
+ *
+ * Why the walk-up: when the operator clicks "reply" on a thread child
+ * (e.g. a customer's thread reply), the delivery's threadTs is set to
+ * that child's messageTs. A direct `messageTs === threadTs` lookup would
+ * return the child, not the root. Slack itself flattens nested threads
+ * to one level, so walking up once is enough.
+ *
+ * Returns null when no match exists (orphan thread).
+ */
+async function resolveParentEventId(params: {
+  conversationId: string;
+  threadTs: string;
+}): Promise<string | null> {
+  const direct = await prisma.supportConversationEvent.findFirst({
+    where: {
+      conversationId: params.conversationId,
+      detailsJson: {
+        path: ["messageTs"],
+        equals: params.threadTs,
+      },
+    },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, parentEventId: true },
+  });
+  if (!direct) return null;
+  return direct.parentEventId ?? direct.id;
+}
+
 async function loadConversationDeliveryContext(workspaceId: string, conversationId: string) {
   const conversation = await prisma.supportConversation.findFirst({
     where: {
@@ -265,6 +299,16 @@ async function sendReplyWithRecordedAttempt(
     replyToEventId: params.replyToEventId,
   });
 
+  // Resolve parentEventId for direct UI grouping. Every operator reply
+  // belongs to some thread (even "standalone" replies thread off the
+  // targeted message). Find the event whose messageTs matches our
+  // resolvedThreadTs — that's the thread root, and it becomes the
+  // parent of this delivery.
+  const parentEventId = await resolveParentEventId({
+    conversationId: params.conversationId,
+    threadTs: resolvedThreadTs,
+  });
+
   const requestedAt = new Date();
   const initialAttempt = await prisma.$transaction(async (tx) => {
     const attempt = existingDeliveryAttemptId
@@ -298,6 +342,7 @@ async function sendReplyWithRecordedAttempt(
         eventType: "DELIVERY_ATTEMPTED",
         eventSource: SUPPORT_CONVERSATION_EVENT_SOURCE.operator,
         summary: "Reply send requested",
+        parentEventId,
         detailsJson: {
           actorUserId: params.actorUserId,
           attachments: params.payload.attachments,

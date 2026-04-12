@@ -129,6 +129,7 @@ export async function getConversationTimeline(
         event.detailsJson && typeof event.detailsJson === "object"
           ? (event.detailsJson as Record<string, unknown>)
           : null,
+      parentEventId: event.parentEventId,
       createdAt: event.createdAt.toISOString(),
     })),
   });

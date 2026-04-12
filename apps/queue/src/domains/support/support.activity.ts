@@ -273,6 +273,28 @@ export async function runSupportPipeline(
       });
     }
 
+    // Resolve parentEventId for thread replies. If the event is a true
+    // thread reply (threadTs differs from messageTs), look up the sibling
+    // event whose messageTs matches our threadTs. If that match is itself
+    // a thread child (has its own parentEventId), walk up to the true
+    // thread root — Slack flattens nested threads to one level, so a
+    // single hop always terminates at the root.
+    let parentEventId: string | null = null;
+    if (normalized.threadTs !== normalized.messageTs) {
+      const direct = await tx.supportConversationEvent.findFirst({
+        where: {
+          conversationId: upsertedConversation.id,
+          detailsJson: {
+            path: ["messageTs"],
+            equals: normalized.threadTs,
+          },
+        },
+        orderBy: { createdAt: "asc" },
+        select: { id: true, parentEventId: true },
+      });
+      parentEventId = direct ? (direct.parentEventId ?? direct.id) : null;
+    }
+
     await tx.supportConversationEvent.create({
       data: {
         workspaceId: input.workspaceId,
@@ -280,6 +302,7 @@ export async function runSupportPipeline(
         eventType: "MESSAGE_RECEIVED",
         eventSource: mapAuthorRoleToEventSource(normalized.authorRoleBucket),
         summary: summarizeMessage(normalized.text),
+        parentEventId,
         detailsJson: {
           canonicalIdempotencyKey: input.canonicalIdempotencyKey,
           threadTs: normalized.threadTs,

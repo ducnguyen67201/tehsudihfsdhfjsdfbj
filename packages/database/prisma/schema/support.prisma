@@ -171,19 +171,28 @@ model SupportConversationThreadAlias {
 }
 
 model SupportConversationEvent {
-  id           String                         @id @default(cuid())
-  workspaceId  String
+  id             String                         @id @default(cuid())
+  workspaceId    String
   conversationId String
-  eventType    SupportConversationEventType
-  eventSource  SupportConversationEventSource
-  summary      String?
-  detailsJson  Json?
-  workspace    Workspace                      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  conversation SupportConversation            @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  createdAt    DateTime                       @default(now())
+  eventType      SupportConversationEventType
+  eventSource    SupportConversationEventSource
+  summary        String?
+  detailsJson    Json?
+  /// Resolved at ingress/reply time from Slack's thread_ts. When non-null,
+  /// this event is a reply inside the parent event's thread. The UI groups
+  /// children by this field without re-running the threadTs↔messageTs match.
+  /// Null for thread roots, standalone messages, and orphans whose parent
+  /// wasn't in the DB at ingest time (rare — Slack webhook ordering race).
+  parentEventId  String?
+  workspace      Workspace                      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  conversation   SupportConversation            @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  parent         SupportConversationEvent?      @relation("SupportConversationEventParent", fields: [parentEventId], references: [id], onDelete: SetNull)
+  children       SupportConversationEvent[]     @relation("SupportConversationEventParent")
+  createdAt      DateTime                       @default(now())
 
   @@index([conversationId, createdAt])
   @@index([workspaceId, createdAt])
+  @@index([parentEventId])
 }
 
 model SupportDeliveryAttempt {

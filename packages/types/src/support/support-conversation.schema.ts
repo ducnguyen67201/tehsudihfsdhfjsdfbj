@@ -79,6 +79,10 @@ export const supportConversationTimelineEventSchema = z.object({
   eventSource: supportConversationEventSourceSchema,
   summary: z.string().trim().min(1).nullable(),
   detailsJson: z.record(z.string(), z.unknown()).nullable(),
+  /// Parent event ID for thread replies. Resolved at ingress from Slack's
+  /// thread_ts. Null for thread roots, standalone messages, and orphans.
+  /// The inbox UI groups children by this field.
+  parentEventId: z.string().nullable(),
   createdAt: z.iso.datetime(),
 });
 

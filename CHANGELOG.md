@@ -2,6 +2,18 @@
 
 All notable changes to TrustLoop will be documented in this file.
 
+## [0.1.6.0] - 2026-04-12
+
+### Changed
+- **Thread hierarchy resolved server-side, not at render time.** Events now carry a first-class `parentEventId` column on `SupportConversationEvent`, populated at ingress (for customer messages) and at reply delivery (for operator messages) from Slack's `thread_ts`. The inbox UI groups children by this field directly — no more `threadTs ↔ messageTs` matching in the browser. Keeps the UI trivial and moves thread awareness into the data model where it belongs.
+- **Parent resolution walks up one hop** when the direct lookup lands on a thread child. When the operator clicks "reply" on a thread reply (which sets the resolver target to the child's messageTs), the server normalizes to the thread root so every reply points at the top-of-thread. Matches Slack's own thread flattening — there's no real "sub-thread" concept.
+
+### Added
+- **Migration `20260412040000_support_event_parent_event_id`.** Adds the nullable `parentEventId` column with a self-referential FK (`SET NULL` on delete), plus an index for child-lookup queries. Includes a two-step backfill: first pass matches `threadTs → messageTs` across all existing events, second pass walks grandchildren up to their true root.
+
+### Removed
+- **Client-side thread tree matching.** The old `buildThreadTree` consulted `threadTs`, `messageTs`, and `replyToEventId` with fall-through rules to build the hierarchy in the browser. Replaced with a 10-line group-by on `parentEventId`. The rule set shrunk from 4 rules to 1.
+
 ## [0.1.5.0] - 2026-04-12
 
 ### Fixed
