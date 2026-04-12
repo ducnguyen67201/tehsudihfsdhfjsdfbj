@@ -317,7 +317,8 @@ model SupportMessageAttachment {
   eventId         String?
   provider        SupportProvider
   providerFileId  String?
-  storageKey      String
+  storageKey      String?
+  fileData        Bytes?
   mimeType        String
   sizeBytes       Int
   originalFilename String?

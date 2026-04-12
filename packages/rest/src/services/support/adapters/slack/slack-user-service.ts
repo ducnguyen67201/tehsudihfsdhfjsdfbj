@@ -1,3 +1,4 @@
+import { prisma } from "@shared/database";
 import { env } from "@shared/env";
 import { PermanentExternalError, TransientExternalError } from "@shared/types";
 
@@ -17,11 +18,30 @@ interface SlackUsersInfoResponse {
   ok?: boolean;
   error?: string;
   user?: {
+    id?: string;
+    real_name?: string;
+    name?: string;
+    is_bot?: boolean;
+    is_stranger?: boolean;
     profile?: {
       email?: string;
+      display_name?: string;
+      real_name?: string;
+      image_72?: string;
     };
   };
 }
+
+interface SlackBotsInfoResponse {
+  ok?: boolean;
+  error?: string;
+  bot?: {
+    name?: string;
+    icons?: { image_72?: string };
+  };
+}
+
+const PROFILE_TTL_MS = 24 * 60 * 60 * 1000;
 
 const TRANSIENT_ERRORS = new Set([
   "internal_error",
@@ -91,4 +111,134 @@ export async function fetchEmail(
   }
 
   return json.user?.profile?.email?.toLowerCase() ?? null;
+}
+
+export async function getCachedProfile(
+  installationId: string,
+  externalUserId: string
+): Promise<{
+  displayName: string | null;
+  realName: string | null;
+  avatarUrl: string | null;
+  isBot: boolean;
+  isExternal: boolean;
+} | null> {
+  const row = await prisma.supportCustomerProfile.findUnique({
+    where: { installationId_externalUserId: { installationId, externalUserId } },
+  });
+
+  if (!row) {
+    return null;
+  }
+
+  const isStale = Date.now() - row.profileFetchedAt.getTime() > PROFILE_TTL_MS;
+  if (isStale) {
+    return null;
+  }
+
+  return {
+    displayName: row.displayName,
+    realName: row.realName,
+    avatarUrl: row.avatarUrl,
+    isBot: row.isBot,
+    isExternal: row.isExternal,
+  };
+}
+
+export async function refreshProfile(
+  installationId: string,
+  workspaceId: string,
+  externalUserId: string,
+  installationMetadata: unknown
+): Promise<void> {
+  const token = resolveToken(installationMetadata);
+
+  const response = await fetch(
+    `https://slack.com/api/users.info?user=${encodeURIComponent(externalUserId)}`,
+    {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+
+  if (!response.ok) {
+    throw new TransientExternalError(
+      `Slack users.info request failed with HTTP ${response.status}`
+    );
+  }
+
+  const json = (await response.json()) as SlackUsersInfoResponse;
+
+  if (!json.ok) {
+    const errorCode = json.error ?? "unknown_error";
+
+    if (errorCode === "user_not_visible") {
+      await prisma.supportCustomerProfile.upsert({
+        where: { installationId_externalUserId: { installationId, externalUserId } },
+        create: {
+          workspaceId,
+          installationId,
+          provider: "SLACK",
+          externalUserId,
+          isExternal: true,
+          profileFetchedAt: new Date(),
+        },
+        update: {
+          isExternal: true,
+          profileFetchedAt: new Date(),
+        },
+      });
+      return;
+    }
+
+    if (TRANSIENT_ERRORS.has(errorCode)) {
+      throw new TransientExternalError(`Slack users.info failed: ${errorCode}`);
+    }
+
+    throw new PermanentExternalError(`Slack users.info failed: ${errorCode}`);
+  }
+
+  const user = json.user;
+  const isBot = user?.is_bot === true;
+
+  let displayName = user?.profile?.display_name ?? null;
+  let avatarUrl = user?.profile?.image_72 ?? null;
+
+  if (isBot && user?.id) {
+    const botResp = await fetch(
+      `https://slack.com/api/bots.info?bot=${encodeURIComponent(user.id)}`,
+      { method: "GET", headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (botResp.ok) {
+      const botJson = (await botResp.json()) as SlackBotsInfoResponse;
+      if (botJson.ok && botJson.bot) {
+        displayName = botJson.bot.name ?? displayName;
+        avatarUrl = botJson.bot.icons?.image_72 ?? avatarUrl;
+      }
+    }
+  }
+
+  await prisma.supportCustomerProfile.upsert({
+    where: { installationId_externalUserId: { installationId, externalUserId } },
+    create: {
+      workspaceId,
+      installationId,
+      provider: "SLACK",
+      externalUserId,
+      displayName,
+      realName: user?.real_name ?? user?.profile?.real_name ?? null,
+      avatarUrl,
+      isBot,
+      isExternal: user?.is_stranger === true,
+      profileFetchedAt: new Date(),
+    },
+    update: {
+      displayName,
+      realName: user?.real_name ?? user?.profile?.real_name ?? null,
+      avatarUrl,
+      isBot,
+      isExternal: user?.is_stranger === true,
+      profileFetchedAt: new Date(),
+    },
+  });
 }
