@@ -6,12 +6,33 @@ import {
   SUPPORT_CONVERSATION_EVENT_SOURCE,
   SUPPORT_CONVERSATION_STATUS,
   SUPPORT_INGRESS_PROCESSING_STATE,
+  type SupportConversationEventSource,
   type SupportWorkflowInput,
   type SupportWorkflowResult,
   WORKFLOW_PROCESSING_STATUS,
 } from "@shared/types";
 import { ConflictError, ValidationError } from "@shared/types/errors";
-import { SUPPORT_AUTHOR_ROLE_BUCKET } from "@shared/types/support/support-adapter.schema";
+import {
+  SUPPORT_AUTHOR_ROLE_BUCKET,
+  type SupportAuthorRoleBucket,
+} from "@shared/types/support/support-adapter.schema";
+
+// Ingress drops these at the boundary so they never hit the conversation
+// upsert or the timeline. `bot` covers our own chat.postMessage echoes;
+// `system` covers Slack noise subtypes (edits, joins, pinned_item, etc.).
+const DROPPED_AUTHOR_ROLES = new Set<SupportAuthorRoleBucket>([
+  SUPPORT_AUTHOR_ROLE_BUCKET.bot,
+  SUPPORT_AUTHOR_ROLE_BUCKET.system,
+]);
+
+function mapAuthorRoleToEventSource(
+  role: SupportAuthorRoleBucket
+): SupportConversationEventSource {
+  if (role === SUPPORT_AUTHOR_ROLE_BUCKET.internal) {
+    return SUPPORT_CONVERSATION_EVENT_SOURCE.operator;
+  }
+  return SUPPORT_CONVERSATION_EVENT_SOURCE.customer;
+}
 
 function buildCanonicalConversationKey(
   installationId: string,
@@ -86,6 +107,39 @@ export async function runSupportPipeline(
   const normalized = normalizeSlackMessageEvent(ingressEvent.rawPayloadJson);
   if (!normalized) {
     throw new ValidationError("Slack ingress payload could not be normalized");
+  }
+
+  // Slack Events API echoes our own chat.postMessage calls back as message
+  // events (role=bot). It also emits noise like edits, deletes, and channel
+  // membership churn (role=system via NOISE_SUBTYPES in the normalizer).
+  // Neither should upsert the conversation or create a timeline entry —
+  // operator replies are tracked via DELIVERY_* events, and Slack noise
+  // carries no human signal.
+  //
+  // KNOWN LIMITATION: this is a blanket drop, not a targeted filter on our
+  // installation's bot user ID. Other-integration bot messages that carry
+  // file attachments (per design doc §3) are silently dropped too. To be
+  // fixed when Pillar A (file mirroring) lands — see TODOS.md.
+  if (DROPPED_AUTHOR_ROLES.has(normalized.authorRoleBucket)) {
+    const droppedAt = new Date();
+    console.log("[support] dropped ingress event", {
+      ingressEventId: ingressEvent.id,
+      authorRoleBucket: normalized.authorRoleBucket,
+      slackUserId: normalized.slackUserId,
+    });
+    await prisma.supportIngressEvent.update({
+      where: { id: ingressEvent.id },
+      data: {
+        processingState: SUPPORT_INGRESS_PROCESSING_STATE.processed,
+        processedAt: droppedAt,
+      },
+    });
+    return {
+      ingressEventId: input.ingressEventId,
+      conversationId: null,
+      status: WORKFLOW_PROCESSING_STATUS.processed,
+      processedAt: droppedAt.toISOString(),
+    };
   }
 
   const now = new Date();
@@ -196,7 +250,7 @@ export async function runSupportPipeline(
         workspaceId: input.workspaceId,
         conversationId: upsertedConversation.id,
         eventType: "MESSAGE_RECEIVED",
-        eventSource: SUPPORT_CONVERSATION_EVENT_SOURCE.customer,
+        eventSource: mapAuthorRoleToEventSource(normalized.authorRoleBucket),
         summary: summarizeMessage(normalized.text),
         detailsJson: {
           canonicalIdempotencyKey: input.canonicalIdempotencyKey,

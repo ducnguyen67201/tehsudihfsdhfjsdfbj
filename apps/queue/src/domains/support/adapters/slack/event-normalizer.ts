@@ -15,6 +15,29 @@ export interface NormalizedSlackMessageEvent {
   authorRoleBucket: SupportAuthorRoleBucket;
 }
 
+// Slack message subtypes that carry no human content worth surfacing in the
+// support inbox: edits, deletes, channel membership churn, pin/star signals,
+// reminders, etc. All of these get classified as `system` so the downstream
+// pipeline can drop them at the ingress boundary.
+const NOISE_SUBTYPES = new Set([
+  "message_changed",
+  "message_deleted",
+  "channel_join",
+  "channel_leave",
+  "group_join",
+  "group_leave",
+  "channel_topic",
+  "channel_purpose",
+  "channel_name",
+  "channel_archive",
+  "channel_unarchive",
+  "pinned_item",
+  "unpinned_item",
+  "reminder_add",
+  "bot_add",
+  "bot_remove",
+]);
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -55,7 +78,9 @@ export function normalizeSlackMessageEvent(
   const userId = readString(event, "user");
 
   let authorRoleBucket: SupportAuthorRoleBucket = SUPPORT_AUTHOR_ROLE_BUCKET.system;
-  if (botId || subtype === "bot_message") {
+  if (subtype && NOISE_SUBTYPES.has(subtype)) {
+    authorRoleBucket = SUPPORT_AUTHOR_ROLE_BUCKET.system;
+  } else if (botId || subtype === "bot_message") {
     authorRoleBucket = SUPPORT_AUTHOR_ROLE_BUCKET.bot;
   } else if (userId) {
     authorRoleBucket = SUPPORT_AUTHOR_ROLE_BUCKET.customer;
