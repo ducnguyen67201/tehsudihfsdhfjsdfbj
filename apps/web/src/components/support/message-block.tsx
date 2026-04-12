@@ -159,14 +159,16 @@ export function MessageBlock({ event, showHeader, onReplyToThread, children }: M
               <span className="text-xs text-muted-foreground">{formatTime(event.createdAt)}</span>
             </div>
           ) : null}
-          <div
-            className={cn(
-              "w-fit rounded-lg px-3 py-1.5 text-sm",
-              isOperator ? "bg-primary/10" : "bg-muted/60"
-            )}
-          >
-            {messageText ? <p className="whitespace-pre-wrap">{messageText}</p> : null}
-          </div>
+          {messageText && messageText.trim().length > 0 ? (
+            <div
+              className={cn(
+                "w-fit rounded-lg px-3 py-1.5 text-sm",
+                isOperator ? "bg-primary/10" : "bg-muted/60"
+              )}
+            >
+              <p className="whitespace-pre-wrap">{messageText}</p>
+            </div>
+          ) : null}
 
           {/* Inline attachments — render below the message bubble, no card wrapper */}
           {attachments.length > 0 ? (

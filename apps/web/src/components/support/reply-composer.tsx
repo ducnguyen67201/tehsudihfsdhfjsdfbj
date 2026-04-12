@@ -103,7 +103,7 @@ export function ReplyComposer({
     }
 
     await onSendReply(
-      text || "(attachment)",
+      text || " ",
       replyToEventId ?? undefined,
       uploadedIds.length > 0 ? uploadedIds : undefined
     );
