@@ -1,12 +1,6 @@
 import { ConversationProgress } from "@/components/insights/conversation-progress";
 
-export default async function WorkspaceInsightsPage({
-  params,
-}: {
-  params: Promise<{ workspaceId: string }>;
-}) {
-  const { workspaceId } = await params;
-
+export default function WorkspaceInsightsPage() {
   return (
     <div className="w-full p-4 md:p-6">
       <div className="mb-6 flex flex-col gap-3 border-b pb-4 md:flex-row md:items-baseline md:justify-between">
@@ -17,7 +11,7 @@ export default async function WorkspaceInsightsPage({
           </p>
         </div>
       </div>
-      <ConversationProgress workspaceId={workspaceId} />
+      <ConversationProgress />
     </div>
   );
 }
