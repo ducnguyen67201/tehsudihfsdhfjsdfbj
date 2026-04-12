@@ -82,6 +82,34 @@ When you pick this up: add a `hostedDomain String?` field to `Workspace`, pass i
 
 ## Slack Ingestion
 
+### Tighten bot-message filter to installation.botUserId
+
+**What:** Replace the blanket `authorRoleBucket === bot` drop in `apps/queue/src/domains/support/support.activity.ts:118` with a targeted filter that only drops messages from our specific installation's bot user ID. Preserve bot-authored messages from other integrations (e.g., GitHub app posting a PR screenshot).
+
+**Why:** The slack-functionality design doc §3 ("Inbound file flow — actor handling") explicitly says files from `bot_id`-authored messages from other integrations should still be mirrored and rendered under a bot avatar. The session's quick fix dropped ALL bot messages to stop our own chat.postMessage echoes from double-ingesting. That's over-aggressive but harmless today because no file mirroring exists yet. When Pillar A lands, other-bot files will silently disappear unless this is fixed first.
+
+**Context:** Landed from `/plan-eng-review` on 2026-04-11 as a known conflict with the Slack functionality design doc. The blanket filter is in place because: (a) the Slack Events API echoes every `chat.postMessage` call back as a message event, (b) we had no way to distinguish our echoes from other bots without an installation.botUserId lookup, and (c) the debugging cost was immediate while the design conflict was not. The design doc expects the `users.info`-resolved bot user ID to be stored on `SupportInstallation.metadata` at OAuth install time. That plumbing doesn't exist yet — adding it is the first step of this TODO.
+
+When you pick this up: (1) capture `authed_user.id` or `bot_user_id` from the Slack OAuth v2 response in `slack-oauth-service.ts` and persist to `SupportInstallation.metadata.botUserId`, (2) pass the bot user ID through to the ingress activity via the existing `installation` eager-load, (3) in `runSupportPipeline`, change the drop condition from `DROPPED_AUTHOR_ROLES.has(role)` to `(role === bot && slackUserId === installation.metadata.botUserId) || role === system`, (4) backfill `botUserId` for existing installations via a one-shot migration or lazy-resolve on first inbound event. Add a test case for "other bot with files is NOT dropped" in `slack-event-normalizer.test.ts` (or the activity's integration test, once that exists).
+
+**Effort:** S (human: ~4 hours / CC: ~45 min)
+**Priority:** P1 — blocks Pillar A (file mirroring) from working correctly for bot-authored file uploads.
+**Depends on:** No hard blockers. Can be done any time before Pillar A ships.
+
+### Session-ingest upsert race retry
+
+**What:** `apps/web/src/server/http/rest/sessions/ingest.ts:120-156` replaced Prisma's `upsert()` with a manual `findFirst → update | create` because `upsert()` can't target the partial unique index on `(workspaceId, sessionId) WHERE deletedAt IS NULL`. The manual version introduces a race: two concurrent flushes for the same sessionId can both see "not found" and both try to create, leading to a unique-constraint violation on the second one.
+
+**Why:** Currently caught in the `console.error` path at line 191 and logged as `[session-ingest] Async write failed`. The SDK will retry on next flush (10s later) so session data converges eventually. This is acceptable for now — the worst case is a 10-second delay on new session creation under extreme concurrency. But in production under load, this will fill the logs with unique-violation errors.
+
+**Context:** Landed from `/plan-eng-review` on 2026-04-11. The original Prisma `upsert()` was broken (ON CONFLICT doesn't target partial unique indexes — see CLAUDE.md → Soft Delete Rules). The replacement is correct for the soft-delete case but loses Prisma's atomic upsert semantics.
+
+When you pick this up: wrap the `tx.sessionRecord.create(...)` in a try/catch on `Prisma.PrismaClientKnownRequestError` with code `P2002`, and on that specific error, retry the entire transaction from the `findFirst`. Two attempts max. Alternative: use a Postgres advisory lock keyed on `(workspaceId, sessionId)` to serialize concurrent creates. The retry approach is simpler and matches the rest of the codebase's conflict handling.
+
+**Effort:** S (human: ~1 hour / CC: ~10 min)
+**Priority:** P2 — not blocking, but will surface as log noise under production load.
+**Depends on:** None.
+
 ### Projection Replay and Backfill Tooling
 
 **What:** Build scoped replay tooling to rebuild conversation projections from immutable event logs with dry-run support.

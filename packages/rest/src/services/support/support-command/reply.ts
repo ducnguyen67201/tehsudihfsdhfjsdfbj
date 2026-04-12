@@ -48,6 +48,104 @@ type SupportDeliverySender = (input: SupportDeliverySenderRequest) => Promise<{
   providerMessageId: string;
 }>;
 
+function extractSlackMessageTs(detailsJson: unknown): string | null {
+  if (typeof detailsJson !== "object" || detailsJson === null) {
+    return null;
+  }
+  const record = detailsJson as Record<string, unknown>;
+  const messageTs = record.messageTs;
+  return typeof messageTs === "string" && messageTs.length > 0 ? messageTs : null;
+}
+
+function extractStoredThreadTs(detailsJson: unknown): string | null {
+  if (typeof detailsJson !== "object" || detailsJson === null) {
+    return null;
+  }
+  const record = detailsJson as Record<string, unknown>;
+  const threadTs = record.threadTs;
+  return typeof threadTs === "string" && threadTs.length > 0 ? threadTs : null;
+}
+
+/** @internal Exported for unit tests. Not part of the public service surface. */
+export async function resolveDeliveryThreadTs(params: {
+  conversationId: string;
+  conversationRootThreadTs: string;
+  replyToEventId: string | undefined;
+}): Promise<string> {
+  // Burst-sensitive thread resolution.
+  //
+  // Conceptually, a "burst" is the cluster of customer messages sent between
+  // two operator replies (or before the first one). Each burst deserves its
+  // own Slack thread so replies sit visually adjacent to what the customer
+  // actually asked, instead of all piling into one runaway parent thread.
+  //
+  // Priority (first match wins):
+  //   1. Explicit replyToEventId → UI "reply to this message" override.
+  //      The operator is pointing at a specific event — thread off it.
+  //   2. New burst since last reply → latest customer MESSAGE_RECEIVED
+  //      created AFTER the last DELIVERY_ATTEMPTED. Starts a new thread
+  //      on the newest message of this burst.
+  //   3. No new customer messages → sticky to the last thread we used.
+  //      Covers "operator sends two replies in a row with nothing from the
+  //      customer in between" — don't fragment across self-replies.
+  //   4. Legacy fallback → latest customer message or the conversation's
+  //      grouping anchor. Only fires during the transition window for
+  //      conversations whose last delivery predates threadTs stamping.
+  //      In steady-state, rules 1-3 cover every reply.
+  if (params.replyToEventId) {
+    const targetEvent = await prisma.supportConversationEvent.findUnique({
+      where: { id: params.replyToEventId },
+      select: { detailsJson: true },
+    });
+    const messageTs = extractSlackMessageTs(targetEvent?.detailsJson);
+    if (messageTs) return messageTs;
+  }
+
+  const [lastDelivery, latestCustomerMessage] = await Promise.all([
+    prisma.supportConversationEvent.findFirst({
+      where: {
+        conversationId: params.conversationId,
+        eventType: "DELIVERY_ATTEMPTED",
+      },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true, detailsJson: true },
+    }),
+    prisma.supportConversationEvent.findFirst({
+      where: {
+        conversationId: params.conversationId,
+        eventType: "MESSAGE_RECEIVED",
+        eventSource: SUPPORT_CONVERSATION_EVENT_SOURCE.customer,
+      },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true, detailsJson: true },
+    }),
+  ]);
+
+  const latestCustomerTs = extractSlackMessageTs(latestCustomerMessage?.detailsJson);
+
+  // First reply in the conversation — whole history is one burst.
+  if (!lastDelivery) {
+    return latestCustomerTs ?? params.conversationRootThreadTs;
+  }
+
+  // New customer message arrived since our last reply → start a new thread
+  // on it. This is the "each burst gets its own thread" rule.
+  if (
+    latestCustomerMessage &&
+    latestCustomerMessage.createdAt > lastDelivery.createdAt &&
+    latestCustomerTs
+  ) {
+    return latestCustomerTs;
+  }
+
+  // No new customer activity → stick to the last thread we used.
+  const stickyThreadTs = extractStoredThreadTs(lastDelivery.detailsJson);
+  if (stickyThreadTs) return stickyThreadTs;
+
+  // Legacy fallback for pre-threadTs-stamping rows.
+  return latestCustomerTs ?? params.conversationRootThreadTs;
+}
+
 async function loadConversationDeliveryContext(workspaceId: string, conversationId: string) {
   const conversation = await prisma.supportConversation.findFirst({
     where: {
@@ -175,6 +273,16 @@ async function sendReplyWithRecordedAttempt(
     throw new ValidationError("Only Slack support delivery is implemented");
   }
 
+  // Resolve the Slack thread_ts BEFORE opening the delivery transaction so
+  // the chosen thread can be stamped on the DELIVERY_ATTEMPTED event. Future
+  // replies read that stamp to stay sticky — once we commit to a thread,
+  // subsequent replies in the same conversation continue posting there.
+  const resolvedThreadTs = await resolveDeliveryThreadTs({
+    conversationId: params.conversationId,
+    conversationRootThreadTs: conversation.threadTs,
+    replyToEventId: params.replyToEventId,
+  });
+
   const requestedAt = new Date();
   const initialAttempt = await prisma.$transaction(async (tx) => {
     const attempt = existingDeliveryAttemptId
@@ -214,6 +322,7 @@ async function sendReplyWithRecordedAttempt(
           commandId: params.commandId,
           deliveryAttemptId: attempt.id,
           messageText: params.payload.messageText,
+          threadTs: resolvedThreadTs,
           ...(params.replyToEventId ? { replyToEventId: params.replyToEventId } : {}),
         },
       },
@@ -221,26 +330,6 @@ async function sendReplyWithRecordedAttempt(
 
     return attempt;
   });
-
-  // Resolve the Slack thread_ts: use the target event's messageTs if replying
-  // to a specific message, otherwise fall back to the conversation root.
-  let resolvedThreadTs = conversation.threadTs;
-  if (params.replyToEventId) {
-    const targetEvent = await prisma.supportConversationEvent.findUnique({
-      where: { id: params.replyToEventId },
-      select: { detailsJson: true },
-    });
-    const messageTs =
-      typeof targetEvent?.detailsJson === "object" &&
-      targetEvent.detailsJson !== null &&
-      "messageTs" in targetEvent.detailsJson &&
-      typeof targetEvent.detailsJson.messageTs === "string"
-        ? targetEvent.detailsJson.messageTs
-        : null;
-    if (messageTs) {
-      resolvedThreadTs = messageTs;
-    }
-  }
 
   try {
     const delivery = await sender({

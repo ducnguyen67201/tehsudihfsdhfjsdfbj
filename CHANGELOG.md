@@ -2,6 +2,17 @@
 
 All notable changes to TrustLoop will be documented in this file.
 
+## [0.1.1.0] - 2026-04-12
+
+### Fixed
+- **Session replay recordings now actually land in the database.** Every browser session flushed by the TrustLoop SDK was silently failing to write because Prisma's `upsert()` cannot target a partial unique index. Replaced with a manual find-or-create inside the existing transaction. Session replay history picks up the moment the fix deploys.
+- **Operator replies no longer show up as duplicate customer messages.** Slack's Events API echoes every `chat.postMessage` call back as a new message event, and the old ingress pipeline was ingesting those echoes as customer bubbles in the inbox, making it look like the customer was saying the same thing as the operator. The ingress now drops bot-authored and system-noise events (edits, pins, channel joins) at the boundary.
+- **Replies now land in the most relevant Slack thread.** When a customer sends several messages in a row, the operator's reply targets whichever message is newest at send time, then every follow-up reply in that same burst stays in the same thread. Previous behavior threaded everything off the first-ever message in the conversation, which pushed operator answers out of the visual conversation flow. Explicit "reply to this message" from the inbox UI still overrides.
+
+### Changed
+- **Queue worker dev script now uses `tsx watch`.** Editing activities or workflow code under `apps/queue/src` triggers an automatic worker restart, eliminating a whole class of "why isn't my fix taking effect" bugs.
+- **Naming convention for Temporal workflow/activity files.** Every artifact for a feature now shares one hyphenated prefix (`support-analysis.workflow.ts`, `support-analysis.activity.ts`, `support-analysis.schema.ts`, `support-analysis-service.ts`) so a single fuzzy search surfaces all of it. Renamed the support-analysis workflow + trigger files to match. Documented in `AGENTS.md` as a non-negotiable naming rule.
+
 ## [0.1.0.0] - 2026-04-11
 
 ### Added
