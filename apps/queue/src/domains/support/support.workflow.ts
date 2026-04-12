@@ -1,3 +1,4 @@
+import type * as mirrorActivities from "@/domains/support/support-attachment-mirror.activity";
 import type * as profileActivities from "@/domains/support/support-customer-profile.activity";
 import type * as triggerActivities from "@/domains/support/support-analysis-trigger.activity";
 import type * as supportActivities from "@/domains/support/support.activity";
@@ -20,6 +21,11 @@ const { refreshCustomerProfile } = proxyActivities<typeof profileActivities>({
   retry: { maximumAttempts: 2 },
 });
 
+const { mirrorSupportAttachment } = proxyActivities<typeof mirrorActivities>({
+  startToCloseTimeout: "2 minutes",
+  retry: { maximumAttempts: 3 },
+});
+
 export async function supportInboxWorkflow(
   input: SupportWorkflowInput
 ): Promise<SupportWorkflowResult> {
@@ -30,6 +36,15 @@ export async function supportInboxWorkflow(
       workspaceId: input.workspaceId,
       installationId: input.installationId,
       slackUserId: result.slackUserId,
+    }).catch(() => {});
+  }
+
+  for (const pending of result.pendingAttachments ?? []) {
+    mirrorSupportAttachment({
+      attachmentId: pending.attachmentId,
+      installationId: input.installationId,
+      downloadUrl: pending.downloadUrl,
+      fileAccess: pending.fileAccess,
     }).catch(() => {});
   }
 
