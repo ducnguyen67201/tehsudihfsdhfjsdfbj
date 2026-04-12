@@ -129,7 +129,10 @@ export async function getConversationTimeline(
         event.detailsJson && typeof event.detailsJson === "object"
           ? (event.detailsJson as Record<string, unknown>)
           : null,
-      parentEventId: event.parentEventId,
+      // Coerce undefined → null at the mapping boundary. A stale Prisma
+      // client (pre-parentEventId generation) returns events without this
+      // field; normalizing to null keeps the API contract stable.
+      parentEventId: event.parentEventId ?? null,
       createdAt: event.createdAt.toISOString(),
     })),
   });
