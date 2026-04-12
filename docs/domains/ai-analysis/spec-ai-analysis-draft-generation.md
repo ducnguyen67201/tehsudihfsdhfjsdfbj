@@ -111,7 +111,7 @@ Before diving into the state machines (§4), here is the end-to-end picture — 
         UI streams status via SSE
 ```
 
-Two timeout buckets are deliberate: the context-gathering activities run with a 30-second `startToCloseTimeout` and retry twice, while `runAnalysisAgent` gets 5 minutes with a 45-second heartbeat because agent loops are unbounded in practice. Keeping them in separate `proxyActivities` blocks (see `apps/queue/src/domains/support/analysis.workflow.ts`) prevents one slow agent call from starving fast activities of retry budget.
+Two timeout buckets are deliberate: the context-gathering activities run with a 30-second `startToCloseTimeout` and retry twice, while `runAnalysisAgent` gets 5 minutes with a 45-second heartbeat because agent loops are unbounded in practice. Keeping them in separate `proxyActivities` blocks (see `apps/queue/src/domains/support/support-analysis.workflow.ts`) prevents one slow agent call from starving fast activities of retry budget.
 
 The agent's three tools fan out to independent systems — searching code never blocks Sentry, Sentry failure never blocks PR creation — so one flaky integration degrades gracefully instead of failing the whole analysis.
 
@@ -901,13 +901,13 @@ Following the project's bottom-up commit convention:
 | 3 | Update shared type schemas (statuses, tone config, Sentry types) | `packages/types/src/support/support-analysis.schema.ts` | §10.5 |
 | 4 | Sentry env vars | `packages/env/src/shared.ts` | §7.3 |
 | 5 | Sentry service (namespace-import convention) | `packages/rest/src/services/sentry/sentry-service.ts` | §7.4 |
-| 6 | `fetchSentryContextActivity` | `apps/queue/src/domains/support/analysis.activity.ts` | §11.2 |
-| 7 | `escalateToManualHandling` activity | `apps/queue/src/domains/support/analysis.activity.ts` | §6, §11.3 |
+| 6 | `fetchSentryContextActivity` | `apps/queue/src/domains/support/support-analysis.activity.ts` | §11.2 |
+| 7 | `escalateToManualHandling` activity | `apps/queue/src/domains/support/support-analysis.activity.ts` | §6, §11.3 |
 | 8 | `searchSentry` agent tool (via `sentry.*` namespace) | `apps/agents/src/tools/search-sentry.ts` | §7.5 |
 | 9 | `createDraftPullRequest` codex helper + `createPullRequest` agent tool | `packages/rest/src/codex/github/draft-pr.ts`, `apps/agents/src/tools/create-pr.ts` | §8 |
 | 10 | Register new tools in agent factory | `apps/agents/src/agent.ts` | §9 |
 | 11 | Update agent system prompt (Sentry, PR, tone injection) | `apps/agents/src/prompts/support-analysis.ts` | §9 |
-| 12 | Wire state machine into workflow + activities | `apps/queue/src/domains/support/analysis.workflow.ts` | §11.1 |
+| 12 | Wire state machine into workflow + activities | `apps/queue/src/domains/support/support-analysis.workflow.ts` | §11.1 |
 | 13 | Workspace AI settings service + tRPC router | `packages/rest/src/services/workspace-ai-settings-service.ts`, `packages/rest/src/workspace-ai-settings-router.ts` | §5 |
 | 14 | Update seed script | `packages/database/prisma/seed.ts` | §12 |
 | 15 | UI: gathering context state + Sentry badge + PR link + escalation | `apps/web/src/components/support/` | §13.1–§13.4 |

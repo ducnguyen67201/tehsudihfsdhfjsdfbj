@@ -8,12 +8,12 @@ export {
   dispatchAnalysis,
   findConversationsReadyForAnalysis,
   shouldAutoTrigger,
-} from "@/domains/support/analysis-trigger.activity";
+} from "@/domains/support/support-analysis-trigger.activity";
 export {
   buildThreadSnapshot,
   escalateToManualHandling,
   fetchSentryContextActivity,
   markAnalyzing,
   runAnalysisAgent,
-} from "@/domains/support/analysis.activity";
+} from "@/domains/support/support-analysis.activity";
 export { runSupportPipeline } from "@/domains/support/support.activity";

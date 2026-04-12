@@ -1,4 +1,4 @@
-import type * as analysisActivities from "@/domains/support/analysis.activity";
+import type * as analysisActivities from "@/domains/support/support-analysis.activity";
 import type { SupportAnalysisWorkflowInput, SupportAnalysisWorkflowResult } from "@shared/types";
 import { proxyActivities } from "@temporalio/workflow";
 

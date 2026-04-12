@@ -1,4 +1,4 @@
-import type * as triggerActivities from "@/domains/support/analysis-trigger.activity";
+import type * as triggerActivities from "@/domains/support/support-analysis-trigger.activity";
 import { condition, defineSignal, proxyActivities, setHandler, sleep } from "@temporalio/workflow";
 
 const { dispatchAnalysis } = proxyActivities<typeof triggerActivities>({

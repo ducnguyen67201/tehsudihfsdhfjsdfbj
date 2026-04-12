@@ -1,8 +1,8 @@
-import type * as triggerActivities from "@/domains/support/analysis-trigger.activity";
+import type * as triggerActivities from "@/domains/support/support-analysis-trigger.activity";
 import type * as supportActivities from "@/domains/support/support.activity";
 import type { SupportWorkflowInput, SupportWorkflowResult } from "@shared/types";
 import { getExternalWorkflowHandle, proxyActivities, startChild } from "@temporalio/workflow";
-import { newMessageSignal } from "./analysis-trigger.workflow";
+import { newMessageSignal } from "./support-analysis-trigger.workflow";
 
 const { runSupportPipeline } = proxyActivities<typeof supportActivities>({
   startToCloseTimeout: "1 minute",

@@ -282,6 +282,22 @@ Migration rules: pilot first, migrate a service + all call sites in one commit, 
 - Group reusable domain contracts in focused folders under `packages/types/src/<topic>/` (example: `status/workflow-status.ts`).
 - Never duplicate literal unions/enums across files; export shared constants/schema/type from one module and import it.
 
+### Feature-qualified file names (Non-Negotiable)
+
+Workflow, activity, schema, router, service, and prompt files must use the **same feature-name prefix** so every artifact for a feature is found with a single fuzzy search (e.g. `Cmd+T "support-analysis"`).
+
+- Format: `<feature>.<suffix>.ts` where `<feature>` is the full, hyphenated feature name — not a short alias that relies on the parent folder.
+- Required suffixes by role:
+  - `<feature>.workflow.ts` — Temporal workflow entry points
+  - `<feature>.activity.ts` — Temporal activities belonging to that workflow
+  - `<feature>.schema.ts` — Zod contracts
+  - `<feature>-router.ts` — tRPC routers
+  - `<feature>-service.ts` — service-layer module
+  - `<feature>.prompt.ts` — prompt modules
+- **Do not** drop the domain from the file name just because the folder already implies it. `apps/queue/src/domains/support/analysis.workflow.ts` is wrong — it must be `support-analysis.workflow.ts`, matching `support-analysis.schema.ts`, `support-analysis-router.ts`, `support-analysis-service.ts`, `support-analysis.prompt.ts`.
+- When a workflow has helper/trigger workflows, extend the same prefix: `support-analysis-trigger.workflow.ts`, `support-analysis-trigger.activity.ts`.
+- If you need to rename, use `git mv` (preserves history) and update every import site in the same commit. Run `npm run check` before handoff.
+
 ## Commenting Conventions
 
 Follows Robert C. Martin's _Clean Code_ — code should express intent; comments are a last resort.
