@@ -32,8 +32,8 @@ export default function NoWorkspacePage() {
 
   if (auth.isLoading || memberships.isLoading) {
     return (
-      <main className="mx-auto flex min-h-screen w-full max-w-4xl items-center justify-center p-6">
-        <Alert>
+      <main className="flex min-h-screen w-full items-center justify-center p-6">
+        <Alert className="max-w-md">
           <AlertTitle>Loading account context</AlertTitle>
           <AlertDescription>Checking workspace assignments...</AlertDescription>
         </Alert>
@@ -42,13 +42,15 @@ export default function NoWorkspacePage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-4xl space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Workspace Access Required</h1>
-        <Button variant="outline" asChild>
-          <Link href="/">Back to home</Link>
-        </Button>
-      </div>
+    <main className="relative flex min-h-screen w-full items-center justify-center p-6">
+      <Button
+        variant="ghost"
+        size="sm"
+        asChild
+        className="absolute top-6 right-6 text-muted-foreground"
+      >
+        <Link href="/">← Back to home</Link>
+      </Button>
       <NoWorkspaceState />
     </main>
   );
