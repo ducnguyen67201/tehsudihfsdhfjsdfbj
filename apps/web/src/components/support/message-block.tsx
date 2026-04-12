@@ -120,7 +120,7 @@ function PreviewableAttachment({ attachment }: { attachment: SupportTimelineAtta
 
       {canPreview ? (
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden">
+          <DialogContent className="max-w-[90vw] w-[90vw] max-h-[90vh] p-0 overflow-hidden">
             <div className="flex items-center justify-between border-b px-4 py-2">
               <span className="text-sm font-medium truncate">{attachment.originalFilename}</span>
               <div className="flex items-center gap-1">
@@ -137,7 +137,7 @@ function PreviewableAttachment({ attachment }: { attachment: SupportTimelineAtta
               {isImage ? (
                 <img src={url} alt={attachment.originalFilename ?? "Image"} className="max-w-full mx-auto" />
               ) : isPdf ? (
-                <iframe src={url} className="w-full h-[75vh] border-0" title={attachment.originalFilename ?? "PDF"} />
+                <iframe src={url} className="w-full h-[80vh] border-0" title={attachment.originalFilename ?? "PDF"} />
               ) : null}
             </div>
           </DialogContent>
