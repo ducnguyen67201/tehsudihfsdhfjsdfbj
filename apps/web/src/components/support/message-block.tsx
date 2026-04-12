@@ -106,21 +106,66 @@ function PreviewableAttachment({ attachment }: { attachment: SupportTimelineAtta
             loading="lazy"
           />
         </button>
+      ) : isPdf ? (
+        <div className="mt-2 max-w-xs overflow-hidden rounded-md border bg-background">
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="flex w-full items-center gap-2.5 px-3 py-2 hover:bg-muted/40 transition-colors cursor-pointer"
+          >
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-red-500/10">
+              <svg className="h-4 w-4 text-red-600" viewBox="0 0 24 24" fill="currentColor"><path d="M7 2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-6-6H7zm6 1.5L18.5 9H14a1 1 0 0 1-1-1V3.5zM9.5 13.5c0-.28.22-.5.5-.5h1c.83 0 1.5.67 1.5 1.5S11.83 16 11 16h-.5v1a.5.5 0 0 1-1 0v-3.5zm1 1.5h.5a.5.5 0 0 0 0-1h-.5v1z"/></svg>
+            </div>
+            <div className="min-w-0 flex-1 text-left">
+              <p className="text-sm font-medium truncate">{attachment.originalFilename ?? "File"}</p>
+              <p className="text-xs text-muted-foreground">PDF · {formatFileSize(attachment.sizeBytes)}</p>
+            </div>
+            <a
+              href={url}
+              download={attachment.originalFilename ?? "file.pdf"}
+              onClick={(e) => e.stopPropagation()}
+              className="shrink-0 p-1 rounded hover:bg-muted"
+            >
+              <RiDownloadLine className="h-4 w-4 text-muted-foreground" />
+            </a>
+          </button>
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="relative block w-full h-40 overflow-hidden border-t cursor-pointer"
+          >
+            <iframe
+              src={url}
+              className="w-[200%] h-[400px] border-0 origin-top-left scale-50 pointer-events-none"
+              title="PDF preview"
+              tabIndex={-1}
+            />
+          </button>
+        </div>
       ) : (
-        <button
-          type="button"
-          onClick={() => canPreview ? setOpen(true) : window.open(url, "_blank")}
-          className="mt-1.5 flex items-center gap-1.5 text-sm text-foreground hover:underline cursor-pointer"
-        >
+        <div className="mt-1.5 inline-flex items-center gap-2 rounded-md border px-3 py-2 bg-background">
           <RiAttachmentLine className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <span className="truncate">{attachment.originalFilename ?? "File"}</span>
+          <button
+            type="button"
+            onClick={() => window.open(url, "_blank")}
+            className="text-sm text-foreground hover:underline truncate cursor-pointer"
+          >
+            {attachment.originalFilename ?? "File"}
+          </button>
           <span className="text-xs text-muted-foreground">{formatFileSize(attachment.sizeBytes)}</span>
-        </button>
+          <a
+            href={url}
+            download={attachment.originalFilename ?? "file"}
+            className="shrink-0 p-1 rounded hover:bg-muted"
+          >
+            <RiDownloadLine className="h-4 w-4 text-muted-foreground" />
+          </a>
+        </div>
       )}
 
       {canPreview ? (
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogContent className="max-w-[90vw] w-[90vw] max-h-[90vh] p-0 overflow-hidden">
+          <DialogContent className="max-w-[95vw] w-[95vw] h-[92vh] max-h-[92vh] p-0 overflow-hidden flex flex-col">
             <div className="flex items-center justify-between border-b px-4 py-2">
               <span className="text-sm font-medium truncate">{attachment.originalFilename}</span>
               <div className="flex items-center gap-1">
@@ -133,11 +178,11 @@ function PreviewableAttachment({ attachment }: { attachment: SupportTimelineAtta
                 </a>
               </div>
             </div>
-            <div className="flex-1 overflow-auto p-4">
+            <div className="flex-1 overflow-auto">
               {isImage ? (
-                <img src={url} alt={attachment.originalFilename ?? "Image"} className="max-w-full mx-auto" />
+                <img src={url} alt={attachment.originalFilename ?? "Image"} className="max-w-full mx-auto p-4" />
               ) : isPdf ? (
-                <iframe src={url} className="w-full h-[80vh] border-0" title={attachment.originalFilename ?? "PDF"} />
+                <iframe src={url} className="w-full h-full border-0" title={attachment.originalFilename ?? "PDF"} />
               ) : null}
             </div>
           </DialogContent>
