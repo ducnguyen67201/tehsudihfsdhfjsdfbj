@@ -530,6 +530,7 @@ export async function sendReply(
       payload: {
         messageText: input.messageText,
         attachments: input.attachments,
+        attachmentIds: input.attachmentIds,
       },
       replyToEventId: input.replyToEventId,
       workspaceId: input.workspaceId,
