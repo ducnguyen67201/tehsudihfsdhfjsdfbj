@@ -2,26 +2,26 @@ import { Agent } from "@mastra/core/agent";
 import {
   AGENT_PROVIDER,
   AGENT_PROVIDER_DEFAULTS,
-  type AgentProviderConfig,
   AGENT_TEAM_MESSAGE_KIND,
   AGENT_TEAM_TARGET,
+  type AgentProviderConfig,
   type AgentTeamDialogueMessageDraft,
+  type AgentTeamRole,
   type AgentTeamRoleTurnInput,
   type AgentTeamRoleTurnOutput,
-  type AgentTeamRole,
   type AgentTeamToolId,
-  agentTeamDialogueMessageDraftSchema,
-  agentTeamFactDraftSchema,
-  agentTeamRoleTurnOutputSchema,
   type AnalyzeRequest,
   type AnalyzeResponse,
-  compressedAgentTeamTurnOutputSchema,
   type SessionDigest,
   type ToneConfig,
   agentProviderConfigSchema,
+  agentTeamDialogueMessageDraftSchema,
+  agentTeamFactDraftSchema,
+  agentTeamRoleTurnOutputSchema,
   agentTeamTargetSchema,
-  reconstructAgentTeamTurnOutput,
+  compressedAgentTeamTurnOutputSchema,
   compressedAnalysisOutputSchema,
+  reconstructAgentTeamTurnOutput,
   reconstructAnalysisOutput,
 } from "@shared/types";
 
@@ -80,10 +80,7 @@ function createSupportAgent(
   });
 }
 
-function createAgentForRole(
-  role: AgentTeamRole,
-  providerConfig: AgentProviderConfig
-) {
+function createAgentForRole(role: AgentTeamRole, providerConfig: AgentProviderConfig) {
   return new Agent({
     id: `trustloop-agent-team-${role.slug}`,
     name: role.label,
@@ -139,7 +136,9 @@ export async function runAnalysis(request: AnalyzeRequest): Promise<AnalyzeRespo
   };
 }
 
-export async function runTeamTurn(request: AgentTeamRoleTurnInput): Promise<AgentTeamRoleTurnOutput> {
+export async function runTeamTurn(
+  request: AgentTeamRoleTurnInput
+): Promise<AgentTeamRoleTurnOutput> {
   const startTime = Date.now();
   const providerConfig = agentProviderConfigSchema.parse({
     provider: request.role.provider,
@@ -218,9 +217,7 @@ function parseTeamTurnOutput(rawOutput: string | undefined) {
         refs: message.refs,
       })
     ),
-    proposedFacts: reconstructed.proposedFacts.map((fact) =>
-      agentTeamFactDraftSchema.parse(fact)
-    ),
+    proposedFacts: reconstructed.proposedFacts.map((fact) => agentTeamFactDraftSchema.parse(fact)),
     resolvedQuestionIds: reconstructed.resolvedQuestionIds,
     nextSuggestedRoles: reconstructed.nextSuggestedRoles,
     done: reconstructed.done,
@@ -308,7 +305,7 @@ ${sessionDigest}`;
 }
 
 function buildToolTraceMessages(
-  toolCalls: ReturnType<typeof extractToolCalls>,
+  toolCalls: ReturnType<typeof extractToolCalls>
 ): AgentTeamDialogueMessageDraft[] {
   return toolCalls.flatMap((toolCall) => [
     {
