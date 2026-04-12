@@ -159,9 +159,37 @@ export async function runSupportPipeline(
     (installationMeta?.maxGroupingWindowMinutes as number) ?? GROUPING_DEFAULTS.maxWindowMinutes;
 
   const conversation = await prisma.$transaction(async (tx) => {
-    // Resolve the threadTs for the canonical key. For standalone messages from
-    // customers, check for an active grouping anchor to reuse.
+    // Resolve the threadTs for the canonical key.
+    //
+    // Priority:
+    //   1. Thread-alias lookup — if this is a thread reply (not standalone)
+    //      and the alias table maps it to an existing conversation, use
+    //      that conversation's root threadTs. Covers the case where the
+    //      operator previously delivered a reply into this Slack thread
+    //      (stamped an alias), and the customer is now replying to it.
+    //   2. Grouping anchor — for standalone customer messages, check for
+    //      an active grouping window to attach to.
+    //   3. Default — the event's own threadTs.
     let resolvedThreadTs = normalized.threadTs;
+
+    const isThreadReply = normalized.threadTs !== normalized.messageTs;
+    if (isThreadReply && isCustomer) {
+      const alias = await tx.supportConversationThreadAlias.findUnique({
+        where: {
+          installationId_channelId_threadTs: {
+            installationId: input.installationId,
+            channelId: normalized.channelId,
+            threadTs: normalized.threadTs,
+          },
+        },
+        select: {
+          conversation: { select: { threadTs: true, deletedAt: true } },
+        },
+      });
+      if (alias?.conversation && !alias.conversation.deletedAt) {
+        resolvedThreadTs = alias.conversation.threadTs;
+      }
+    }
 
     if (shouldGroupStandalone) {
       const activeAnchor = await tx.supportGroupingAnchor.findFirst({

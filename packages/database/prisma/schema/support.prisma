@@ -75,6 +75,7 @@ model SupportInstallation {
   workspace              Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   ingressEvents          SupportIngressEvent[]
   conversations          SupportConversation[]
+  threadAliases          SupportConversationThreadAlias[]
   createdAt              DateTime             @default(now())
   updatedAt              DateTime             @updatedAt
 
@@ -125,6 +126,7 @@ model SupportConversation {
   deliveryAttempts       SupportDeliveryAttempt[]
   ticketLinks            SupportTicketLink[]
   groupingAnchors        SupportGroupingAnchor[]
+  threadAliases          SupportConversationThreadAlias[]
   analyses               SupportAnalysis[]
   drafts                 SupportDraft[]
   createdAt              DateTime                  @default(now())
@@ -137,6 +139,35 @@ model SupportConversation {
   @@index([installationId])
   @@index([assigneeUserId])
   // deletedAt: no standalone index (low selectivity). Partial composites cover hot paths.
+}
+
+/// Maps a Slack thread_ts to a TrustLoop conversation.
+///
+/// When the operator delivers a reply into a Slack thread whose parent
+/// is NOT the conversation's canonical thread_ts (e.g. because the
+/// customer sent a later standalone message and the reply targets
+/// that burst), an alias row is written here. Ingress checks this
+/// table before canonical-key lookup so customer responses to that
+/// thread route back to the original conversation instead of spawning
+/// a phantom new one.
+///
+/// Unique on (installationId, channelId, threadTs) — each Slack thread
+/// can only belong to one TrustLoop conversation.
+model SupportConversationThreadAlias {
+  id             String              @id @default(cuid())
+  workspaceId    String
+  conversationId String
+  installationId String
+  channelId      String
+  threadTs       String
+  workspace      Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  conversation   SupportConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  installation   SupportInstallation @relation(fields: [installationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime            @default(now())
+
+  @@unique([installationId, channelId, threadTs])
+  @@index([conversationId])
+  @@index([workspaceId])
 }
 
 model SupportConversationEvent {

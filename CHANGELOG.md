@@ -2,6 +2,12 @@
 
 All notable changes to TrustLoop will be documented in this file.
 
+## [0.1.4.0] - 2026-04-12
+
+### Added
+- **Replies land wherever the customer is active.** If the customer replied inside a specific Slack thread, the operator's reply continues that thread. If the customer sent a new standalone message in the channel, the operator's reply threads off that message directly. One TrustLoop conversation can now own multiple Slack threads without fragmenting. Explicit "reply to this message" from the UI still overrides. This is what v0.1.1.0's "burst-sensitive" attempt was trying to do, but it lacked the routing infrastructure; v0.1.4.0 adds it.
+- **`SupportConversationThreadAlias` table.** A new join table tracks every Slack thread a conversation has ever spawned. Ingress looks up incoming customer thread-replies against this table before canonical-key fallback, so responses to any of the conversation's threads route back to the original conversation instead of creating a phantom new one. Unique on `(installationId, channelId, threadTs)`; cascades on conversation/installation delete.
+
 ## [0.1.3.0] - 2026-04-12
 
 ### Fixed

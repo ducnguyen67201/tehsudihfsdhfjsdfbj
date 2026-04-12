@@ -63,30 +63,28 @@ export async function resolveDeliveryThreadTs(params: {
   conversationRootThreadTs: string;
   replyToEventId: string | undefined;
 }): Promise<string> {
-  // Conversation-anchored thread resolution.
+  // Resolve the Slack thread_ts the operator's reply should target.
   //
-  // Every operator reply targets the conversation's root thread_ts (the
-  // first customer message of the conversation). This guarantees that
-  // whatever Slack thread the customer replies into matches the
-  // conversation's canonical key, so ingress can route customer replies
-  // back into the same TrustLoop conversation.
+  // Rule: land adjacent to whatever the customer just did.
+  //   - If their latest message is a thread reply (messageTs ≠ threadTs),
+  //     continue replying in that same thread.
+  //   - If their latest message is a standalone top-level channel message,
+  //     thread off that message's own ts so the reply appears visually
+  //     attached to the thing they just asked.
+  //   - If there are no customer messages yet, fall back to the
+  //     conversation's root thread (the grouping anchor).
   //
-  // An earlier iteration tried "burst-sensitive" targeting (each cluster
-  // of customer messages got its own Slack thread) but that created an
-  // ingress routing bug: when the operator's reply started a new Slack
-  // thread parented by a later message, the customer's response to that
-  // thread came back with a thread_ts that didn't match the original
-  // conversation's canonical key, so ingress created a fresh phantom
-  // conversation instead of appending. Until we add a conversation ↔
-  // thread_ts alias table, one Slack thread per conversation is the only
-  // safe shape.
+  // Every reply into a non-root thread also inserts a
+  // SupportConversationThreadAlias row (see sendReplyWithRecordedAttempt)
+  // so customer responses in that thread route back to the same
+  // TrustLoop conversation instead of spawning a phantom new one.
   //
   // Priority:
   //   1. Explicit replyToEventId → the operator clicked "reply to this
-  //      specific message" in the UI. Use that event's messageTs; Slack
-  //      auto-normalizes to the containing thread parent on send.
-  //   2. Default → conversationRootThreadTs (the conversation's original
-  //      grouping anchor, stored on SupportConversation.threadTs).
+  //      specific message" in the UI. Use that event's messageTs.
+  //   2. Latest customer thread context → use thread_ts if they replied in
+  //      a thread, or messageTs if they sent a standalone.
+  //   3. Fallback → conversationRootThreadTs.
   if (params.replyToEventId) {
     const targetEvent = await prisma.supportConversationEvent.findUnique({
       where: { id: params.replyToEventId },
@@ -96,7 +94,38 @@ export async function resolveDeliveryThreadTs(params: {
     if (messageTs) return messageTs;
   }
 
+  const latestCustomerEvent = await prisma.supportConversationEvent.findFirst({
+    where: {
+      conversationId: params.conversationId,
+      eventType: "MESSAGE_RECEIVED",
+      eventSource: SUPPORT_CONVERSATION_EVENT_SOURCE.customer,
+    },
+    orderBy: { createdAt: "desc" },
+    select: { detailsJson: true },
+  });
+
+  if (latestCustomerEvent) {
+    const messageTs = extractSlackMessageTs(latestCustomerEvent.detailsJson);
+    const threadTs = extractEventThreadTs(latestCustomerEvent.detailsJson);
+    if (threadTs && messageTs && threadTs !== messageTs) {
+      // Customer replied inside a Slack thread — continue it.
+      return threadTs;
+    }
+    if (messageTs) {
+      // Customer's latest is a standalone channel message — start or
+      // continue a thread parented by it.
+      return messageTs;
+    }
+  }
+
   return params.conversationRootThreadTs;
+}
+
+function extractEventThreadTs(detailsJson: unknown): string | null {
+  if (typeof detailsJson !== "object" || detailsJson === null) return null;
+  const record = detailsJson as Record<string, unknown>;
+  const threadTs = record.threadTs;
+  return typeof threadTs === "string" && threadTs.length > 0 ? threadTs : null;
 }
 
 async function loadConversationDeliveryContext(workspaceId: string, conversationId: string) {
@@ -344,6 +373,31 @@ async function sendReplyWithRecordedAttempt(
           },
         },
       });
+
+      // If we posted into a Slack thread whose ts differs from the
+      // conversation's canonical root, register an alias so future
+      // customer responses in that thread route back to this conv
+      // instead of creating a phantom new one. Idempotent via the
+      // unique (installationId, channelId, threadTs) constraint.
+      if (resolvedThreadTs !== conversation.threadTs) {
+        await tx.supportConversationThreadAlias.upsert({
+          where: {
+            installationId_channelId_threadTs: {
+              installationId: conversation.installation.id,
+              channelId: conversation.channelId,
+              threadTs: resolvedThreadTs,
+            },
+          },
+          create: {
+            workspaceId: params.workspaceId,
+            conversationId: params.conversationId,
+            installationId: conversation.installation.id,
+            channelId: conversation.channelId,
+            threadTs: resolvedThreadTs,
+          },
+          update: {},
+        });
+      }
     });
   } catch (error) {
     const isTransient = error instanceof TransientExternalError;

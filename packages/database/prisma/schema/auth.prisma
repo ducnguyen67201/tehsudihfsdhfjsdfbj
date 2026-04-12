@@ -22,6 +22,7 @@ model Workspace {
   supportInstallations     SupportInstallation[]
   supportIngressEvents     SupportIngressEvent[]
   supportConversations     SupportConversation[]
+  supportConversationThreadAliases SupportConversationThreadAlias[]
   supportConversationEvent SupportConversationEvent[]
   supportDeliveryAttempts  SupportDeliveryAttempt[]
   supportDeadLetters       SupportDeadLetter[]
