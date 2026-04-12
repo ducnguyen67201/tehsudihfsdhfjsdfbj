@@ -57,41 +57,36 @@ function extractSlackMessageTs(detailsJson: unknown): string | null {
   return typeof messageTs === "string" && messageTs.length > 0 ? messageTs : null;
 }
 
-function extractStoredThreadTs(detailsJson: unknown): string | null {
-  if (typeof detailsJson !== "object" || detailsJson === null) {
-    return null;
-  }
-  const record = detailsJson as Record<string, unknown>;
-  const threadTs = record.threadTs;
-  return typeof threadTs === "string" && threadTs.length > 0 ? threadTs : null;
-}
-
 /** @internal Exported for unit tests. Not part of the public service surface. */
 export async function resolveDeliveryThreadTs(params: {
   conversationId: string;
   conversationRootThreadTs: string;
   replyToEventId: string | undefined;
 }): Promise<string> {
-  // Burst-sensitive thread resolution.
+  // Conversation-anchored thread resolution.
   //
-  // Conceptually, a "burst" is the cluster of customer messages sent between
-  // two operator replies (or before the first one). Each burst deserves its
-  // own Slack thread so replies sit visually adjacent to what the customer
-  // actually asked, instead of all piling into one runaway parent thread.
+  // Every operator reply targets the conversation's root thread_ts (the
+  // first customer message of the conversation). This guarantees that
+  // whatever Slack thread the customer replies into matches the
+  // conversation's canonical key, so ingress can route customer replies
+  // back into the same TrustLoop conversation.
   //
-  // Priority (first match wins):
-  //   1. Explicit replyToEventId → UI "reply to this message" override.
-  //      The operator is pointing at a specific event — thread off it.
-  //   2. New burst since last reply → latest customer MESSAGE_RECEIVED
-  //      created AFTER the last DELIVERY_ATTEMPTED. Starts a new thread
-  //      on the newest message of this burst.
-  //   3. No new customer messages → sticky to the last thread we used.
-  //      Covers "operator sends two replies in a row with nothing from the
-  //      customer in between" — don't fragment across self-replies.
-  //   4. Legacy fallback → latest customer message or the conversation's
-  //      grouping anchor. Only fires during the transition window for
-  //      conversations whose last delivery predates threadTs stamping.
-  //      In steady-state, rules 1-3 cover every reply.
+  // An earlier iteration tried "burst-sensitive" targeting (each cluster
+  // of customer messages got its own Slack thread) but that created an
+  // ingress routing bug: when the operator's reply started a new Slack
+  // thread parented by a later message, the customer's response to that
+  // thread came back with a thread_ts that didn't match the original
+  // conversation's canonical key, so ingress created a fresh phantom
+  // conversation instead of appending. Until we add a conversation ↔
+  // thread_ts alias table, one Slack thread per conversation is the only
+  // safe shape.
+  //
+  // Priority:
+  //   1. Explicit replyToEventId → the operator clicked "reply to this
+  //      specific message" in the UI. Use that event's messageTs; Slack
+  //      auto-normalizes to the containing thread parent on send.
+  //   2. Default → conversationRootThreadTs (the conversation's original
+  //      grouping anchor, stored on SupportConversation.threadTs).
   if (params.replyToEventId) {
     const targetEvent = await prisma.supportConversationEvent.findUnique({
       where: { id: params.replyToEventId },
@@ -101,49 +96,7 @@ export async function resolveDeliveryThreadTs(params: {
     if (messageTs) return messageTs;
   }
 
-  const [lastDelivery, latestCustomerMessage] = await Promise.all([
-    prisma.supportConversationEvent.findFirst({
-      where: {
-        conversationId: params.conversationId,
-        eventType: "DELIVERY_ATTEMPTED",
-      },
-      orderBy: { createdAt: "desc" },
-      select: { createdAt: true, detailsJson: true },
-    }),
-    prisma.supportConversationEvent.findFirst({
-      where: {
-        conversationId: params.conversationId,
-        eventType: "MESSAGE_RECEIVED",
-        eventSource: SUPPORT_CONVERSATION_EVENT_SOURCE.customer,
-      },
-      orderBy: { createdAt: "desc" },
-      select: { createdAt: true, detailsJson: true },
-    }),
-  ]);
-
-  const latestCustomerTs = extractSlackMessageTs(latestCustomerMessage?.detailsJson);
-
-  // First reply in the conversation — whole history is one burst.
-  if (!lastDelivery) {
-    return latestCustomerTs ?? params.conversationRootThreadTs;
-  }
-
-  // New customer message arrived since our last reply → start a new thread
-  // on it. This is the "each burst gets its own thread" rule.
-  if (
-    latestCustomerMessage &&
-    latestCustomerMessage.createdAt > lastDelivery.createdAt &&
-    latestCustomerTs
-  ) {
-    return latestCustomerTs;
-  }
-
-  // No new customer activity → stick to the last thread we used.
-  const stickyThreadTs = extractStoredThreadTs(lastDelivery.detailsJson);
-  if (stickyThreadTs) return stickyThreadTs;
-
-  // Legacy fallback for pre-threadTs-stamping rows.
-  return latestCustomerTs ?? params.conversationRootThreadTs;
+  return params.conversationRootThreadTs;
 }
 
 async function loadConversationDeliveryContext(workspaceId: string, conversationId: string) {

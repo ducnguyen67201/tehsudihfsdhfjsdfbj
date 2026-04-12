@@ -2,6 +2,11 @@
 
 All notable changes to TrustLoop will be documented in this file.
 
+## [0.1.3.0] - 2026-04-12
+
+### Fixed
+- **Customer replies no longer spawn phantom conversations.** When v0.1.1.0 introduced burst-sensitive thread targeting (each cluster of customer messages got its own Slack thread), a routing bug emerged: if the operator's reply started a new Slack thread anchored on a later message, the customer's response to that thread came back with a `thread_ts` that didn't match the conversation's canonical key, and ingress would create a brand-new conversation for it. The inbox looked like the thread history had been lost. Fixed by reverting to conversation-anchored thread targeting: every operator reply now targets the conversation's root `thread_ts` (the first customer message), so every customer response lands back in the same conversation. Explicit "reply to this specific message" from the UI still overrides.
+
 ## [0.1.2.0] - 2026-04-12
 
 ### Changed
