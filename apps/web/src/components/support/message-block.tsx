@@ -1,5 +1,5 @@
 import { avatarColor, senderInitials } from "@/components/support/avatar-utils";
-import { useCurrentUserName, useCustomerProfile } from "@/components/support/customer-profile-context";
+import { useCurrentUser, useCustomerProfile } from "@/components/support/customer-profile-context";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -119,12 +119,12 @@ export function MessageBlock({ event, showHeader, onReplyToThread, children }: M
   const slackUserId =
     typeof event.detailsJson?.slackUserId === "string" ? event.detailsJson.slackUserId : null;
   const profile = useCustomerProfile(slackUserId);
-  const currentUserName = useCurrentUserName();
+  const currentUser = useCurrentUser();
 
   const name = isOperator
-    ? (currentUserName ? `${currentUserName} (you)` : "You")
+    ? (currentUser.name ? `${currentUser.name} (you)` : "You")
     : (profile?.realName ?? profile?.displayName ?? senderDisplayName(event));
-  const avatarUrl = profile?.avatarUrl ?? null;
+  const avatarUrl = isOperator ? currentUser.avatarUrl : (profile?.avatarUrl ?? null);
   const hasThread = Boolean(children);
   const attachments = event.attachments ?? [];
 
