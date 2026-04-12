@@ -1,10 +1,10 @@
 # Auth + Workspace Isolation + Security (P0) Implementation Checklist
 
 Source spec:
-- `docs/spec-auth-workspace-security-p0.md`
+- `docs/domains/auth/spec-auth-workspace-security-p0.md`
 
 Locked constraints:
-- shadcn/ui only for UI (`docs/ui-conventions.md`)
+- shadcn/ui only for UI (`docs/conventions/ui-conventions.md`)
 - direct rollout, no feature flags
 
 ## 1) Execution Order (Critical Path)

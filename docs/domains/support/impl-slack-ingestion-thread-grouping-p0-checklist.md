@@ -2,7 +2,7 @@
 
 Source spec:
 
-- `docs/spec-slack-ingestion-thread-grouping-p0.md`
+- `docs/domains/support/spec-slack-ingestion-thread-grouping-p0.md`
 
 Execution mode:
 

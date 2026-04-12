@@ -13,7 +13,7 @@ Define the P0 implementation spec for:
 
 This spec is the focused execution plan for section **A. Auth, Workspace Isolation, and Security (P0)** in:
 
-- `docs/impl-plan-first-customer-happy-path-mvp.md`
+- `docs/plans/impl-plan-first-customer-happy-path-mvp.md`
 
 ## 2) Problem Statement
 
@@ -33,7 +33,7 @@ By the end of this scope:
 
 ## 3.1) Locked Decisions (2026-03-29)
 
-- UI implementation is shadcn/ui-only, following `docs/ui-conventions.md`.
+- UI implementation is shadcn/ui-only, following `docs/conventions/ui-conventions.md`.
 - This scope rolls out directly with no feature flags.
 - Membership mutation remains `OWNER`-only in P0.
 - Active workspace preference is session-backed for P0 (no profile persistence requirement).
@@ -264,7 +264,7 @@ Security constraints:
 
 ## 10) UI Plan (P0)
 
-All UI changes must follow `docs/ui-conventions.md`:
+All UI changes must follow `docs/conventions/ui-conventions.md`:
 
 - shadcn/ui only
 - Tailwind utility classes

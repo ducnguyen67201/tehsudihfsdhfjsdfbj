@@ -22,6 +22,7 @@ model Workspace {
   supportInstallations     SupportInstallation[]
   supportIngressEvents     SupportIngressEvent[]
   supportConversations     SupportConversation[]
+  supportConversationThreadAliases SupportConversationThreadAlias[]
   supportConversationEvent SupportConversationEvent[]
   supportDeliveryAttempts  SupportDeliveryAttempt[]
   supportDeadLetters       SupportDeadLetter[]
@@ -36,6 +37,7 @@ model Workspace {
   groupingAnchors          SupportGroupingAnchor[]
   supportAnalyses          SupportAnalysis[]
   supportDrafts            SupportDraft[]
+  aiSettings               WorkspaceAiSettings?
   sessionRecords           SessionRecord[]
   sessionEvents            SessionEvent[]
   sessionReplayChunks      SessionReplayChunk[]

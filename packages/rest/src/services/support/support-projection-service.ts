@@ -19,7 +19,7 @@ import { TRPCError } from "@trpc/server";
 //   const page = await supportProjection.listConversations(input);
 //   const timeline = await supportProjection.getConversationTimeline(ws, conv);
 //
-// See docs/service-layer-conventions.md.
+// See docs/conventions/service-layer-conventions.md.
 // ---------------------------------------------------------------------------
 
 /**
@@ -129,6 +129,10 @@ export async function getConversationTimeline(
         event.detailsJson && typeof event.detailsJson === "object"
           ? (event.detailsJson as Record<string, unknown>)
           : null,
+      // Coerce undefined → null at the mapping boundary. A stale Prisma
+      // client (pre-parentEventId generation) returns events without this
+      // field; normalizing to null keeps the API contract stable.
+      parentEventId: event.parentEventId ?? null,
       createdAt: event.createdAt.toISOString(),
     })),
   });

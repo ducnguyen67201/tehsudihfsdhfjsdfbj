@@ -79,6 +79,16 @@ export const supportConversationTimelineEventSchema = z.object({
   eventSource: supportConversationEventSourceSchema,
   summary: z.string().trim().min(1).nullable(),
   detailsJson: z.record(z.string(), z.unknown()).nullable(),
+  /// Parent event ID for thread replies. Resolved at ingress from Slack's
+  /// thread_ts. Null for thread roots, standalone messages, and orphans.
+  /// The inbox UI groups children by this field.
+  ///
+  /// `.nullish()` rather than `.nullable()` so a stale Prisma client (one
+  /// generated before the parentEventId column existed) that returns
+  /// events without the field doesn't fail the whole timeline parse.
+  /// In that degraded state the inbox renders flat, which is the same
+  /// behavior as pre-v0.1.6.0 and is preferable to a 500.
+  parentEventId: z.string().nullish(),
   createdAt: z.iso.datetime(),
 });
 

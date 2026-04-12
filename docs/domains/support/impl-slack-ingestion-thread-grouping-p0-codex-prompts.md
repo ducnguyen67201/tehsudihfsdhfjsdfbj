@@ -4,8 +4,8 @@ Use this document to drive implementation in Codex/gstack with minimal ambiguity
 
 Primary references:
 
-- `docs/spec-slack-ingestion-thread-grouping-p0.md`
-- `docs/impl-slack-ingestion-thread-grouping-p0-checklist.md`
+- `docs/domains/support/spec-slack-ingestion-thread-grouping-p0.md`
+- `docs/domains/support/impl-slack-ingestion-thread-grouping-p0-checklist.md`
 
 ## 0) Yes, this is implementation start
 
@@ -24,8 +24,8 @@ Recommended execution order:
 
 ```text
 Implement Slack Ingestion + Deterministic Thread Grouping P0 using:
-- docs/spec-slack-ingestion-thread-grouping-p0.md
-- docs/impl-slack-ingestion-thread-grouping-p0-checklist.md
+- docs/domains/support/spec-slack-ingestion-thread-grouping-p0.md
+- docs/domains/support/impl-slack-ingestion-thread-grouping-p0-checklist.md
 
 Rules:
 - Follow AGENTS.md boundaries and naming conventions.
@@ -44,7 +44,7 @@ Start with Lane A only.
 Implement Lane A for Slack Ingestion P0.
 
 Scope:
-- Extend packages/database/prisma/schema.prisma with support models and indexes from docs/spec-slack-ingestion-thread-grouping-p0.md.
+- Extend packages/database/prisma/schema.prisma with support models and indexes from docs/domains/support/spec-slack-ingestion-thread-grouping-p0.md.
 - Add support contracts under packages/types/src/support/* and export from packages/types/src/index.ts.
 - Add SUPPORT_INGEST_ENABLED and required Slack env vars in packages/env/src/index.ts and .env.example.
 
