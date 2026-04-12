@@ -1,5 +1,5 @@
-import type * as agentTeamActivities from "@/domains/agent-team/agent-team-run.activity";
 import { MAX_AGENT_TEAM_TURNS } from "@/domains/agent-team/agent-team-run-routing";
+import type * as agentTeamActivities from "@/domains/agent-team/agent-team-run.activity";
 import {
   AGENT_TEAM_RUN_STATUS,
   type AgentTeamRunWorkflowInput,

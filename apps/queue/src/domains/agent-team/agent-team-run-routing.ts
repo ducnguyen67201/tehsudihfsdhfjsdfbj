@@ -2,13 +2,13 @@ import {
   AGENT_TEAM_MESSAGE_KIND,
   AGENT_TEAM_ROLE_SLUG,
   AGENT_TEAM_TARGET,
-  canRouteTo,
-  isRoleTarget,
   type AgentTeamDialogueMessageDraft,
   type AgentTeamMessageKind,
   type AgentTeamRole,
   type AgentTeamRoleSlug,
   type AgentTeamSnapshot,
+  canRouteTo,
+  isRoleTarget,
 } from "@shared/types";
 
 export const MAX_AGENT_TEAM_MESSAGES = 40;

@@ -1,27 +1,20 @@
 import {
   MAX_AGENT_TEAM_MESSAGES,
-  collectQueuedTargets,
   assertValidMessageRouting,
+  collectQueuedTargets,
   selectInitialRole,
   shouldCreateOpenQuestion,
 } from "@/domains/agent-team/agent-team-run-routing";
-import { prisma, type Prisma } from "@shared/database";
+import { type Prisma, prisma } from "@shared/database";
 import { env } from "@shared/env";
 import {
+  AGENT_TEAM_FACT_STATUS,
   AGENT_TEAM_MESSAGE_KIND,
+  AGENT_TEAM_OPEN_QUESTION_STATUS,
   AGENT_TEAM_ROLE_INBOX_STATE,
   AGENT_TEAM_ROLE_SLUG,
   AGENT_TEAM_RUN_STATUS,
   AGENT_TEAM_TARGET,
-  AGENT_TEAM_FACT_STATUS,
-  AGENT_TEAM_OPEN_QUESTION_STATUS,
-  agentTeamDialogueMessageSchema,
-  agentTeamFactSchema,
-  agentTeamOpenQuestionSchema,
-  agentTeamRoleInboxSchema,
-  agentTeamRoleTurnInputSchema,
-  agentTeamRoleTurnOutputSchema,
-  agentTeamRoleSlugSchema,
   type AgentTeamDialogueMessage,
   type AgentTeamDialogueMessageDraft,
   type AgentTeamFact,
@@ -32,6 +25,13 @@ import {
   type AgentTeamRoleTurnInput,
   type AgentTeamRoleTurnOutput,
   type AgentTeamRunWorkflowInput,
+  agentTeamDialogueMessageSchema,
+  agentTeamFactSchema,
+  agentTeamOpenQuestionSchema,
+  agentTeamRoleInboxSchema,
+  agentTeamRoleSlugSchema,
+  agentTeamRoleTurnInputSchema,
+  agentTeamRoleTurnOutputSchema,
 } from "@shared/types";
 import { heartbeat } from "@temporalio/activity";
 
@@ -407,7 +407,9 @@ function normalizeTurnMessages(
   result: AgentTeamRoleTurnOutput
 ): AgentTeamDialogueMessageDraft[] {
   const messages = [...result.messages];
-  const alreadyBlocked = messages.some((message) => message.kind === AGENT_TEAM_MESSAGE_KIND.blocked);
+  const alreadyBlocked = messages.some(
+    (message) => message.kind === AGENT_TEAM_MESSAGE_KIND.blocked
+  );
 
   if (result.blockedReason && !alreadyBlocked) {
     messages.push({
@@ -425,10 +427,14 @@ function normalizeTurnMessages(
   return messages;
 }
 
-function buildOpenQuestionRow(message: AgentTeamDialogueMessage, askedByRoleSlug: AgentTeamRoleSlug) {
-  const ownerRoleSlug = message.toRoleSlug === AGENT_TEAM_TARGET.orchestrator
-    ? AGENT_TEAM_ROLE_SLUG.architect
-    : agentTeamRoleSlugSchema.parse(message.toRoleSlug);
+function buildOpenQuestionRow(
+  message: AgentTeamDialogueMessage,
+  askedByRoleSlug: AgentTeamRoleSlug
+) {
+  const ownerRoleSlug =
+    message.toRoleSlug === AGENT_TEAM_TARGET.orchestrator
+      ? AGENT_TEAM_ROLE_SLUG.architect
+      : agentTeamRoleSlugSchema.parse(message.toRoleSlug);
 
   return {
     runId: message.runId,
@@ -610,7 +616,9 @@ function mapOpenQuestionRow(row: {
 }
 
 function parseJsonStringArray(value: Prisma.JsonValue | null): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
 }
 
 function parseJsonRoleSlugArray(value: Prisma.JsonValue | null): AgentTeamRoleSlug[] {
@@ -625,7 +633,9 @@ function parseJsonRecord(value: Prisma.JsonValue | null): Record<string, unknown
   return value as Record<string, unknown>;
 }
 
-function toNullableJsonValue(value: Record<string, unknown> | null | undefined): Prisma.InputJsonValue | undefined {
+function toNullableJsonValue(
+  value: Record<string, unknown> | null | undefined
+): Prisma.InputJsonValue | undefined {
   if (!value) {
     return undefined;
   }
