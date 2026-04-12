@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { AgentTeam, CreateAgentTeamInput } from "@shared/types";
-import { useState, type FormEvent } from "react";
+import { type FormEvent, useState } from "react";
 
 interface CreateTeamDialogProps {
   onCreate: (input: CreateAgentTeamInput) => Promise<AgentTeam>;

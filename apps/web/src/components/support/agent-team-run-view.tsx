@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RiRefreshLine, RiRobot2Line, RiSparklingLine } from "@remixicon/react";
 import {
   AGENT_TEAM_OPEN_QUESTION_STATUS,
   AGENT_TEAM_RUN_STATUS,
@@ -13,7 +14,6 @@ import {
   type AgentTeamRoleInbox,
   type AgentTeamRunSummary,
 } from "@shared/types";
-import { RiRobot2Line, RiRefreshLine, RiSparklingLine } from "@remixicon/react";
 import type { ReactNode } from "react";
 
 interface AgentTeamRunViewProps {
@@ -59,8 +59,9 @@ export function AgentTeamRunView({
   const messageCount = run.messages?.length ?? 0;
   const factCount = run.facts?.length ?? 0;
   const openQuestionCount =
-    run.openQuestions?.filter((question) => question.status === AGENT_TEAM_OPEN_QUESTION_STATUS.open)
-      .length ?? 0;
+    run.openQuestions?.filter(
+      (question) => question.status === AGENT_TEAM_OPEN_QUESTION_STATUS.open
+    ).length ?? 0;
   const inboxCount = run.roleInboxes?.length ?? 0;
 
   return (
@@ -71,9 +72,7 @@ export function AgentTeamRunView({
             <Badge variant="outline" className={statusClassName(run.status)}>
               {run.status}
             </Badge>
-            {isStreaming ? (
-              <span className="text-xs text-muted-foreground">Live</span>
-            ) : null}
+            {isStreaming ? <span className="text-xs text-muted-foreground">Live</span> : null}
           </div>
           <p className="text-xs text-muted-foreground">
             {messageCount} messages · {factCount} facts · {openQuestionCount} open questions
@@ -184,7 +183,10 @@ export function AgentTeamRunView({
 
 function MessageRow({ message }: { message: AgentTeamDialogueMessage }) {
   return (
-    <div className="rounded-md border border-border/50 bg-muted/20 p-3 text-sm" data-testid="agent-team-message">
+    <div
+      className="rounded-md border border-border/50 bg-muted/20 p-3 text-sm"
+      data-testid="agent-team-message"
+    >
       <div className="flex items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="secondary" className="capitalize">
@@ -225,7 +227,10 @@ function FactRow({ fact }: { fact: AgentTeamFact }) {
 
 function QuestionRow({ question }: { question: AgentTeamOpenQuestion }) {
   return (
-    <div className="rounded-md border border-border/50 p-3 text-sm" data-testid="agent-team-question">
+    <div
+      className="rounded-md border border-border/50 p-3 text-sm"
+      data-testid="agent-team-question"
+    >
       <div className="flex items-center justify-between gap-2">
         <Badge variant="outline">{question.status}</Badge>
         <span className="text-[11px] text-muted-foreground">

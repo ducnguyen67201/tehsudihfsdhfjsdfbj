@@ -5,8 +5,8 @@ import { TeamDetailSection } from "@/components/settings/agent-team/team-detail-
 import { TeamListSection } from "@/components/settings/agent-team/team-list-section";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AsyncDataGuard } from "@/components/ui/async-data-guard";
-import { useAuthSession } from "@/hooks/use-auth-session";
 import { useAgentTeams } from "@/hooks/use-agent-teams";
+import { useAuthSession } from "@/hooks/use-auth-session";
 import { WORKSPACE_ROLE } from "@shared/types";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -38,8 +38,7 @@ export function AgentTeamSettingsView() {
 
   const canManage =
     auth.session?.role === WORKSPACE_ROLE.OWNER || auth.session?.role === WORKSPACE_ROLE.ADMIN;
-  const selectedTeam =
-    agentTeams.data?.teams.find((team) => team.id === selectedTeamId) ?? null;
+  const selectedTeam = agentTeams.data?.teams.find((team) => team.id === selectedTeamId) ?? null;
 
   return (
     <AsyncDataGuard

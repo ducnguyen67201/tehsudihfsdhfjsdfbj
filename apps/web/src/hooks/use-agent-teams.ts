@@ -40,9 +40,13 @@ export function useAgentTeams() {
   const createTeam = useCallback(
     async (input: CreateAgentTeamInput) => {
       setError(null);
-      const created = await trpcMutation<CreateAgentTeamInput, AgentTeam>("agentTeam.create", input, {
-        withCsrf: true,
-      });
+      const created = await trpcMutation<CreateAgentTeamInput, AgentTeam>(
+        "agentTeam.create",
+        input,
+        {
+          withCsrf: true,
+        }
+      );
       await refresh();
       return created;
     },

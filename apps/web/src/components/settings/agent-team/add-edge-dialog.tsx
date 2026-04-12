@@ -110,7 +110,11 @@ export function AddEdgeDialog({ team, onAddEdge }: AddEdgeDialogProps) {
           <Button type="button" variant="outline" onClick={() => setOpen(false)}>
             Cancel
           </Button>
-          <Button type="button" onClick={handleSubmit} disabled={isSubmitting || !sourceRoleId || !targetRoleId}>
+          <Button
+            type="button"
+            onClick={handleSubmit}
+            disabled={isSubmitting || !sourceRoleId || !targetRoleId}
+          >
             {isSubmitting ? "Adding..." : "Add handoff"}
           </Button>
         </DialogFooter>

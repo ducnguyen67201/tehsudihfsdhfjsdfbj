@@ -27,7 +27,7 @@ import {
   AGENT_TEAM_TOOL_ID,
   type AddAgentTeamRoleInput,
 } from "@shared/types";
-import { useState, type FormEvent } from "react";
+import { type FormEvent, useState } from "react";
 
 const ROLE_OPTIONS = [
   { value: AGENT_TEAM_ROLE_SLUG.architect, label: "Architect" },
@@ -53,7 +53,9 @@ interface AddRoleDialogProps {
  */
 export function AddRoleDialog({ teamId, onAddRole }: AddRoleDialogProps) {
   const [open, setOpen] = useState(false);
-  const [slug, setSlug] = useState<(typeof ROLE_OPTIONS)[number]["value"]>(AGENT_TEAM_ROLE_SLUG.architect);
+  const [slug, setSlug] = useState<(typeof ROLE_OPTIONS)[number]["value"]>(
+    AGENT_TEAM_ROLE_SLUG.architect
+  );
   const [label, setLabel] = useState("Architect");
   const [description, setDescription] = useState("");
   const [model, setModel] = useState("");
@@ -135,7 +137,11 @@ export function AddRoleDialog({ teamId, onAddRole }: AddRoleDialogProps) {
 
           <div className="space-y-2">
             <Label htmlFor="agent-role-label">Label</Label>
-            <Input id="agent-role-label" value={label} onChange={(event) => setLabel(event.target.value)} />
+            <Input
+              id="agent-role-label"
+              value={label}
+              onChange={(event) => setLabel(event.target.value)}
+            />
           </div>
 
           <div className="space-y-2">
@@ -174,8 +180,13 @@ export function AddRoleDialog({ teamId, onAddRole }: AddRoleDialogProps) {
             <Label>Tools</Label>
             <div className="space-y-2 rounded-md border p-3">
               {TOOL_OPTIONS.map((option) => (
-                <label key={option.value} className="flex items-center gap-3 text-sm">
+                <label
+                  key={option.value}
+                  htmlFor={`tool-${option.value}`}
+                  className="flex items-center gap-3 text-sm"
+                >
                   <Checkbox
+                    id={`tool-${option.value}`}
                     checked={toolIds.includes(option.value)}
                     onCheckedChange={(checked) => toggleTool(option.value, checked === true)}
                   />

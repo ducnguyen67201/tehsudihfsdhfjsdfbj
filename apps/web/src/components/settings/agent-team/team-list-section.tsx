@@ -44,20 +44,13 @@ export function TeamListSection({
         ) : null}
 
         {teams.map((team) => (
-          <div
+          <button
             key={team.id}
-            role="button"
-            tabIndex={0}
+            type="button"
             className={`w-full rounded-lg border p-4 text-left transition ${
               team.id === selectedTeamId ? "border-primary bg-primary/5" : "hover:bg-muted/40"
             }`}
             onClick={() => onSelectTeam(team.id)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                onSelectTeam(team.id);
-              }
-            }}
           >
             <div className="flex items-start justify-between gap-3">
               <div className="space-y-1">
@@ -102,7 +95,7 @@ export function TeamListSection({
                 </div>
               ) : null}
             </div>
-          </div>
+          </button>
         ))}
       </CardContent>
     </Card>
