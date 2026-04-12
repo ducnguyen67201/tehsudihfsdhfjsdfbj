@@ -9,12 +9,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { SupportConversationTimelineEvent } from "@shared/types";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-const MESSAGE_EVENT_TYPES = new Set(["MESSAGE_RECEIVED", "DELIVERY_ATTEMPTED", "NOTE"]);
+const MESSAGE_EVENT_TYPES = new Set(["MESSAGE_RECEIVED", "DELIVERY_SUCCEEDED", "NOTE"]);
 
 const INLINE_ANNOTATION_TYPES = new Set(["DELIVERY_FAILED"]);
 
 const SIDEBAR_ONLY_EVENT_TYPES = new Set([
-  "DELIVERY_SUCCEEDED",
+  "DELIVERY_ATTEMPTED",
   "STATUS_CHANGED",
   "ASSIGNEE_CHANGED",
   "ANALYSIS_COMPLETED",
