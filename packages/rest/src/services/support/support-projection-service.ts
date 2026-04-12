@@ -86,6 +86,20 @@ export async function getConversationTimeline(
         orderBy: {
           createdAt: "asc",
         },
+        include: {
+          attachments: {
+            select: {
+              id: true,
+              mimeType: true,
+              uploadState: true,
+              originalFilename: true,
+              sizeBytes: true,
+              errorCode: true,
+              direction: true,
+            },
+            orderBy: { createdAt: "asc" },
+          },
+        },
       },
     },
   });
@@ -132,6 +146,15 @@ export async function getConversationTimeline(
       // Coerce undefined → null at the mapping boundary. A stale Prisma
       // client (pre-parentEventId generation) returns events without this
       // field; normalizing to null keeps the API contract stable.
+      attachments: (event.attachments ?? []).map((a) => ({
+        id: a.id,
+        mimeType: a.mimeType,
+        uploadState: a.uploadState,
+        originalFilename: a.originalFilename,
+        sizeBytes: a.sizeBytes,
+        errorCode: a.errorCode ?? null,
+        direction: a.direction,
+      })),
       parentEventId: event.parentEventId ?? null,
       createdAt: event.createdAt.toISOString(),
     })),

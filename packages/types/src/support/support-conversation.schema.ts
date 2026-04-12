@@ -71,6 +71,18 @@ export const supportConversationListResponseSchema = z.object({
   delayedData: z.boolean().default(false),
 });
 
+export const supportTimelineAttachmentSchema = z.object({
+  id: z.string().min(1),
+  mimeType: z.string().min(1),
+  uploadState: z.enum(["PENDING", "UPLOADED", "FAILED"]),
+  originalFilename: z.string().nullable(),
+  sizeBytes: z.number().int(),
+  errorCode: z.string().nullable().optional(),
+  direction: z.enum(["INBOUND", "OUTBOUND"]),
+});
+
+export type SupportTimelineAttachment = z.infer<typeof supportTimelineAttachmentSchema>;
+
 export const supportConversationTimelineEventSchema = z.object({
   id: z.string().min(1),
   conversationId: z.string().min(1),
@@ -79,6 +91,7 @@ export const supportConversationTimelineEventSchema = z.object({
   eventSource: supportConversationEventSourceSchema,
   summary: z.string().trim().min(1).nullable(),
   detailsJson: z.record(z.string(), z.unknown()).nullable(),
+  attachments: z.array(supportTimelineAttachmentSchema).default([]),
   /// Parent event ID for thread replies. Resolved at ingress from Slack's
   /// thread_ts. Null for thread roots, standalone messages, and orphans.
   /// The inbox UI groups children by this field.

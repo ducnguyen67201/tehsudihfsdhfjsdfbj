@@ -1,8 +1,12 @@
 import { avatarColor, senderInitials } from "@/components/support/avatar-utils";
 import { cn } from "@/lib/utils";
-import { RiReplyLine } from "@remixicon/react";
+import { RiAttachmentLine, RiAlertLine, RiReplyLine } from "@remixicon/react";
 import { SUPPORT_CONVERSATION_EVENT_SOURCE } from "@shared/types";
-import type { SupportConversationTimelineEvent } from "@shared/types";
+import type {
+  SupportConversationTimelineEvent,
+  SupportTimelineAttachment,
+} from "@shared/types";
+import { Skeleton } from "@/components/ui/skeleton";
 
 function formatTime(value: string): string {
   return new Intl.DateTimeFormat(undefined, {
@@ -10,6 +14,14 @@ function formatTime(value: string): string {
     minute: "2-digit",
   }).format(new Date(value));
 }
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+const IMAGE_MIMETYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
 
 export function extractSenderKey(event: SupportConversationTimelineEvent): string {
   const slackUserId =
@@ -36,6 +48,62 @@ function extractMessageText(event: SupportConversationTimelineEvent): string | n
   return null;
 }
 
+function AttachmentRow({ attachment }: { attachment: SupportTimelineAttachment }) {
+  if (attachment.uploadState === "PENDING") {
+    if (IMAGE_MIMETYPES.has(attachment.mimeType)) {
+      return (
+        <div className="mt-2 space-y-1">
+          <Skeleton className="h-[200px] w-full max-w-md rounded-sm" />
+          <p className="text-xs text-muted-foreground">Mirroring attachment...</p>
+        </div>
+      );
+    }
+    return (
+      <div className="mt-1.5 flex items-center gap-1.5 text-sm text-muted-foreground">
+        <Skeleton className="h-4 w-4 rounded-sm" />
+        <Skeleton className="h-4 w-32 rounded-sm" />
+        <span className="text-xs">Mirroring...</span>
+      </div>
+    );
+  }
+
+  if (attachment.uploadState === "FAILED") {
+    return (
+      <div className="mt-1.5 flex items-center gap-1.5 text-sm text-destructive">
+        <RiAlertLine className="h-4 w-4 shrink-0" />
+        <span className="truncate">{attachment.originalFilename ?? "Attachment"}</span>
+        <span className="text-xs">
+          Unavailable{attachment.errorCode ? ` — ${attachment.errorCode}` : ""}
+        </span>
+      </div>
+    );
+  }
+
+  if (IMAGE_MIMETYPES.has(attachment.mimeType)) {
+    return (
+      <img
+        src={`/api/support/attachments/${attachment.id}`}
+        alt={attachment.originalFilename ?? "Image attachment"}
+        className="mt-2 block max-h-[320px] max-w-full rounded-sm"
+        loading="lazy"
+      />
+    );
+  }
+
+  return (
+    <a
+      href={`/api/support/attachments/${attachment.id}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="mt-1.5 flex items-center gap-1.5 text-sm text-foreground hover:underline"
+    >
+      <RiAttachmentLine className="h-4 w-4 shrink-0 text-muted-foreground" />
+      <span className="truncate">{attachment.originalFilename ?? "File"}</span>
+      <span className="text-xs text-muted-foreground">{formatFileSize(attachment.sizeBytes)}</span>
+    </a>
+  );
+}
+
 interface MessageBlockProps {
   event: SupportConversationTimelineEvent;
   showHeader: boolean;
@@ -43,19 +111,17 @@ interface MessageBlockProps {
   children?: React.ReactNode;
 }
 
-/**
- * Message row: avatar + name/time header, bubble below, thread replies as children.
- */
 export function MessageBlock({ event, showHeader, onReplyToThread, children }: MessageBlockProps) {
   const messageText = extractMessageText(event);
   const isOperator = event.eventSource === SUPPORT_CONVERSATION_EVENT_SOURCE.operator;
   const name = senderDisplayName(event);
   const hasThread = Boolean(children);
+  const attachments = event.attachments ?? [];
 
   return (
     <article className="group/msg" aria-label={`${name} at ${formatTime(event.createdAt)}`}>
       <div className="flex gap-2.5">
-        {/* Avatar column — shows avatar on header rows, tree line when thread follows */}
+        {/* Avatar column */}
         <div className="flex w-8 shrink-0 flex-col items-center">
           {showHeader ? (
             <div
@@ -69,7 +135,6 @@ export function MessageBlock({ event, showHeader, onReplyToThread, children }: M
           ) : (
             <div className="h-8 w-8" />
           )}
-          {/* Tree connector line down to thread */}
           {hasThread ? <div className="w-px flex-1 bg-border" /> : null}
         </div>
 
@@ -89,7 +154,16 @@ export function MessageBlock({ event, showHeader, onReplyToThread, children }: M
           >
             {messageText ? <p className="whitespace-pre-wrap">{messageText}</p> : null}
           </div>
-          {/* Show reply action only for messages without existing threads */}
+
+          {/* Inline attachments — render below the message bubble, no card wrapper */}
+          {attachments.length > 0 ? (
+            <div className="mt-1">
+              {attachments.map((attachment) => (
+                <AttachmentRow key={attachment.id} attachment={attachment} />
+              ))}
+            </div>
+          ) : null}
+
           {!hasThread ? (
             <button
               type="button"
@@ -103,7 +177,6 @@ export function MessageBlock({ event, showHeader, onReplyToThread, children }: M
         </div>
       </div>
 
-      {/* Thread replies — indented with tree connector */}
       {hasThread ? (
         <div className="flex gap-2.5">
           <div className="flex w-8 shrink-0 justify-center">
