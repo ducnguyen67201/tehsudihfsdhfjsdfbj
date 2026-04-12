@@ -12,7 +12,7 @@ import { createInstallationOctokit } from "./_shared";
 // Octokit access stays behind the codex namespace per service-layer rules.
 // ---------------------------------------------------------------------------
 
-const MAX_FILES_PER_PR = 5;
+export const MAX_FILES_PER_PR = 5;
 
 export interface DraftPullRequestChange {
   filePath: string;

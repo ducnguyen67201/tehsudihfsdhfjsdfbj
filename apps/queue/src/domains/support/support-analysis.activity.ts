@@ -8,6 +8,8 @@ import {
   ANALYSIS_RESULT_STATUS,
   ANALYSIS_STATUS,
   ANALYSIS_TRIGGER_TYPE,
+  type AnalysisEvent,
+  type AnalysisStatus,
   type AnalysisTriggerType,
   type AnalyzeResponse,
   DRAFT_STATUS,
@@ -17,6 +19,8 @@ import {
   type SupportAnalysisWorkflowResult,
   type ToneConfig,
   analyzeResponseSchema,
+  restoreAnalysisContext,
+  transitionAnalysis,
 } from "@shared/types";
 import { heartbeat } from "@temporalio/activity";
 
@@ -184,10 +188,35 @@ export async function fetchSentryContextActivity(
   return { sentryContext };
 }
 
+/**
+ * Load the current SupportAnalysis row as a state-machine context so
+ * transitions can be validated against the DB truth. Every status write in
+ * this activity goes through `transitionAnalysis(loaded, event)` — a direct
+ * status update would silently bypass the guard rails the spec promises.
+ *
+ * Prisma's generated enum for `status` is a structural match of
+ * `AnalysisStatus`, but TypeScript can't prove it, so we narrow-cast at the
+ * library boundary.
+ */
+async function loadAnalysisContext(analysisId: string) {
+  const row = await prisma.supportAnalysis.findUniqueOrThrow({
+    where: { id: analysisId },
+    select: { id: true, status: true, errorMessage: true, retryCount: true },
+  });
+  return restoreAnalysisContext(
+    row.id,
+    row.status as AnalysisStatus,
+    row.errorMessage,
+    row.retryCount
+  );
+}
+
 export async function markAnalyzing(analysisId: string): Promise<void> {
+  const ctx = await loadAnalysisContext(analysisId);
+  const next = transitionAnalysis(ctx, { type: "contextReady" });
   await prisma.supportAnalysis.update({
     where: { id: analysisId },
-    data: { status: ANALYSIS_STATUS.analyzing },
+    data: { status: next.status },
   });
 }
 
@@ -312,10 +341,15 @@ async function callAgentService(input: AnalysisAgentInput, config: { toneConfig:
 }
 
 async function persistAnalysisResult(analysisId: string, result: AnalyzeResponse) {
+  const ctx = await loadAnalysisContext(analysisId);
+  const event: AnalysisEvent = result.draft
+    ? { type: "analyzed", result: result.analysis, draft: result.draft }
+    : { type: "needsContext", missingInfo: result.analysis.missingInfo };
+  const next = transitionAnalysis(ctx, event);
   await prisma.supportAnalysis.update({
     where: { id: analysisId },
     data: {
-      status: result.draft ? ANALYSIS_STATUS.analyzed : ANALYSIS_STATUS.needsContext,
+      status: next.status,
       problemStatement: result.analysis.problemStatement,
       likelySubsystem: result.analysis.likelySubsystem,
       severity: result.analysis.severity,
@@ -387,9 +421,18 @@ async function handleAnalysisFailure(
 ): Promise<SupportAnalysisWorkflowResult> {
   const errorMessage = error instanceof Error ? error.message : String(error);
 
+  // Route failure through the state machine so we can't accidentally mark a
+  // terminal (ANALYZED) row as FAILED. transitionAnalysis throws
+  // InvalidAnalysisTransitionError if the current state doesn't allow it —
+  // the throw surfaces as a Temporal retry, which is the correct behavior.
+  const ctx = await loadAnalysisContext(input.analysisId);
+  const next = transitionAnalysis(ctx, { type: "failed", error: errorMessage });
   const analysis = await prisma.supportAnalysis.update({
     where: { id: input.analysisId },
-    data: { status: ANALYSIS_STATUS.failed, errorMessage },
+    data: {
+      status: next.status,
+      errorMessage: next.errorMessage,
+    },
   });
 
   if (analysis.retryCount >= MAX_ANALYSIS_RETRIES) {

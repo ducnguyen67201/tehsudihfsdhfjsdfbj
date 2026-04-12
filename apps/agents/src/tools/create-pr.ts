@@ -2,8 +2,6 @@ import { createTool } from "@mastra/core/tools";
 import * as codex from "@shared/rest/codex";
 import { z } from "zod";
 
-const MAX_FILES_PER_PR = 5;
-
 export const createPullRequestTool = createTool({
   id: "create_pull_request",
   description:
@@ -23,8 +21,8 @@ export const createPullRequestTool = createTool({
         })
       )
       .min(1)
-      .max(MAX_FILES_PER_PR)
-      .describe(`File changes (max ${MAX_FILES_PER_PR})`),
+      .max(codex.MAX_FILES_PER_PR)
+      .describe(`File changes (max ${codex.MAX_FILES_PER_PR})`),
     baseBranch: z.string().optional().describe("Base branch (defaults to repo default branch)"),
   }),
   execute: async (input) => {

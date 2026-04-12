@@ -1,5 +1,6 @@
 "use client";
 
+import { ProductMetricsGrid } from "@/components/brand/product-metrics";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@shared/brand";
@@ -113,24 +114,9 @@ function VisualSide() {
             fix PR. Every answer grounded in real code.
           </p>
 
-          <dl className="mt-8 grid grid-cols-3 gap-4 border-background/15 border-t pt-6">
-            <Metric value="<30s" label="First draft" />
-            <Metric value="90%+" label="Accuracy" />
-            <Metric value="Hours" label="Saved / wk" />
-          </dl>
+          <ProductMetricsGrid />
         </div>
       </div>
-    </div>
-  );
-}
-
-function Metric({ value, label }: { value: string; label: string }) {
-  return (
-    <div>
-      <dt className="text-xl font-semibold tracking-tight text-background">{value}</dt>
-      <dd className="mt-1 text-[10px] font-medium uppercase tracking-wider text-background/60">
-        {label}
-      </dd>
     </div>
   );
 }
