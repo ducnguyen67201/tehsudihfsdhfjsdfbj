@@ -1,0 +1,38 @@
+import {
+  AGENT_TEAM_ROLE_SLUG,
+  agentTeamRoleSlugSchema,
+  type AgentTeamRoleSlug,
+} from "./agent-team-core.schema";
+
+export const AGENT_TEAM_ROUTING_POLICY: Record<AgentTeamRoleSlug, readonly AgentTeamRoleSlug[]> = {
+  [AGENT_TEAM_ROLE_SLUG.architect]: [
+    AGENT_TEAM_ROLE_SLUG.rcaAnalyst,
+    AGENT_TEAM_ROLE_SLUG.codeReader,
+    AGENT_TEAM_ROLE_SLUG.reviewer,
+    AGENT_TEAM_ROLE_SLUG.prCreator,
+  ],
+  [AGENT_TEAM_ROLE_SLUG.rcaAnalyst]: [
+    AGENT_TEAM_ROLE_SLUG.architect,
+    AGENT_TEAM_ROLE_SLUG.reviewer,
+  ],
+  [AGENT_TEAM_ROLE_SLUG.codeReader]: [
+    AGENT_TEAM_ROLE_SLUG.architect,
+    AGENT_TEAM_ROLE_SLUG.reviewer,
+  ],
+  [AGENT_TEAM_ROLE_SLUG.reviewer]: [
+    AGENT_TEAM_ROLE_SLUG.architect,
+    AGENT_TEAM_ROLE_SLUG.prCreator,
+  ],
+  [AGENT_TEAM_ROLE_SLUG.prCreator]: [
+    AGENT_TEAM_ROLE_SLUG.architect,
+    AGENT_TEAM_ROLE_SLUG.reviewer,
+  ],
+};
+
+export function listAllowedTargets(roleSlug: AgentTeamRoleSlug): readonly AgentTeamRoleSlug[] {
+  return AGENT_TEAM_ROUTING_POLICY[roleSlug];
+}
+
+export function canRouteTo(fromRoleSlug: AgentTeamRoleSlug, toRoleSlug: AgentTeamRoleSlug): boolean {
+  return AGENT_TEAM_ROUTING_POLICY[fromRoleSlug].includes(agentTeamRoleSlugSchema.parse(toRoleSlug));
+}

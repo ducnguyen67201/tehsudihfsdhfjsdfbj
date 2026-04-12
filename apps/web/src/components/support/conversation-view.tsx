@@ -1,7 +1,7 @@
 "use client";
 
+import { ConversationInsightsPanel } from "@/components/support/conversation-insights-panel";
 import { ConversationHeader } from "@/components/support/conversation-header";
-import { ConversationPropertiesSidebar } from "@/components/support/conversation-properties-sidebar";
 import { MessageList } from "@/components/support/message-list";
 import { ReplyComposer } from "@/components/support/reply-composer";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -119,7 +119,7 @@ export function ConversationView({ conversationId, workspaceId, onBack }: Conver
         </div>
 
         {/* Right: properties sidebar */}
-        <ConversationPropertiesSidebar
+        <ConversationInsightsPanel
           conversation={conversation}
           events={events}
           isMutating={isMutating}
