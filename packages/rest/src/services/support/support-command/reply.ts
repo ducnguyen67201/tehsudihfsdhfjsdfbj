@@ -409,7 +409,7 @@ async function sendReplyWithRecordedAttempt(
         },
       });
 
-      await tx.supportConversationEvent.create({
+      const deliveryEvent = await tx.supportConversationEvent.create({
         data: {
           workspaceId: params.workspaceId,
           conversationId: params.conversationId,
@@ -422,9 +422,20 @@ async function sendReplyWithRecordedAttempt(
             deliveredAt: delivery.deliveredAt,
             deliveryAttemptId: initialAttempt.id,
             providerMessageId: delivery.providerMessageId,
+            messageText: params.payload.messageText,
           },
         },
       });
+
+      if (params.payload.attachmentIds && params.payload.attachmentIds.length > 0) {
+        await tx.supportMessageAttachment.updateMany({
+          where: {
+            id: { in: params.payload.attachmentIds },
+            workspaceId: params.workspaceId,
+          },
+          data: { eventId: deliveryEvent.id },
+        });
+      }
 
       // If we posted into a Slack thread whose ts differs from the
       // conversation's canonical root, register an alias so future
