@@ -1,4 +1,5 @@
 import { normalizeSlackMessageEvent } from "@/domains/support/adapters/slack/event-normalizer";
+import { shouldDropIngressEvent } from "@/domains/support/ingress-drop-rules";
 import { prisma, softUpsert } from "@shared/database";
 import {
   GROUPING_DEFAULTS,
@@ -16,14 +17,6 @@ import {
   SUPPORT_AUTHOR_ROLE_BUCKET,
   type SupportAuthorRoleBucket,
 } from "@shared/types/support/support-adapter.schema";
-
-// Ingress drops these at the boundary so they never hit the conversation
-// upsert or the timeline. `bot` covers our own chat.postMessage echoes;
-// `system` covers Slack noise subtypes (edits, joins, pinned_item, etc.).
-const DROPPED_AUTHOR_ROLES = new Set<SupportAuthorRoleBucket>([
-  SUPPORT_AUTHOR_ROLE_BUCKET.bot,
-  SUPPORT_AUTHOR_ROLE_BUCKET.system,
-]);
 
 function mapAuthorRoleToEventSource(
   role: SupportAuthorRoleBucket
@@ -110,22 +103,29 @@ export async function runSupportPipeline(
   }
 
   // Slack Events API echoes our own chat.postMessage calls back as message
-  // events (role=bot). It also emits noise like edits, deletes, and channel
-  // membership churn (role=system via NOISE_SUBTYPES in the normalizer).
-  // Neither should upsert the conversation or create a timeline entry —
-  // operator replies are tracked via DELIVERY_* events, and Slack noise
-  // carries no human signal.
+  // events. Drop them (plus Slack noise subtypes) at the boundary so they
+  // never upsert the conversation or create a timeline entry.
   //
-  // KNOWN LIMITATION: this is a blanket drop, not a targeted filter on our
-  // installation's bot user ID. Other-integration bot messages that carry
-  // file attachments (per design doc §3) are silently dropped too. To be
-  // fixed when Pillar A (file mirroring) lands — see TODOS.md.
-  if (DROPPED_AUTHOR_ROLES.has(normalized.authorRoleBucket)) {
+  // `shouldDropIngressEvent` uses `installation.botUserId` (captured at
+  // OAuth install time) to distinguish our own echoes from messages
+  // authored by other bots posting in the same channel (e.g. a GitHub
+  // app uploading a PR diff). Messages from other bots pass through so
+  // file-mirroring (design doc §3) can process them. Legacy installs
+  // with a null botUserId fall back to blanket-dropping all bots until
+  // the field is backfilled — see shouldDropIngressEvent's docstring.
+  if (
+    shouldDropIngressEvent({
+      authorRoleBucket: normalized.authorRoleBucket,
+      slackUserId: normalized.slackUserId,
+      installationBotUserId: ingressEvent.installation.botUserId,
+    })
+  ) {
     const droppedAt = new Date();
     console.log("[support] dropped ingress event", {
       ingressEventId: ingressEvent.id,
       authorRoleBucket: normalized.authorRoleBucket,
       slackUserId: normalized.slackUserId,
+      installationBotUserId: ingressEvent.installation.botUserId,
     });
     await prisma.supportIngressEvent.update({
       where: { id: ingressEvent.id },

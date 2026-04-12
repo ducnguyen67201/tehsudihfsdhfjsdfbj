@@ -2,6 +2,12 @@
 
 All notable changes to TrustLoop will be documented in this file.
 
+## [0.1.2.0] - 2026-04-12
+
+### Changed
+- **Slack ingress filter now distinguishes our own bot from other bots.** Previously we dropped every bot-authored Slack message at the ingress boundary to stop `chat.postMessage` echoes from leaking into the inbox. That was correct for echoes but over-aggressive: it also silently threw away messages from other integrations posting in the same channel (e.g. a GitHub app uploading a PR diff). The filter now compares each event's `user` field against `installation.botUserId` (captured at OAuth install time) and drops only our own bot. Other-integration bot messages pass through and will be mirrored once file-attachment support lands. Legacy installs where `botUserId` is null fall back to the old blanket drop — safe default until they re-install or backfill the field.
+- **Dev seed honors `SLACK_DEV_BOT_USER_ID` env var.** If you're dev-testing against a real Slack workspace, set `SLACK_DEV_BOT_USER_ID` in `.env` to your workspace's actual bot user ID so the echo filter works out of the box. Without the env var, the seed uses a placeholder that only works for synthetic (no-real-Slack) dev loops.
+
 ## [0.1.1.0] - 2026-04-12
 
 ### Fixed
