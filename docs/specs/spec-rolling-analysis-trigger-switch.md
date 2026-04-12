@@ -21,6 +21,16 @@ Customer message arrives
     → dispatchAnalysis()               // fires unconditionally ← GAP
 ```
 
+```mermaid
+flowchart TD
+  A["supportInboxWorkflow message"] --> B["shouldAutoTrigger(workspaceId)"]
+  B --> C["analysisTriggerWorkflow debounce timer"]
+  C --> D["dispatchAnalysis()"]
+  D --> E{"workspace still AUTO?"}
+  E -->|yes| F["startSupportAnalysisWorkflow(AUTO)"]
+  E -->|no| G["skip dispatch"]
+```
+
 ### What already works
 
 The `shouldAutoTrigger` activity runs **per message** in `supportInboxWorkflow`. This means:
