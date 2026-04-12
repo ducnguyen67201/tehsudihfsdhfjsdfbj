@@ -178,6 +178,12 @@ model SupportConversationEvent {
   eventSource    SupportConversationEventSource
   summary        String?
   detailsJson    Json?
+  /// Slack's message ts for MESSAGE_RECEIVED events. Promoted to a
+  /// first-class column so thread-parent lookups can use a B-tree index
+  /// instead of a JSONB path filter (which forces a sequential scan).
+  /// Null for DELIVERY_ATTEMPTED / DELIVERY_SUCCEEDED and internal
+  /// audit events — those don't become thread roots.
+  messageTs      String?
   /// Resolved at ingress/reply time from Slack's thread_ts. When non-null,
   /// this event is a reply inside the parent event's thread. The UI groups
   /// children by this field without re-running the threadTs↔messageTs match.
@@ -193,6 +199,7 @@ model SupportConversationEvent {
   @@index([conversationId, createdAt])
   @@index([workspaceId, createdAt])
   @@index([parentEventId])
+  @@index([conversationId, messageTs])
 }
 
 model SupportDeliveryAttempt {

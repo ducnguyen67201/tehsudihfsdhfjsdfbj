@@ -2,6 +2,16 @@
 
 All notable changes to TrustLoop will be documented in this file.
 
+## [0.1.7.0] - 2026-04-12
+
+### Changed
+- **`messageTs` promoted to a first-class column on `SupportConversationEvent`.** Thread-parent resolution previously used a JSONB path filter (`detailsJson->>'messageTs' = $1`) which can't use a JSONB GIN index and forces a sequential scan over every event in the conversation. Now a real text column with a composite `(conversationId, messageTs)` B-tree index. Reply latency goes from O(events-per-conversation) to O(log n). Ingest writes still mirror `messageTs` into `detailsJson` for forensic lookup — removing the mirror is a future cleanup once we're confident nothing reads it.
+- **Thread-parent resolution extracted to `supportEvents.resolveParentEventId`.** Both the ingress path (`runSupportPipeline`) and the reply path (`sendReplyWithRecordedAttempt`) now call the shared service instead of each maintaining their own inline query. Walk-up rule, defensive stale-client guard, and structural-client typing live in one place — `packages/rest/src/services/support/support-event-service.ts`. 5 new unit tests cover root/child/walk-up/scoping/structural-client cases.
+- **`useConversationReply` hook extracted from `conversation-view.tsx`.** The component now owns layout and delegation; the hook owns timeline polling + reply/send/retry state and handlers. Reply flow can be tested in isolation and Pillar A's multi-file upload state will have a clean home instead of piling on top of the component.
+
+### Added
+- **Migration `20260412050000_support_event_message_ts_column`.** Adds the `messageTs` column, backfills it from `detailsJson`, and creates the composite index. 32 existing rows backfilled during development. Ingress writes the column alongside the detailsJson mirror going forward.
+
 ## [0.1.6.0] - 2026-04-12
 
 ### Changed
