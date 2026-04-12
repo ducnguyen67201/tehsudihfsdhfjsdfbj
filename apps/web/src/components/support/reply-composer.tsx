@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
+import { getStoredCsrfToken } from "@/lib/trpc-http";
 import {
   RiAttachmentLine,
   RiCloseLine,
@@ -12,9 +13,8 @@ import {
 } from "@remixicon/react";
 import type { EmojiClickData } from "emoji-picker-react";
 import dynamic from "next/dynamic";
-import { getStoredCsrfToken } from "@/lib/trpc-http";
-import { toast } from "sonner";
 import { useCallback, useRef, useState } from "react";
+import { toast } from "sonner";
 
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 
@@ -31,7 +31,11 @@ import { EMOJI_PICKER_HEIGHT, EMOJI_PICKER_WIDTH, formatFileSize } from "@/lib/a
 
 interface ReplyComposerProps {
   isMutating: boolean;
-  onSendReply: (messageText: string, replyToEventId?: string, attachmentIds?: string[]) => Promise<unknown>;
+  onSendReply: (
+    messageText: string,
+    replyToEventId?: string,
+    attachmentIds?: string[]
+  ) => Promise<unknown>;
   replyToEventId: string | null;
   onCancelThreadReply: () => void;
   sendError: string | null;
@@ -53,24 +57,27 @@ export function ReplyComposer({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const handleEmojiSelect = useCallback((emojiData: EmojiClickData) => {
-    const textarea = textareaRef.current;
-    if (textarea) {
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-      const updated = draft.slice(0, start) + emojiData.emoji + draft.slice(end);
-      setDraft(updated);
-      requestAnimationFrame(() => {
-        const cursor = start + emojiData.emoji.length;
-        textarea.selectionStart = cursor;
-        textarea.selectionEnd = cursor;
-        textarea.focus();
-      });
-    } else {
-      setDraft((prev) => prev + emojiData.emoji);
-    }
-    setEmojiPickerOpen(false);
-  }, [draft]);
+  const handleEmojiSelect = useCallback(
+    (emojiData: EmojiClickData) => {
+      const textarea = textareaRef.current;
+      if (textarea) {
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const updated = draft.slice(0, start) + emojiData.emoji + draft.slice(end);
+        setDraft(updated);
+        requestAnimationFrame(() => {
+          const cursor = start + emojiData.emoji.length;
+          textarea.selectionStart = cursor;
+          textarea.selectionEnd = cursor;
+          textarea.focus();
+        });
+      } else {
+        setDraft((prev) => prev + emojiData.emoji);
+      }
+      setEmojiPickerOpen(false);
+    },
+    [draft]
+  );
 
   const addFiles = useCallback((files: FileList | File[]) => {
     const newFiles = Array.from(files);

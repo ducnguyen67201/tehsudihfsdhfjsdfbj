@@ -30,13 +30,13 @@ export function CustomerProfileProvider({
   children: React.ReactNode;
 }) {
   return (
-    <CustomerProfileContext value={{ profiles, currentUser }}>
-      {children}
-    </CustomerProfileContext>
+    <CustomerProfileContext value={{ profiles, currentUser }}>{children}</CustomerProfileContext>
   );
 }
 
-export function useCustomerProfile(externalUserId: string | null): SupportCustomerProfileSummary | null {
+export function useCustomerProfile(
+  externalUserId: string | null
+): SupportCustomerProfileSummary | null {
   const { profiles } = useContext(CustomerProfileContext);
   if (!externalUserId) return null;
   return profiles[externalUserId] ?? null;

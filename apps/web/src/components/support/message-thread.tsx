@@ -47,7 +47,11 @@ function ThreadAttachment({ attachment }: { attachment: SupportTimelineAttachmen
       <RiAttachmentLine className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       <span className="truncate">{attachment.originalFilename ?? "File"}</span>
       <span className="text-muted-foreground">{formatFileSize(attachment.sizeBytes)}</span>
-      <a href={url} download={attachment.originalFilename ?? "file"} className="shrink-0 p-0.5 rounded hover:bg-muted">
+      <a
+        href={url}
+        download={attachment.originalFilename ?? "file"}
+        className="shrink-0 p-0.5 rounded hover:bg-muted"
+      >
         <RiDownloadLine className="h-3.5 w-3.5 text-muted-foreground" />
       </a>
     </div>

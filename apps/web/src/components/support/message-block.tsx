@@ -5,7 +5,14 @@ import { Dialog, DialogClose, DialogContent } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { RiAttachmentLine, RiAlertLine, RiCloseLine, RiDownloadLine, RiEmotionLine, RiReplyLine } from "@remixicon/react";
+import {
+  RiAlertLine,
+  RiAttachmentLine,
+  RiCloseLine,
+  RiDownloadLine,
+  RiEmotionLine,
+  RiReplyLine,
+} from "@remixicon/react";
 import { SUPPORT_CONVERSATION_EVENT_SOURCE } from "@shared/types";
 import type {
   SupportConversationTimelineEvent,
@@ -25,7 +32,12 @@ function formatTime(value: string): string {
   }).format(new Date(value));
 }
 
-import { EMOJI_PICKER_HEIGHT, EMOJI_PICKER_WIDTH, IMAGE_MIMETYPES, formatFileSize } from "@/lib/attachment-utils";
+import {
+  EMOJI_PICKER_HEIGHT,
+  EMOJI_PICKER_WIDTH,
+  IMAGE_MIMETYPES,
+  formatFileSize,
+} from "@/lib/attachment-utils";
 
 export function extractSenderKey(event: SupportConversationTimelineEvent): string {
   const slackUserId =
@@ -114,11 +126,24 @@ function PreviewableAttachment({ attachment }: { attachment: SupportTimelineAtta
             className="flex w-full items-center gap-2.5 px-3 py-2 hover:bg-muted/40 transition-colors cursor-pointer"
           >
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-red-500/10">
-              <svg className="h-4 w-4 text-red-600" viewBox="0 0 24 24" fill="currentColor"><path d="M7 2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-6-6H7zm6 1.5L18.5 9H14a1 1 0 0 1-1-1V3.5zM9.5 13.5c0-.28.22-.5.5-.5h1c.83 0 1.5.67 1.5 1.5S11.83 16 11 16h-.5v1a.5.5 0 0 1-1 0v-3.5zm1 1.5h.5a.5.5 0 0 0 0-1h-.5v1z"/></svg>
+              <svg
+                className="h-4 w-4 text-red-600"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                role="img"
+                aria-label="File attachment"
+              >
+                <title>File attachment</title>
+                <path d="M7 2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-6-6H7zm6 1.5L18.5 9H14a1 1 0 0 1-1-1V3.5zM9.5 13.5c0-.28.22-.5.5-.5h1c.83 0 1.5.67 1.5 1.5S11.83 16 11 16h-.5v1a.5.5 0 0 1-1 0v-3.5zm1 1.5h.5a.5.5 0 0 0 0-1h-.5v1z" />
+              </svg>
             </div>
             <div className="min-w-0 flex-1 text-left">
-              <p className="text-sm font-medium truncate">{attachment.originalFilename ?? "File"}</p>
-              <p className="text-xs text-muted-foreground">PDF · {formatFileSize(attachment.sizeBytes)}</p>
+              <p className="text-sm font-medium truncate">
+                {attachment.originalFilename ?? "File"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                PDF · {formatFileSize(attachment.sizeBytes)}
+              </p>
             </div>
             <a
               href={url}
@@ -152,7 +177,9 @@ function PreviewableAttachment({ attachment }: { attachment: SupportTimelineAtta
           >
             {attachment.originalFilename ?? "File"}
           </button>
-          <span className="text-xs text-muted-foreground">{formatFileSize(attachment.sizeBytes)}</span>
+          <span className="text-xs text-muted-foreground">
+            {formatFileSize(attachment.sizeBytes)}
+          </span>
           <a
             href={url}
             download={attachment.originalFilename ?? "file"}
@@ -165,7 +192,10 @@ function PreviewableAttachment({ attachment }: { attachment: SupportTimelineAtta
 
       {canPreview ? (
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogContent showCloseButton={false} className="sm:max-w-[80%] w-[80%] h-[92vh] max-h-[92vh] p-0 overflow-hidden flex flex-col">
+          <DialogContent
+            showCloseButton={false}
+            className="sm:max-w-[80%] w-[80%] h-[92vh] max-h-[92vh] p-0 overflow-hidden flex flex-col"
+          >
             <div className="flex items-center justify-between border-b px-4 py-2">
               <span className="text-sm font-medium truncate">{attachment.originalFilename}</span>
               <div className="flex items-center gap-1">
@@ -186,9 +216,17 @@ function PreviewableAttachment({ attachment }: { attachment: SupportTimelineAtta
             </div>
             <div className="flex-1 overflow-auto">
               {isImage ? (
-                <img src={url} alt={attachment.originalFilename ?? "Image"} className="max-w-full mx-auto p-4" />
+                <img
+                  src={url}
+                  alt={attachment.originalFilename ?? "Image"}
+                  className="max-w-full mx-auto p-4"
+                />
               ) : isPdf ? (
-                <iframe src={url} className="w-full h-full border-0" title={attachment.originalFilename ?? "PDF"} />
+                <iframe
+                  src={url}
+                  className="w-full h-full border-0"
+                  title={attachment.originalFilename ?? "PDF"}
+                />
               ) : null}
             </div>
           </DialogContent>
@@ -254,7 +292,14 @@ interface MessageBlockProps {
   children?: React.ReactNode;
 }
 
-export function MessageBlock({ event, showHeader, onReplyToThread, onToggleReaction, currentUserId, children }: MessageBlockProps) {
+export function MessageBlock({
+  event,
+  showHeader,
+  onReplyToThread,
+  onToggleReaction,
+  currentUserId,
+  children,
+}: MessageBlockProps) {
   const messageText = extractMessageText(event);
   const isOperator = event.eventSource === SUPPORT_CONVERSATION_EVENT_SOURCE.operator;
   const slackUserId =
@@ -280,7 +325,9 @@ export function MessageBlock({ event, showHeader, onReplyToThread, onToggleReact
   );
 
   const name = isOperator
-    ? (currentUser.name ? `${currentUser.name} (you)` : "You")
+    ? currentUser.name
+      ? `${currentUser.name} (you)`
+      : "You"
     : (profile?.realName ?? profile?.displayName ?? senderDisplayName(event));
   const avatarUrl = isOperator ? currentUser.avatarUrl : (profile?.avatarUrl ?? null);
   const hasThread = Boolean(children);
@@ -296,10 +343,7 @@ export function MessageBlock({ event, showHeader, onReplyToThread, onToggleReact
             <Avatar className="h-8 w-8">
               {avatarUrl ? <AvatarImage src={avatarUrl} alt={`${name}'s avatar`} /> : null}
               <AvatarFallback
-                className={cn(
-                  "text-xs font-semibold",
-                  avatarColor(name, isOperator)
-                )}
+                className={cn("text-xs font-semibold", avatarColor(name, isOperator))}
               >
                 {senderInitials(name)}
               </AvatarFallback>

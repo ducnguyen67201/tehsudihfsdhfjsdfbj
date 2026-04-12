@@ -159,7 +159,12 @@ export function useSupportInbox() {
   );
 
   const sendReply = useCallback(
-    async (conversationId: string, messageText: string, replyToEventId?: string, attachmentIds?: string[]) =>
+    async (
+      conversationId: string,
+      messageText: string,
+      replyToEventId?: string,
+      attachmentIds?: string[]
+    ) =>
       runMutation("supportInbox.sendReply", {
         conversationId,
         messageText,
@@ -171,7 +176,12 @@ export function useSupportInbox() {
   );
 
   const toggleReaction = useCallback(
-    async (conversationId: string, eventId: string, emojiName: string, emojiUnicode: string | null) =>
+    async (
+      conversationId: string,
+      eventId: string,
+      emojiName: string,
+      emojiUnicode: string | null
+    ) =>
       trpcMutation<
         { conversationId: string; eventId: string; emojiName: string; emojiUnicode: string | null },
         SupportReaction[]

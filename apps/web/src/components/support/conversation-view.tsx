@@ -99,61 +99,61 @@ export function ConversationView({ conversationId, workspaceId, onBack }: Conver
         avatarUrl: auth.session?.user.avatarUrl ?? null,
       }}
     >
-    <div className="flex h-full flex-col">
-      {/* Full-width header */}
-      <ConversationHeader
-        conversation={conversation}
-        isMutating={isMutating}
-        onBack={onBack}
-        onMarkDoneWithOverride={inbox.markDoneWithOverrideReason}
-        onUpdateStatus={inbox.updateConversationStatus}
-      />
+      <div className="flex h-full flex-col">
+        {/* Full-width header */}
+        <ConversationHeader
+          conversation={conversation}
+          isMutating={isMutating}
+          onBack={onBack}
+          onMarkDoneWithOverride={inbox.markDoneWithOverrideReason}
+          onUpdateStatus={inbox.updateConversationStatus}
+        />
 
-      {/* Two-panel body */}
-      <div className="flex min-h-0 flex-1">
-        {/* Left: messages + composer */}
-        <div className="flex min-w-0 flex-1 flex-col">
-          <MessageList
+        {/* Two-panel body */}
+        <div className="flex min-h-0 flex-1">
+          {/* Left: messages + composer */}
+          <div className="flex min-w-0 flex-1 flex-col">
+            <MessageList
+              events={events}
+              isLoading={isLoading}
+              isMutating={isMutating}
+              onRetryDelivery={handleRetryDelivery}
+              onSetReplyToEventId={setReplyToEventId}
+              onToggleReaction={handleToggleReaction}
+              currentUserId={auth.session?.user.id ?? null}
+            />
+
+            <ReplyComposer
+              isMutating={isMutating}
+              onSendReply={handleSendReply}
+              replyToEventId={replyToEventId}
+              conversationId={conversationId}
+              onCancelThreadReply={() => setReplyToEventId(null)}
+              sendError={sendError}
+            />
+          </div>
+
+          {/* Right: properties sidebar */}
+          <ConversationPropertiesSidebar
+            conversation={conversation}
             events={events}
-            isLoading={isLoading}
             isMutating={isMutating}
-            onRetryDelivery={handleRetryDelivery}
-            onSetReplyToEventId={setReplyToEventId}
-            onToggleReaction={handleToggleReaction}
-            currentUserId={auth.session?.user.id ?? null}
-          />
-
-          <ReplyComposer
-            isMutating={isMutating}
-            onSendReply={handleSendReply}
-            replyToEventId={replyToEventId}
-            conversationId={conversationId}
-            onCancelThreadReply={() => setReplyToEventId(null)}
-            sendError={sendError}
+            onAssign={inbox.assignConversation}
+            onUpdateStatus={inbox.updateConversationStatus}
+            analysis={analysisHook.analysis}
+            isAnalyzing={analysisHook.isAnalyzing}
+            isAnalysisMutating={analysisHook.isMutating}
+            analysisError={analysisHook.error}
+            onTriggerAnalysis={() => void analysisHook.triggerAnalysis()}
+            onApproveDraft={(draftId, editedBody) =>
+              void analysisHook.approveDraft(draftId, editedBody)
+            }
+            onDismissDraft={(draftId, reason) => void analysisHook.dismissDraft(draftId, reason)}
+            workspaceId={workspaceId}
+            sessionReplay={sessionReplay}
           />
         </div>
-
-        {/* Right: properties sidebar */}
-        <ConversationPropertiesSidebar
-          conversation={conversation}
-          events={events}
-          isMutating={isMutating}
-          onAssign={inbox.assignConversation}
-          onUpdateStatus={inbox.updateConversationStatus}
-          analysis={analysisHook.analysis}
-          isAnalyzing={analysisHook.isAnalyzing}
-          isAnalysisMutating={analysisHook.isMutating}
-          analysisError={analysisHook.error}
-          onTriggerAnalysis={() => void analysisHook.triggerAnalysis()}
-          onApproveDraft={(draftId, editedBody) =>
-            void analysisHook.approveDraft(draftId, editedBody)
-          }
-          onDismissDraft={(draftId, reason) => void analysisHook.dismissDraft(draftId, reason)}
-          workspaceId={workspaceId}
-          sessionReplay={sessionReplay}
-        />
       </div>
-    </div>
     </CustomerProfileProvider>
   );
 }

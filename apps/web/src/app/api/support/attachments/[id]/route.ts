@@ -2,10 +2,7 @@ import { resolveSessionFromRequest } from "@shared/rest/security/session";
 import * as supportAttachments from "@shared/rest/services/support/support-attachment-service";
 import { NextResponse } from "next/server";
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await resolveSessionFromRequest(request);
   if (!session?.user || !session.activeWorkspaceId) {
     return NextResponse.json(
@@ -25,8 +22,13 @@ export async function GET(
   }
 
   const SAFE_INLINE_TYPES = new Set([
-    "image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml",
-    "application/pdf", "text/plain",
+    "image/png",
+    "image/jpeg",
+    "image/gif",
+    "image/webp",
+    "image/svg+xml",
+    "application/pdf",
+    "text/plain",
   ]);
   const isSafeInline = SAFE_INLINE_TYPES.has(result.mimeType);
   const contentType = isSafeInline ? result.mimeType : "application/octet-stream";

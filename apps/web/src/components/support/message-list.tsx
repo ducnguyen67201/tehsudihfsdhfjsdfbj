@@ -187,8 +187,8 @@ export function MessageList({
             }
 
             if (MESSAGE_EVENT_TYPES.has(event.eventType)) {
-              const replies = (childrenByParent.get(event.id) ?? []).filter(
-                (r) => MESSAGE_EVENT_TYPES.has(r.eventType)
+              const replies = (childrenByParent.get(event.id) ?? []).filter((r) =>
+                MESSAGE_EVENT_TYPES.has(r.eventType)
               );
 
               nodes.push(<div key={`spacer-${event.id}`} className="h-3" />);

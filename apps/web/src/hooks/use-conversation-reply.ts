@@ -2,7 +2,11 @@
 
 import { useConversationPolling } from "@/hooks/use-conversation-polling";
 import { useSupportInbox } from "@/hooks/use-support-inbox";
-import type { SupportConversation, SupportConversationTimelineEvent, SupportCustomerProfileSummary } from "@shared/types";
+import type {
+  SupportConversation,
+  SupportConversationTimelineEvent,
+  SupportCustomerProfileSummary,
+} from "@shared/types";
 import { useCallback, useMemo, useState } from "react";
 
 /**
@@ -37,7 +41,11 @@ export interface UseConversationReplyResult {
   clearSendError: () => void;
 
   // Handlers
-  handleSendReply: (messageText: string, replyToId?: string, attachmentIds?: string[]) => Promise<void>;
+  handleSendReply: (
+    messageText: string,
+    replyToId?: string,
+    attachmentIds?: string[]
+  ) => Promise<void>;
   handleRetryDelivery: (deliveryAttemptId: string) => void;
   handleToggleReaction: (eventId: string, emojiName: string, emojiUnicode: string | null) => void;
 
@@ -74,7 +82,9 @@ export function useConversationReply(conversationId: string): UseConversationRep
 
   const handleToggleReaction = useCallback(
     (eventId: string, emojiName: string, emojiUnicode: string | null) => {
-      void inbox.toggleReaction(conversationId, eventId, emojiName, emojiUnicode).then(() => polling.refresh());
+      void inbox
+        .toggleReaction(conversationId, eventId, emojiName, emojiUnicode)
+        .then(() => polling.refresh());
     },
     [conversationId, inbox, polling]
   );
@@ -91,7 +101,10 @@ export function useConversationReply(conversationId: string): UseConversationRep
   return {
     conversation: polling.timelineData?.conversation ?? null,
     events: useMemo(() => polling.timelineData?.events ?? [], [polling.timelineData]),
-    customerProfiles: useMemo(() => polling.timelineData?.customerProfiles ?? {}, [polling.timelineData]),
+    customerProfiles: useMemo(
+      () => polling.timelineData?.customerProfiles ?? {},
+      [polling.timelineData]
+    ),
     isLoading: polling.isLoading,
     pollingError: polling.error,
     refresh,
