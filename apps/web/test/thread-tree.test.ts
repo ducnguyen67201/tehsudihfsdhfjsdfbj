@@ -1,6 +1,6 @@
+import type { SupportConversationTimelineEvent } from "@shared/types";
 import { describe, expect, it } from "vitest";
 import { buildThreadTree } from "../src/components/support/thread-tree";
-import type { SupportConversationTimelineEvent } from "@shared/types";
 
 /**
  * Unit tests for buildThreadTree — groups timeline events into
@@ -118,9 +118,7 @@ describe("buildThreadTree", () => {
     // Orphan child: parentEventId references an event not in the timeline
     // (e.g., deleted parent, pagination gap). Render at top-level rather
     // than silently dropping.
-    const events = [
-      event({ id: "orphan", parentEventId: "missing-parent", text: "stranded" }),
-    ];
+    const events = [event({ id: "orphan", parentEventId: "missing-parent", text: "stranded" })];
 
     const { topLevel, childrenByParent } = buildThreadTree(events);
 

@@ -31,15 +31,12 @@ export function NoWorkspaceState({ onSignOut }: { onSignOut: () => void }) {
 function AccessPanel({ onSignOut }: { onSignOut: () => void }) {
   return (
     <div className="flex flex-col justify-center p-8 md:p-12">
-      <Logo
-        title="TrustLoop AI"
-        className="mb-8 size-12 rounded-full bg-foreground/5 p-2.5"
-      />
+      <Logo title="TrustLoop AI" className="mb-8 size-12 rounded-full bg-foreground/5 p-2.5" />
 
       <h1 className="text-3xl font-semibold tracking-tight text-balance">Access Restricted</h1>
       <p className="mt-2 text-sm text-muted-foreground text-balance">
-        Sign-in worked, but you don't have access to a workspace yet. Contact your admin, or
-        request access below and we'll find someone who can help.
+        Sign-in worked, but you don't have access to a workspace yet. Contact your admin, or request
+        access below and we'll find someone who can help.
       </p>
 
       <div className="mt-8">

@@ -18,9 +18,7 @@ import {
   type SupportAuthorRoleBucket,
 } from "@shared/types/support/support-adapter.schema";
 
-function mapAuthorRoleToEventSource(
-  role: SupportAuthorRoleBucket
-): SupportConversationEventSource {
+function mapAuthorRoleToEventSource(role: SupportAuthorRoleBucket): SupportConversationEventSource {
   if (role === SUPPORT_AUTHOR_ROLE_BUCKET.internal) {
     return SUPPORT_CONVERSATION_EVENT_SOURCE.operator;
   }

@@ -5,12 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // (if not). Replaces the old upsert() which couldn't target the partial
 // unique index on (workspaceId, sessionId) WHERE deletedAt IS NULL.
 const mockSessionFindFirst = vi.fn().mockResolvedValue(null);
-const mockSessionCreate = vi
-  .fn()
-  .mockResolvedValue({ id: "sr_1", eventCount: 0 });
-const mockSessionUpdate = vi
-  .fn()
-  .mockResolvedValue({ id: "sr_1", eventCount: 1 });
+const mockSessionCreate = vi.fn().mockResolvedValue({ id: "sr_1", eventCount: 0 });
+const mockSessionUpdate = vi.fn().mockResolvedValue({ id: "sr_1", eventCount: 1 });
 const mockCreateMany = vi.fn().mockResolvedValue({ count: 1 });
 const mockChunkFindFirst = vi.fn().mockResolvedValue(null);
 const mockChunkCreate = vi.fn().mockResolvedValue({ id: "chunk_1" });

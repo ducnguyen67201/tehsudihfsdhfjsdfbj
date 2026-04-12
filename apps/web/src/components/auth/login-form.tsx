@@ -32,10 +32,7 @@ export function LoginForm({ googleBanner, googleEnabled }: LoginFormProps) {
 function FormSide({ googleBanner, googleEnabled }: LoginFormProps) {
   return (
     <div className="flex flex-col justify-center p-8 md:p-12">
-      <Logo
-        title="TrustLoop AI"
-        className="mb-8 size-12 rounded-full bg-foreground/5 p-2.5"
-      />
+      <Logo title="TrustLoop AI" className="mb-8 size-12 rounded-full bg-foreground/5 p-2.5" />
 
       <h1 className="text-3xl font-semibold tracking-tight text-balance">Welcome back</h1>
       <p className="mt-2 text-sm text-muted-foreground text-balance">
@@ -73,8 +70,8 @@ function FormSide({ googleBanner, googleEnabled }: LoginFormProps) {
         )}
 
         <p className="text-xs text-muted-foreground">
-          New here? Your team provisions workspaces, so reach out to your admin first. By
-          continuing you agree to TrustLoop's terms and privacy policy.
+          New here? Your team provisions workspaces, so reach out to your admin first. By continuing
+          you agree to TrustLoop's terms and privacy policy.
         </p>
       </div>
     </div>
