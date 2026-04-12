@@ -143,6 +143,7 @@ type SlackOAuthAccessResponse = {
   access_token?: string;
   bot_user_id?: string;
   app_id?: string;
+  scope?: string;
   team?: { id?: string; name?: string };
 };
 
@@ -158,6 +159,7 @@ export async function exchangeCode(
   teamId: string;
   teamName: string;
   appId: string;
+  scopes: string[];
 }> {
   const clientId = env.SLACK_CLIENT_ID;
   const clientSecret = env.SLACK_CLIENT_SECRET;
@@ -189,6 +191,7 @@ export async function exchangeCode(
     teamId: data.team?.id ?? "",
     teamName: data.team?.name ?? "",
     appId: data.app_id ?? "",
+    scopes: data.scope?.split(",") ?? [],
   };
 }
 
@@ -204,6 +207,7 @@ export async function completeInstall(
     teamId: string;
     teamName: string;
     appId: string;
+    scopes: string[];
   },
   actorUserId?: string
 ) {
@@ -216,12 +220,15 @@ export async function completeInstall(
     workspaceId,
     teamId: oauthResult.teamId,
     botUserId: oauthResult.botUserId,
+    oauthScopes: oauthResult.scopes,
     metadata,
   };
 
+  const providerInstallationId = `${oauthResult.appId}:${oauthResult.teamId}`;
+
   const installation = await softUpsert(prisma.supportInstallation, {
-    where: { provider: "SLACK", providerInstallationId: oauthResult.appId },
-    create: { provider: "SLACK", providerInstallationId: oauthResult.appId, ...installData },
+    where: { provider: "SLACK", providerInstallationId },
+    create: { provider: "SLACK", providerInstallationId, ...installData },
     update: installData,
   });
 

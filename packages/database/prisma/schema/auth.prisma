@@ -37,6 +37,8 @@ model Workspace {
   groupingAnchors          SupportGroupingAnchor[]
   supportAnalyses          SupportAnalysis[]
   supportDrafts            SupportDraft[]
+  supportAttachments       SupportMessageAttachment[]
+  supportCustomerProfiles  SupportCustomerProfile[]
   aiSettings               WorkspaceAiSettings?
   sessionRecords           SessionRecord[]
   sessionEvents            SessionEvent[]
