@@ -5,24 +5,38 @@ import { createContext, useContext } from "react";
 
 type ProfileMap = Record<string, SupportCustomerProfileSummary>;
 
-const CustomerProfileContext = createContext<ProfileMap>({});
+interface ProfileContextValue {
+  profiles: ProfileMap;
+  currentUserName: string | null;
+}
+
+const CustomerProfileContext = createContext<ProfileContextValue>({
+  profiles: {},
+  currentUserName: null,
+});
 
 export function CustomerProfileProvider({
   profiles,
+  currentUserName,
   children,
 }: {
   profiles: ProfileMap;
+  currentUserName: string | null;
   children: React.ReactNode;
 }) {
   return (
-    <CustomerProfileContext value={profiles}>
+    <CustomerProfileContext value={{ profiles, currentUserName }}>
       {children}
     </CustomerProfileContext>
   );
 }
 
 export function useCustomerProfile(externalUserId: string | null): SupportCustomerProfileSummary | null {
-  const map = useContext(CustomerProfileContext);
+  const { profiles } = useContext(CustomerProfileContext);
   if (!externalUserId) return null;
-  return map[externalUserId] ?? null;
+  return profiles[externalUserId] ?? null;
+}
+
+export function useCurrentUserName(): string | null {
+  return useContext(CustomerProfileContext).currentUserName;
 }

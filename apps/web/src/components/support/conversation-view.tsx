@@ -8,6 +8,7 @@ import { ReplyComposer } from "@/components/support/reply-composer";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAnalysis } from "@/hooks/use-analysis";
+import { useAuthSession } from "@/hooks/use-auth-session";
 import { useConversationReply } from "@/hooks/use-conversation-reply";
 import { useSessionReplay } from "@/hooks/use-session-replay";
 import { useSupportInbox } from "@/hooks/use-support-inbox";
@@ -29,6 +30,7 @@ interface ConversationViewProps {
 export function ConversationView({ conversationId, workspaceId, onBack }: ConversationViewProps) {
   // Reply/send/retry/polling flow — owns timeline state + reply handlers.
   const reply = useConversationReply(conversationId);
+  const auth = useAuthSession();
   // Non-reply mutations (assign, status change, mark-done) still come
   // straight from the shared inbox hook.
   const inbox = useSupportInbox();
@@ -89,7 +91,7 @@ export function ConversationView({ conversationId, workspaceId, onBack }: Conver
   }
 
   return (
-    <CustomerProfileProvider profiles={customerProfiles}>
+    <CustomerProfileProvider profiles={customerProfiles} currentUserName={(auth.session?.user as Record<string, unknown> | undefined)?.name as string ?? null}>
     <div className="flex h-full flex-col">
       {/* Full-width header */}
       <ConversationHeader
