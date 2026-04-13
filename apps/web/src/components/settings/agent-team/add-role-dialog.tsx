@@ -46,12 +46,13 @@ const TOOL_OPTIONS = [
 interface AddRoleDialogProps {
   teamId: string;
   onAddRole: (input: AddAgentTeamRoleInput) => Promise<void>;
+  triggerRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
 /**
  * Adds a specialized role to the selected agent team.
  */
-export function AddRoleDialog({ teamId, onAddRole }: AddRoleDialogProps) {
+export function AddRoleDialog({ teamId, onAddRole, triggerRef }: AddRoleDialogProps) {
   const [open, setOpen] = useState(false);
   const [slug, setSlug] = useState<(typeof ROLE_OPTIONS)[number]["value"]>(
     AGENT_TEAM_ROLE_SLUG.architect
@@ -108,7 +109,9 @@ export function AddRoleDialog({ teamId, onAddRole }: AddRoleDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline">Add role</Button>
+        <Button ref={triggerRef} variant="outline" size="sm">
+          Add role
+        </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>

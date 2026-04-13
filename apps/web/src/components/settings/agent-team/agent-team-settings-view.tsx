@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 
 /**
  * Workspace settings surface for configuring multi-agent team blueprints.
+ * Two-column layout: narrow team list on left, graph + detail on right.
  */
 export function AgentTeamSettingsView() {
   const router = useRouter();
@@ -46,7 +47,7 @@ export function AgentTeamSettingsView() {
       data={agentTeams.data}
       error={agentTeams.error}
       loadingTitle="Loading agent teams"
-      loadingDescription="Fetching team definitions, roles, and handoffs..."
+      loadingDescription="Fetching team definitions, roles, and connections..."
       errorTitle="Unable to load agent teams"
     >
       {(agentTeamData) => (
@@ -54,7 +55,7 @@ export function AgentTeamSettingsView() {
           <header className="space-y-1">
             <h1 className="text-2xl font-semibold">Agent Teams</h1>
             <p className="text-sm text-muted-foreground">
-              Configure multi-role agent pipelines for analysis, review, and PR creation.
+              Build your team of AI specialists. Connect them. Watch them collaborate.
             </p>
           </header>
 
@@ -68,7 +69,7 @@ export function AgentTeamSettingsView() {
             </Alert>
           ) : null}
 
-          <div className="grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
+          <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
             <TeamListSection
               teams={agentTeamData.teams}
               selectedTeamId={selectedTeamId}
