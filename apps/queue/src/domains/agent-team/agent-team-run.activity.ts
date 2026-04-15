@@ -7,7 +7,12 @@ import {
 } from "@/domains/agent-team/agent-team-run-routing";
 import { type Prisma, prisma } from "@shared/database";
 import { env } from "@shared/env";
-import { logRecordedEvents, recordEvent } from "@shared/rest/services/agent-team/run-event-service";
+import {
+  logRecordedEvents,
+  recordEvent,
+  recordEvents,
+} from "@shared/rest/services/agent-team/run-event-service";
+import type { AgentTeamRunEventDraft } from "@shared/types";
 import {
   AGENT_TEAM_EVENT_ACTOR_SYSTEM,
   AGENT_TEAM_EVENT_KIND,
@@ -266,7 +271,14 @@ export async function persistRoleTurnResult(
     messages: normalizedMessages,
   });
 
-  return prisma.$transaction(async (tx) => {
+  const { snapshot, recordedEvents } = await prisma.$transaction(async (tx) => {
+    // workspaceId is required on every event. Fetch once per turn so callers
+    // don't need to thread it through the activity input.
+    const run = await tx.agentTeamRun.findUniqueOrThrow({
+      where: { id: input.runId },
+      select: { workspaceId: true },
+    });
+
     const messageCount = await tx.agentTeamMessage.count({
       where: { runId: input.runId },
     });
@@ -275,6 +287,10 @@ export async function persistRoleTurnResult(
         `Agent team run exceeded the ${MAX_AGENT_TEAM_MESSAGES} message budget for run ${input.runId}`
       );
     }
+
+    // Collect event drafts as we project; flush in one batch at the end of
+    // the transaction so the event log + its projections share atomicity.
+    const eventDrafts: AgentTeamRunEventDraft[] = [];
 
     const createdMessages: AgentTeamDialogueMessage[] = [];
     for (const message of normalizedMessages) {
@@ -295,6 +311,16 @@ export async function persistRoleTurnResult(
         },
       });
       createdMessages.push(mapMessageRow(created));
+
+      eventDrafts.push(
+        buildMessageSentDraft({
+          runId: input.runId,
+          workspaceId: run.workspaceId,
+          senderRoleSlug: input.role.slug,
+          messageId: created.id,
+          message,
+        })
+      );
     }
 
     for (const fact of input.result.proposedFacts) {
@@ -386,8 +412,17 @@ export async function persistRoleTurnResult(
       },
     });
 
-    return getRunProgressSnapshot(tx, input.runId);
+    // Flush accumulated event drafts inside the same transaction. Projections
+    // and the event log share atomicity: if any write fails, the turn rolls
+    // back as a whole.
+    const recordedEvents = await recordEvents(tx, eventDrafts);
+
+    const snapshot = await getRunProgressSnapshot(tx, input.runId);
+    return { snapshot, recordedEvents };
   });
+
+  logRecordedEvents(recordedEvents);
+  return snapshot;
 }
 
 export async function getRunProgress(runId: string): Promise<RunProgressSnapshot> {
@@ -463,6 +498,37 @@ function computeDurationMs(startedAt: Date | null, completedAt: Date | null): nu
   if (!startedAt || !completedAt) return 0;
   const delta = completedAt.getTime() - startedAt.getTime();
   return delta < 0 ? 0 : delta;
+}
+
+/**
+ * Translate a persisted message + its source draft into a `message_sent` event.
+ * Pure function, trivially testable. The contentPreview is capped at 280 chars
+ * so the event payload never carries a multi-KB blob — callers rely on the
+ * AgentTeamMessage projection for the full body.
+ */
+export function buildMessageSentDraft(input: {
+  runId: string;
+  workspaceId: string;
+  senderRoleSlug: AgentTeamRoleSlug;
+  messageId: string;
+  message: AgentTeamDialogueMessageDraft;
+}): AgentTeamRunEventDraft {
+  return {
+    kind: AGENT_TEAM_EVENT_KIND.messageSent,
+    runId: input.runId,
+    workspaceId: input.workspaceId,
+    actor: input.senderRoleSlug,
+    target: input.message.toRoleSlug,
+    messageKind: input.message.kind,
+    payload: {
+      messageId: input.messageId,
+      fromRoleSlug: input.senderRoleSlug,
+      toRoleSlug: input.message.toRoleSlug,
+      kind: input.message.kind,
+      subject: input.message.subject,
+      contentPreview: input.message.content.slice(0, 280),
+    },
+  };
 }
 
 function normalizeTurnMessages(
