@@ -65,6 +65,10 @@ export const serverSchemas = {
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().min(1).optional(),
   GOOGLE_OAUTH_REDIRECT_PATH: z.string().min(1).optional().default("/api/auth/google/callback"),
 
+  // S3 bucket for archived agent-team event JSONL (commit 6). Optional so the
+  // archive workflow no-ops in environments that don't have S3 credentials.
+  AWS_AGENT_ARCHIVE_BUCKET: z.string().min(1).optional(),
+
   // Debug
   TRUSTLOOP_DEBUG_TRPC: z.enum(["0", "1"]).optional().default("0"),
 };

@@ -71,6 +71,7 @@ model AgentTeamRun {
   startedAt      DateTime?
   completedAt    DateTime?
   errorMessage   String?  @db.Text
+  summary        Json?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -80,10 +81,72 @@ model AgentTeamRun {
   roleInboxes   AgentTeamRoleInbox[]
   facts         AgentTeamFact[]
   openQuestions AgentTeamOpenQuestion[]
+  events        AgentTeamRunEvent[]
 
   @@index([workspaceId, status])
   @@index([conversationId])
   @@index([analysisId])
+}
+
+// Append-only event log for an agent-team run. Source of truth; derived read
+// models (AgentTeamMessage / AgentTeamFact / AgentTeamOpenQuestion /
+// AgentTeamRoleInbox) are populated by projectors inside the same transaction.
+//
+// DB TABLE IS PARTITIONED BY RANGE (ts). Prisma declares the logical shape here;
+// the migration appends `PARTITION BY RANGE (ts)` + creates monthly partitions
+// via $queryRawUnsafe. Do NOT run db:push on this model — it will recreate the
+// table without partitions. Use db:migrate.
+model AgentTeamRunEvent {
+  id          String   @default(cuid())
+  runId       String
+  workspaceId String
+  // Partition key. Included in composite PK because Postgres requires partition
+  // columns to appear in any unique constraint on a partitioned table.
+  ts          DateTime @default(now())
+
+  actor       String
+  kind        String
+  target      String?
+  messageKind String?
+
+  payload     Json
+  latencyMs   Int?
+  tokensIn    Int?
+  tokensOut   Int?
+  truncated   Boolean  @default(false)
+
+  run       AgentTeamRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  workspace Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  @@id([id, ts])
+  @@index([runId, ts, id])
+  @@index([workspaceId, ts])
+  @@index([runId, actor, kind])
+}
+
+// Daily per-workspace rollup of agent-team activity. Populated by
+// agent-team-metrics-rollup.workflow.ts (commit 7). One row per workspace per
+// UTC day. Not wired to UI in this PR; exposed via SQL / downstream dashboards.
+model WorkspaceAgentMetrics {
+  id               String   @id @default(cuid())
+  workspaceId      String
+  day              DateTime @db.Date
+  runsTotal        Int      @default(0)
+  runsSucceeded    Int      @default(0)
+  runsFailed       Int      @default(0)
+  turnsTotal       Int      @default(0)
+  toolCallsTotal   Int      @default(0)
+  tokensTotal      Int      @default(0)
+  toolLatencyP50Ms Int?
+  toolLatencyP95Ms Int?
+  turnWallP50Ms    Int?
+  turnWallP95Ms    Int?
+  computedAt       DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, day])
+  @@index([day])
 }
 
 model AgentTeamMessage {

@@ -182,6 +182,18 @@ When you pick this up: wrap the `tx.sessionRecord.create(...)` in a try/catch on
 
 ## Design System
 
+### Keyboard-accessible connection fallback for agent-team graph
+
+**What:** Keep a keyboard-accessible fallback for creating agent-team connections after drag-to-connect becomes the primary interaction in the React Flow graph.
+
+**Why:** Prevent the new graph editor from regressing accessibility for users who cannot rely on pointer-driven drag interactions.
+
+**Context:** The reduced React Flow migration plan for `duc/agent-team-builder` replaces the custom SVG graph with direct connect/delete interactions on the settings page. That makes the UI easier for mouse users, but it risks removing the current modal-based connection path (`AddEdgeDialog`) before keyboard-only graph editing is verified. When you pick this up: either retain `AddEdgeDialog` as a fallback path or add an equivalent keyboard-first connection flow before fully removing the dialog from the page.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** Constrained React Flow migration landing on the agent-team settings page.
+
 ### Create Canonical DESIGN.md for TrustLoop
 
 **What:** Run design-system definition and publish a repo-wide `DESIGN.md` that supersedes per-feature local token appendices.
@@ -258,6 +270,22 @@ When you pick this up: wrap the `tx.sessionRecord.create(...)` in a try/catch on
 **Priority:** P2
 **Depends on:** File attachment feature stable in production. Trigger: DB size growth from attachments becomes noticeable.
 
+## Agent Team Observability
+
+### Payload S3 offload for large tool results
+
+**What:** When an `AgentTeamRunEvent.payload` exceeds the 64KB truncation cap, store the full payload in S3 and put a pointer in the event row (`{ s3Key, truncated: true }`).
+
+**Why:** Truncation-with-flag is fine for v1, but once operators start regularly debugging runs where a `tool_returned` event got cut (large code-search results, diff blobs), they'll want the full payload. S3 is the right tier — cheap, durable, already in the stack if archival ships.
+
+**Context:** Added from `/plan-eng-review` of agent-team observability on 2026-04-14. Rejected inline in the design doc because no operator has asked for it yet and it's premature optimization. Revisit when a specific operator says "I needed the full tool output and only had the truncation flag."
+
+When you pick this up: the `AgentTeamRunEvent` table already supports JSONB payload. Add an optional `payloadS3Key String?` column, update `recordEvent` to offload when `JSON.stringify(payload).length > 65536`, and add a resolver helper `loadFullPayload(event)` for consumers. Depends on: S3 credentials in `@shared/env` (already set up if archival workflow ships in the same PR).
+
+**Effort:** S (human) / XS (CC)
+**Priority:** P3
+**Depends on:** `AgentTeamRunEvent` table shipped, S3 credentials configured.
+
 ## Completed
 
 ### Tighten bot-message filter to installation.botUserId
@@ -269,4 +297,3 @@ When you pick this up: wrap the `tx.sessionRecord.create(...)` in a try/catch on
 **Tests:** 8 new unit tests in `apps/queue/test/should-drop-ingress-event.test.ts` cover SYSTEM / BOT-is-ours / BOT-is-other / legacy-null / customer / internal / edge cases.
 
 **Completed:** v0.1.2.0 (2026-04-12)
-
