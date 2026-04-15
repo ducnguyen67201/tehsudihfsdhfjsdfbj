@@ -321,10 +321,39 @@ export async function persistRoleTurnResult(
           message,
         })
       );
+
+      // Tool calls/results arrive as regular dialogue messages with kind =
+      // tool_call | tool_result and a toolName. Mirror them to the event log
+      // as tool_called / tool_returned so the observability layer has
+      // first-class timing + latency data per tool invocation.
+      if (message.kind === AGENT_TEAM_MESSAGE_KIND.toolCall && message.toolName) {
+        eventDrafts.push({
+          kind: AGENT_TEAM_EVENT_KIND.toolCalled,
+          runId: input.runId,
+          workspaceId: run.workspaceId,
+          actor: input.role.slug,
+          payload: {
+            toolName: message.toolName,
+            argsPreview: message.content.slice(0, 1024),
+          },
+        });
+      } else if (message.kind === AGENT_TEAM_MESSAGE_KIND.toolResult && message.toolName) {
+        eventDrafts.push({
+          kind: AGENT_TEAM_EVENT_KIND.toolReturned,
+          runId: input.runId,
+          workspaceId: run.workspaceId,
+          actor: input.role.slug,
+          payload: {
+            toolName: message.toolName,
+            ok: message.kind === AGENT_TEAM_MESSAGE_KIND.toolResult,
+            resultSummary: message.content.slice(0, 2048),
+          },
+        });
+      }
     }
 
     for (const fact of input.result.proposedFacts) {
-      await tx.agentTeamFact.create({
+      const factRow = await tx.agentTeamFact.create({
         data: {
           runId: input.runId,
           statement: fact.statement,
@@ -335,6 +364,18 @@ export async function persistRoleTurnResult(
             fact.confidence >= 0.75
               ? AGENT_TEAM_FACT_STATUS.accepted
               : AGENT_TEAM_FACT_STATUS.proposed,
+        },
+        select: { id: true },
+      });
+      eventDrafts.push({
+        kind: AGENT_TEAM_EVENT_KIND.factProposed,
+        runId: input.runId,
+        workspaceId: run.workspaceId,
+        actor: input.role.slug,
+        payload: {
+          factId: factRow.id,
+          statement: fact.statement,
+          confidence: fact.confidence,
         },
       });
     }
@@ -356,9 +397,25 @@ export async function persistRoleTurnResult(
       .map((message) => buildOpenQuestionRow(message, input.role.slug));
 
     if (openQuestionsToCreate.length > 0) {
-      await tx.agentTeamOpenQuestion.createMany({
+      // Use createManyAndReturn so we have row ids for the matching events;
+      // old path was createMany which doesn't return rows.
+      const createdQuestions = await tx.agentTeamOpenQuestion.createManyAndReturn({
         data: openQuestionsToCreate,
       });
+      for (const question of createdQuestions) {
+        eventDrafts.push({
+          kind: AGENT_TEAM_EVENT_KIND.questionOpened,
+          runId: input.runId,
+          workspaceId: run.workspaceId,
+          actor: input.role.slug,
+          target: question.ownerRoleSlug,
+          payload: {
+            questionId: question.id,
+            question: question.question,
+            ownerRoleSlug: question.ownerRoleSlug,
+          },
+        });
+      }
     }
 
     const hasReviewerApproval = await reviewerApprovalExists(tx, input.runId, createdMessages);
@@ -391,7 +448,23 @@ export async function persistRoleTurnResult(
           wakeReason,
         },
       });
+      eventDrafts.push({
+        kind: AGENT_TEAM_EVENT_KIND.roleQueued,
+        runId: input.runId,
+        workspaceId: run.workspaceId,
+        actor: input.role.slug,
+        target: roleSlug,
+        payload: { roleSlug, wakeReason },
+      });
     }
+
+    // Self-role terminal state. done → role_completed, blockedReason →
+    // role_blocked. "idle" is the normal between-turn state; no event.
+    const selfState = input.result.done
+      ? AGENT_TEAM_ROLE_INBOX_STATE.done
+      : input.result.blockedReason
+        ? AGENT_TEAM_ROLE_INBOX_STATE.blocked
+        : AGENT_TEAM_ROLE_INBOX_STATE.idle;
 
     await tx.agentTeamRoleInbox.update({
       where: {
@@ -401,16 +474,33 @@ export async function persistRoleTurnResult(
         },
       },
       data: {
-        state: input.result.done
-          ? AGENT_TEAM_ROLE_INBOX_STATE.done
-          : input.result.blockedReason
-            ? AGENT_TEAM_ROLE_INBOX_STATE.blocked
-            : AGENT_TEAM_ROLE_INBOX_STATE.idle,
+        state: selfState,
         lastReadMessageId: createdMessages.at(-1)?.id ?? null,
         unreadCount: 0,
         wakeReason: input.result.blockedReason ?? null,
       },
     });
+
+    if (selfState === AGENT_TEAM_ROLE_INBOX_STATE.done) {
+      eventDrafts.push({
+        kind: AGENT_TEAM_EVENT_KIND.roleCompleted,
+        runId: input.runId,
+        workspaceId: run.workspaceId,
+        actor: input.role.slug,
+        payload: { roleSlug: input.role.slug },
+      });
+    } else if (selfState === AGENT_TEAM_ROLE_INBOX_STATE.blocked) {
+      eventDrafts.push({
+        kind: AGENT_TEAM_EVENT_KIND.roleBlocked,
+        runId: input.runId,
+        workspaceId: run.workspaceId,
+        actor: input.role.slug,
+        payload: {
+          roleSlug: input.role.slug,
+          wakeReason: input.result.blockedReason ?? null,
+        },
+      });
+    }
 
     // Flush accumulated event drafts inside the same transaction. Projections
     // and the event log share atomicity: if any write fails, the turn rolls
