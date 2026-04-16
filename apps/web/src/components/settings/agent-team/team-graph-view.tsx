@@ -61,8 +61,10 @@ const nodeTypes: NodeTypes = {
   role: TeamGraphRoleNode,
 };
 
+const EDGE_STROKE = "color-mix(in oklch, var(--foreground) 55%, var(--background))";
+
 const defaultEdgeStyle = {
-  stroke: "hsl(var(--muted-foreground))",
+  stroke: EDGE_STROKE,
   strokeWidth: 1.5,
 };
 
@@ -95,7 +97,7 @@ function buildFlowEdges(team: AgentTeam): Edge[] {
     type: "smoothstep",
     markerEnd: {
       type: MarkerType.ArrowClosed,
-      color: "hsl(var(--muted-foreground))",
+      color: EDGE_STROKE,
     },
     style: defaultEdgeStyle,
   }));
@@ -249,7 +251,7 @@ export function TeamGraphView({
         type: "smoothstep",
         markerEnd: {
           type: MarkerType.ArrowClosed,
-          color: "hsl(var(--muted-foreground))",
+          color: EDGE_STROKE,
         },
         style: defaultEdgeStyle,
       };
@@ -385,7 +387,7 @@ export function TeamGraphView({
   }, [conflictTeam, nodes, saveLayout]);
 
   const minimapNodeColor = useCallback((node: TeamGraphRoleNodeType) => {
-    return node.selected ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))";
+    return node.selected ? "var(--primary)" : EDGE_STROKE;
   }, []);
 
   const toolbar = useMemo(
@@ -482,7 +484,7 @@ export function TeamGraphView({
           style: defaultEdgeStyle,
           markerEnd: {
             type: MarkerType.ArrowClosed,
-            color: "hsl(var(--muted-foreground))",
+            color: EDGE_STROKE,
           },
         }}
       >
