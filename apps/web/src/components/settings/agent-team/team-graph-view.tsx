@@ -180,17 +180,15 @@ export function TeamGraphView({
     setEdges(buildFlowEdges(team));
   }, [team, hasLocalDraft, onRemoveRole, setEdges, setNodes]);
 
-  const showMiniMap = team.roles.length >= 8;
+  const showMiniMap = team.roles.length >= 4;
   const isEmpty = team.roles.length === 0;
   const conflictActionsVisible = conflictTeam !== null;
-  const defaultStatus =
-    !status && !canManage
-      ? {
-          tone: "neutral" as const,
-          title: "Read only",
-          description: "You can inspect the graph, but only owners and admins can change it.",
-        }
-      : status;
+  const isSavingLayout = status?.title === "Saving layout";
+  // Saving state renders as the bottom-right pill only — avoid stacking two
+  // indicators for the same action. Anything else (conflicts, errors, etc.)
+  // still surfaces as an Alert, and the "Read only" context moves to the
+  // toolbar chip instead of a second page-level banner.
+  const alertStatus = status && !isSavingLayout ? status : null;
 
   const saveLayout = useCallback(
     async (nextNodes: TeamGraphRoleNodeType[], expectedUpdatedAt: string) => {
@@ -405,7 +403,7 @@ export function TeamGraphView({
           </Button>
         ) : null}
         {!canManage ? (
-          <div className="inline-flex items-center gap-1 border border-border bg-card px-2 py-1 text-[0.65rem] text-muted-foreground">
+          <div className="inline-flex items-center gap-1 border border-border bg-card px-2 py-1 text-xs text-muted-foreground">
             <RiLockLine className="size-3" />
             Read only
           </div>
@@ -417,17 +415,17 @@ export function TeamGraphView({
 
   return (
     <div
-      className="relative h-[clamp(380px,50vh,560px)] w-full overflow-hidden border border-border bg-card"
+      className="relative h-[clamp(440px,62vh,720px)] w-full overflow-hidden border border-border bg-card"
       data-testid="agent-team-graph"
     >
       {toolbar}
 
-      {defaultStatus ? (
-        <div className="absolute inset-x-3 top-12 z-20">
-          <Alert variant={defaultStatus.tone === "destructive" ? "destructive" : "default"}>
+      {alertStatus ? (
+        <div className="absolute left-3 right-[11.25rem] top-12 z-20">
+          <Alert variant={alertStatus.tone === "destructive" ? "destructive" : "default"}>
             <RiAlertLine />
-            <AlertTitle>{defaultStatus.title}</AlertTitle>
-            <AlertDescription>{defaultStatus.description}</AlertDescription>
+            <AlertTitle>{alertStatus.title}</AlertTitle>
+            <AlertDescription>{alertStatus.description}</AlertDescription>
             {conflictActionsVisible ? (
               <div className="mt-2 flex gap-2">
                 <Button variant="outline" size="xs" onClick={() => void handleReloadLayout()}>
@@ -507,21 +505,17 @@ export function TeamGraphView({
 
       {isEmpty ? (
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-          <div className="border border-dashed border-border bg-card px-5 py-4 text-center">
-            <p className="text-sm text-muted-foreground">
-              Add your first role to build the team graph.
+          <div className="max-w-sm border border-dashed border-border bg-card/80 px-6 py-5 text-center">
+            <p className="text-sm font-medium">No roles yet</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Agents will appear here as you add them. Drag between ports to connect.
             </p>
-            {canManage ? (
-              <Button className="pointer-events-auto mt-3" size="sm" onClick={onOpenAddRole}>
-                Add role
-              </Button>
-            ) : null}
           </div>
         </div>
       ) : null}
 
-      {defaultStatus?.title === "Saving layout" ? (
-        <div className="absolute bottom-3 right-3 z-20 inline-flex items-center gap-1.5 border border-border bg-card px-2 py-1 text-[0.65rem] text-muted-foreground">
+      {isSavingLayout ? (
+        <div className="absolute bottom-3 right-3 z-20 inline-flex items-center gap-1.5 border border-border bg-card px-2 py-1 text-xs text-muted-foreground">
           <RiLoader4Line className="size-3 animate-spin" />
           Saving layout…
         </div>
