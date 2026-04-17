@@ -1,0 +1,15 @@
+node_modules/
+.next/
+.turbo/
+dist/
+build/
+coverage/
+.vercel/
+*.generated.ts
+*.generated.js
+**/__generated__/
+packages/database/prisma/migrations/
+graphify-out/
+.claude/
+.codex/
+.skills/

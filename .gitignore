@@ -15,3 +15,6 @@ node_modules
 packages/database/src/generated/
 packages/types/src/prisma-generated/client.ts
 .gstack/
+
+# graphify knowledge graph — commit the report + graph, skip the noisy cache
+graphify-out/cache/
