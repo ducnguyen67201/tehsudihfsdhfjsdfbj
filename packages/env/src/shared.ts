@@ -3,15 +3,23 @@ import { z } from "zod";
 export const NODE_ENV = {
   DEVELOPMENT: "development",
   TEST: "test",
+  STAGING: "staging",
   PRODUCTION: "production",
 } as const;
+
+export type NodeEnv = (typeof NODE_ENV)[keyof typeof NODE_ENV];
+
+/** Treat staging like production for secure cookies, silent DB logs, etc. */
+export function isProductionLike(nodeEnv: NodeEnv): boolean {
+  return nodeEnv === NODE_ENV.PRODUCTION || nodeEnv === NODE_ENV.STAGING;
+}
 
 /**
  * Shared server-side env schemas. Used by both the core (worker/queue)
  * and Next.js (web) env configurations.
  */
 export const serverSchemas = {
-  NODE_ENV: z.enum([NODE_ENV.DEVELOPMENT, NODE_ENV.TEST, NODE_ENV.PRODUCTION]),
+  NODE_ENV: z.enum([NODE_ENV.DEVELOPMENT, NODE_ENV.TEST, NODE_ENV.STAGING, NODE_ENV.PRODUCTION]),
   APP_BASE_URL: z.url(),
   APP_PUBLIC_URL: z.url().optional(),
 
