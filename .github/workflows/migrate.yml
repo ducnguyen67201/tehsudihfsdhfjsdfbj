@@ -138,13 +138,16 @@ jobs:
         # non-fatal: migrate status exits non-zero on drift.
 
       - name: Apply migrations
+        # `migrate deploy` is the production-safe variant: only applies
+        # committed migrations, never creates new ones, never runs
+        # interactively, does not use a shadow DB.
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
         run: |
           doppler run \
             --project trustloop \
             --config ${{ steps.resolve.outputs.config }} \
-            -- npm run db:migrate
+            -- npm run db:migrate:deploy
 
       - name: Summary
         if: always()

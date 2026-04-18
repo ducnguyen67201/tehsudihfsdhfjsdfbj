@@ -28,6 +28,7 @@
     "test": "turbo run test",
     "db:generate": "npm --workspace @shared/database run db:generate && npm --workspace @shared/types run prisma:sync",
     "db:migrate": "npm --workspace @shared/database run db:migrate",
+    "db:migrate:deploy": "npm --workspace @shared/database run db:migrate:deploy",
     "db:new-workspace": "npm --workspace @shared/database run db:new-workspace --",
     "openapi:generate": "npm --workspace @shared/rest run openapi:generate",
     "openapi:check": "npm --workspace @shared/rest run openapi:check",

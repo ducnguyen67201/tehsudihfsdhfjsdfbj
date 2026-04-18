@@ -35,7 +35,10 @@ jobs:
 
     services:
       postgres:
-        image: postgres:17
+        # pgvector image = Postgres 17 + the `vector` extension preinstalled.
+        # Matches docker-compose.yml for local dev. Required because the
+        # add_embedding_hybrid_search migration calls CREATE EXTENSION vector.
+        image: pgvector/pgvector:pg17
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -64,7 +67,10 @@ jobs:
         run: npm run db:generate
 
       - name: Apply all migrations to ephemeral Postgres
-        run: npm run db:migrate
+        # Use `migrate deploy` (production-safe, no shadow DB, no prompts)
+        # instead of `migrate dev` which requires the shadow DB to also
+        # have all extensions installed and is meant for local interactive use.
+        run: npm run db:migrate:deploy
 
       - name: Detect schema drift
         # `prisma migrate diff --exit-code` exits:
