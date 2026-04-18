@@ -72,6 +72,16 @@ jobs:
         # have all extensions installed and is meant for local interactive use.
         run: npm run db:migrate:deploy
 
+      - name: Drop HNSW index for drift check
+        # Prisma 7's schema language cannot express `USING hnsw`. The
+        # RepositoryIndexChunk_embedding_idx lives only in raw SQL. To
+        # let migrate diff see a clean baseline, drop it in the ephemeral
+        # DB before comparison. This is CI-only — staging + prod keep it.
+        run: |
+          PGPASSWORD=postgres psql \
+            -h localhost -U postgres -d trustloop_test \
+            -c 'DROP INDEX IF EXISTS "RepositoryIndexChunk_embedding_idx";'
+
       - name: Detect schema drift
         # Compares the live (just-migrated) DB against the committed
         # schema files. If they differ, someone edited schema/*.prisma
