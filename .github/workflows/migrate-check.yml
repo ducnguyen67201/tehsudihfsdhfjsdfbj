@@ -73,17 +73,24 @@ jobs:
         run: npm run db:migrate:deploy
 
       - name: Detect schema drift
-        # `prisma migrate diff --exit-code` exits:
-        #   0 → schema.prisma matches the applied migrations (good)
-        #   2 → drift detected (bad — someone changed schema.prisma
-        #        without generating a migration)
+        # Compares the live (just-migrated) DB against the committed
+        # schema files. If they differ, someone edited schema/*.prisma
+        # without generating a migration (or vice versa).
+        #
+        # Prisma 7 flag semantics:
+        #   --from-config-datasource → read DATABASE_URL from prisma.config.ts
+        #                              (this is the ephemeral DB after migrate deploy)
+        #   --to-schema <path>       → path to the schema folder (multi-file)
+        #   --exit-code              → 0=no diff, 2=drift detected, 1=error
+        working-directory: packages/database
         run: |
-          npx --workspace @shared/database prisma migrate diff \
-            --from-url "$DATABASE_URL" \
-            --to-schema-datamodel packages/database/prisma/schema.prisma \
+          npx prisma migrate diff \
+            --from-config-datasource \
+            --to-schema ./prisma/schema \
             --exit-code
-        # If this step fails with drift output, the error message tells
-        # the committer exactly what SQL would be needed.
+        # If this step exits 2, the log shows the SQL that would be needed
+        # to bring the DB in line with schema/*.prisma. Run
+        # `npm run db:migrate` locally to generate a real migration for it.
 
       - name: Summary
         if: always()
