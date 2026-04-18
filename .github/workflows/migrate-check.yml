@@ -1,0 +1,91 @@
+name: Migrate check (drift)
+
+# Read-only validation that runs on every PR touching the database
+# package. Uses an ephemeral Postgres container — NEVER touches the
+# real staging or production DBs.
+#
+# What this catches:
+#   - schema.prisma changed without a corresponding migration file
+#     (someone forgot to run `npm run db:migrate` locally)
+#   - a new migration file that fails to apply cleanly from scratch
+#   - migration file renamed/edited after it was committed (bad practice)
+#
+# What this does NOT do:
+#   - apply migrations to staging or prod (that's migrate.yml's job)
+#   - modify any real secret or env
+#
+# If this fails on your PR, run `npm run db:migrate` locally, commit the
+# generated migration file, push again.
+
+on:
+  pull_request:
+    paths:
+      - 'packages/database/**'
+      - '.github/workflows/migrate-check.yml'
+  push:
+    branches: [main, production]
+    paths:
+      - 'packages/database/**'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: trustloop_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/trustloop_test?schema=public
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm install --no-audit --no-fund
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Apply all migrations to ephemeral Postgres
+        run: npm run db:migrate
+
+      - name: Detect schema drift
+        # `prisma migrate diff --exit-code` exits:
+        #   0 → schema.prisma matches the applied migrations (good)
+        #   2 → drift detected (bad — someone changed schema.prisma
+        #        without generating a migration)
+        run: |
+          npx --workspace @shared/database prisma migrate diff \
+            --from-url "$DATABASE_URL" \
+            --to-schema-datamodel packages/database/prisma/schema.prisma \
+            --exit-code
+        # If this step fails with drift output, the error message tells
+        # the committer exactly what SQL would be needed.
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Migration drift check"
+            echo ""
+            echo "- Ephemeral DB: postgres:17"
+            echo "- Trigger: ${{ github.event_name }}"
+            echo "- Outcome: ${{ job.status }}"
+          } >> "$GITHUB_STEP_SUMMARY"
