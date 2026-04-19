@@ -11,13 +11,19 @@ import { useAnalysis } from "@/hooks/use-analysis";
 import { useAuthSession } from "@/hooks/use-auth-session";
 import { useConversationReply } from "@/hooks/use-conversation-reply";
 import { useSessionReplay } from "@/hooks/use-session-replay";
-import { useSupportInbox } from "@/hooks/use-support-inbox";
+import type { SupportConversationStatus } from "@shared/types";
 
 interface ConversationViewProps {
   conversationId: string;
+  onAssignConversation: (conversationId: string, assigneeUserId: string | null) => Promise<unknown>;
   refreshNonce: number;
   workspaceId: string;
   onBack: () => void;
+  onMarkDoneWithOverride: (conversationId: string, overrideReason: string) => Promise<unknown>;
+  onUpdateConversationStatus: (
+    conversationId: string,
+    status: SupportConversationStatus
+  ) => Promise<unknown>;
 }
 
 /**
@@ -30,16 +36,16 @@ interface ConversationViewProps {
  */
 export function ConversationView({
   conversationId,
+  onAssignConversation,
   refreshNonce,
   workspaceId,
   onBack,
+  onMarkDoneWithOverride,
+  onUpdateConversationStatus,
 }: ConversationViewProps) {
   // Reply/send/retry/polling flow — owns timeline state + reply handlers.
   const reply = useConversationReply(conversationId, refreshNonce);
   const auth = useAuthSession();
-  // Non-reply mutations (assign, status change, mark-done) still come
-  // straight from the shared inbox hook.
-  const inbox = useSupportInbox();
   const analysisHook = useAnalysis(conversationId, workspaceId);
   const sessionReplay = useSessionReplay(conversationId, workspaceId);
 
@@ -111,8 +117,8 @@ export function ConversationView({
           conversation={conversation}
           isMutating={isMutating}
           onBack={onBack}
-          onMarkDoneWithOverride={inbox.markDoneWithOverrideReason}
-          onUpdateStatus={inbox.updateConversationStatus}
+          onMarkDoneWithOverride={onMarkDoneWithOverride}
+          onUpdateStatus={onUpdateConversationStatus}
         />
 
         {/* Two-panel body */}
@@ -144,8 +150,8 @@ export function ConversationView({
             conversation={conversation}
             events={events}
             isMutating={isMutating}
-            onAssign={inbox.assignConversation}
-            onUpdateStatus={inbox.updateConversationStatus}
+            onAssign={onAssignConversation}
+            onUpdateStatus={onUpdateConversationStatus}
             analysis={analysisHook.analysis}
             isAnalyzing={analysisHook.isAnalyzing}
             isAnalysisMutating={analysisHook.isMutating}

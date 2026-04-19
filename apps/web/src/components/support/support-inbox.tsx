@@ -122,7 +122,7 @@ export function SupportInbox() {
   function handleDrop(conversationId: string, targetStatus: SupportConversationStatus) {
     const conversation = inbox.listData?.conversations.find((c) => c.id === conversationId);
     if (conversation && conversation.status !== targetStatus) {
-      void inbox.updateConversationStatus(conversationId, targetStatus);
+      void handleUpdateConversationStatus(conversationId, targetStatus);
     }
   }
 
@@ -141,6 +141,40 @@ export function SupportInbox() {
         (conversation) => conversation.status === column.status
       ) ?? [],
   }));
+
+  const refreshSelectedConversation = useCallback(() => {
+    setSelectedConversationRefreshNonce((current) => current + 1);
+  }, []);
+
+  const handleUpdateConversationStatus = useCallback(
+    async (conversationId: string, status: SupportConversationStatus) => {
+      await inbox.updateConversationStatus(conversationId, status);
+      if (conversationId === threadParam) {
+        refreshSelectedConversation();
+      }
+    },
+    [inbox, refreshSelectedConversation, threadParam]
+  );
+
+  const handleAssignConversation = useCallback(
+    async (conversationId: string, assigneeUserId: string | null) => {
+      await inbox.assignConversation(conversationId, assigneeUserId);
+      if (conversationId === threadParam) {
+        refreshSelectedConversation();
+      }
+    },
+    [inbox, refreshSelectedConversation, threadParam]
+  );
+
+  const handleMarkDoneWithOverride = useCallback(
+    async (conversationId: string, overrideReason: string) => {
+      await inbox.markDoneWithOverrideReason(conversationId, overrideReason);
+      if (conversationId === threadParam) {
+        refreshSelectedConversation();
+      }
+    },
+    [inbox, refreshSelectedConversation, threadParam]
+  );
 
   return (
     <main className="flex min-h-[calc(100svh-3.5rem)] w-full flex-col gap-4 p-4 md:p-6">
@@ -227,7 +261,10 @@ export function SupportInbox() {
               conversationId={threadParam}
               refreshNonce={selectedConversationRefreshNonce}
               workspaceId={workspaceId}
+              onAssignConversation={handleAssignConversation}
               onBack={() => handleSheetOpenChange(false)}
+              onMarkDoneWithOverride={handleMarkDoneWithOverride}
+              onUpdateConversationStatus={handleUpdateConversationStatus}
             />
           ) : null}
         </SheetContent>

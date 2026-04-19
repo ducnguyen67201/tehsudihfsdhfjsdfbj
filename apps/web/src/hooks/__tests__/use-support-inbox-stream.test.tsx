@@ -22,6 +22,10 @@ class MockEventSource {
   emit(data: unknown) {
     this.onmessage?.({ data: JSON.stringify(data) } as MessageEvent<string>);
   }
+
+  emitError() {
+    this.onerror?.();
+  }
 }
 
 describe("useSupportInboxStream", () => {
@@ -84,5 +88,27 @@ describe("useSupportInboxStream", () => {
 
     expect(onRefreshInbox).not.toHaveBeenCalled();
     expect(onSelectedConversationChanged).not.toHaveBeenCalled();
+  });
+
+  it("closes the stream on error to avoid endless reconnects", () => {
+    const onRefreshInbox = vi.fn().mockResolvedValue(undefined);
+    const onSelectedConversationChanged = vi.fn();
+
+    renderHook(() =>
+      useSupportInboxStream({
+        enabled: true,
+        workspaceId: "ws_123",
+        selectedConversationId: "conv_123",
+        onRefreshInbox,
+        onSelectedConversationChanged,
+      })
+    );
+
+    const stream = MockEventSource.instances[0];
+    expect(stream?.closed).toBe(false);
+
+    stream?.emitError();
+
+    expect(stream?.closed).toBe(true);
   });
 });

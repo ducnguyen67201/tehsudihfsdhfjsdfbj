@@ -35,28 +35,41 @@ export async function handleSupportStream(
     return new Response("Realtime unavailable", { status: 503 });
   }
 
+  let cleanup = async (_closeController: boolean) => {};
+
   const stream = new ReadableStream({
     start(controller) {
       let isClosed = false;
+      let keepaliveTimer: ReturnType<typeof setInterval> | null = null;
+      let unsubscribe: (() => Promise<void>) | null = null;
 
-      const closeStream = () => {
+      cleanup = async (closeController: boolean) => {
         if (isClosed) {
           return;
         }
 
         isClosed = true;
-        clearInterval(keepaliveTimer);
+        if (keepaliveTimer) {
+          clearInterval(keepaliveTimer);
+          keepaliveTimer = null;
+        }
         request.signal.removeEventListener("abort", handleAbort);
-        void unsubscribe().finally(() => {
+        await unsubscribe?.();
+
+        if (closeController) {
           controller.close();
-        });
+        }
+      };
+
+      const closeStream = () => {
+        void cleanup(true);
       };
 
       const handleAbort = () => {
         closeStream();
       };
 
-      const unsubscribe = supportRealtime.subscribe(workspaceId, (event) => {
+      unsubscribe = supportRealtime.subscribe(workspaceId, (event) => {
         if (isClosed) {
           return;
         }
@@ -64,7 +77,7 @@ export async function handleSupportStream(
         controller.enqueue(encodeSseData(event));
       });
 
-      const keepaliveTimer = setInterval(() => {
+      keepaliveTimer = setInterval(() => {
         if (isClosed) {
           return;
         }
@@ -84,6 +97,9 @@ export async function handleSupportStream(
         )
       );
     },
+    async cancel() {
+      await cleanup(false);
+    },
   });
 
   return new Response(stream, {
@@ -91,6 +107,7 @@ export async function handleSupportStream(
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
     },
   });
 }

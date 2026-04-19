@@ -3,6 +3,8 @@
 import { SUPPORT_REALTIME_EVENT_TYPE, supportRealtimeEventSchema } from "@shared/types";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+const STREAM_RECONNECT_DELAYS_MS = [1_000, 2_000, 5_000, 10_000, 30_000] as const;
+
 interface UseSupportInboxStreamOptions {
   enabled: boolean;
   workspaceId: string | null;
@@ -25,11 +27,13 @@ export function useSupportInboxStream({
   const [isVisible, setIsVisible] = useState(() =>
     typeof document === "undefined" ? true : !document.hidden
   );
+  const [reconnectNonce, setReconnectNonce] = useState(0);
   const refreshStateRef = useRef({ inFlight: false, needsRefresh: false });
   const onRefreshInboxRef = useRef(onRefreshInbox);
   const onSelectedConversationChangedRef = useRef(onSelectedConversationChanged);
   const selectedConversationIdRef = useRef(selectedConversationId);
-  const hasConnectedForWorkspaceRef = useRef(false);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectAttemptRef = useRef(0);
 
   useEffect(() => {
     onRefreshInboxRef.current = onRefreshInbox;
@@ -42,6 +46,27 @@ export function useSupportInboxStream({
   useEffect(() => {
     selectedConversationIdRef.current = selectedConversationId;
   }, [selectedConversationId]);
+
+  const clearReconnectTimer = useCallback(() => {
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleReconnect = useCallback(() => {
+    clearReconnectTimer();
+
+    const attempt = reconnectAttemptRef.current;
+    const delay =
+      STREAM_RECONNECT_DELAYS_MS[Math.min(attempt, STREAM_RECONNECT_DELAYS_MS.length - 1)];
+    reconnectAttemptRef.current = attempt + 1;
+
+    reconnectTimerRef.current = setTimeout(() => {
+      reconnectTimerRef.current = null;
+      setReconnectNonce((current) => current + 1);
+    }, delay);
+  }, [clearReconnectTimer]);
 
   const requestInboxRefresh = useCallback(() => {
     if (refreshStateRef.current.inFlight) {
@@ -79,7 +104,11 @@ export function useSupportInboxStream({
       return;
     }
 
-    hasConnectedForWorkspaceRef.current = false;
+    // Retry attempts advance this token to force a fresh EventSource instance.
+    const connectionAttempt = reconnectNonce;
+    void connectionAttempt;
+
+    let streamClosedByEffectCleanup = false;
     const eventSource = new EventSource(`/api/${workspaceId}/support/stream`);
 
     eventSource.onmessage = (event) => {
@@ -102,13 +131,11 @@ export function useSupportInboxStream({
       }
 
       if (realtimeEvent.type === SUPPORT_REALTIME_EVENT_TYPE.connected) {
-        if (hasConnectedForWorkspaceRef.current) {
-          requestInboxRefresh();
-          if (selectedConversationIdRef.current) {
-            onSelectedConversationChangedRef.current();
-          }
-        } else {
-          hasConnectedForWorkspaceRef.current = true;
+        reconnectAttemptRef.current = 0;
+        clearReconnectTimer();
+        requestInboxRefresh();
+        if (selectedConversationIdRef.current) {
+          onSelectedConversationChangedRef.current();
         }
         return;
       }
@@ -119,8 +146,27 @@ export function useSupportInboxStream({
       }
     };
 
-    return () => {
+    eventSource.onerror = () => {
       eventSource.close();
+      if (!streamClosedByEffectCleanup) {
+        scheduleReconnect();
+      }
     };
-  }, [enabled, isVisible, requestInboxRefresh, workspaceId]);
+
+    return () => {
+      streamClosedByEffectCleanup = true;
+      eventSource.close();
+      clearReconnectTimer();
+    };
+  }, [
+    clearReconnectTimer,
+    enabled,
+    isVisible,
+    reconnectNonce,
+    requestInboxRefresh,
+    scheduleReconnect,
+    workspaceId,
+  ]);
+
+  useEffect(() => clearReconnectTimer, [clearReconnectTimer]);
 }
