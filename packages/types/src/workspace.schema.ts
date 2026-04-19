@@ -33,9 +33,9 @@ export const workspaceMembershipListSchema = z.object({
 
 export const workspaceMemberSchema = z.object({
   userId: z.string().min(1),
-  email: z.email(),
+  email: z.string().email(),
   role: workspaceRoleSchema,
-  joinedAt: z.iso.datetime(),
+  joinedAt: z.string().datetime(),
 });
 
 export const workspaceMemberListResponseSchema = z.object({
@@ -44,7 +44,7 @@ export const workspaceMemberListResponseSchema = z.object({
 });
 
 export const workspaceMemberAddRequestSchema = z.object({
-  email: z.email(),
+  email: z.string().email(),
   role: workspaceRoleSchema,
 });
 
@@ -76,7 +76,7 @@ export const workspaceActiveResponseSchema = z.object({
 });
 
 export const workspaceRequestAccessRequestSchema = z.object({
-  contactEmail: z.email().optional(),
+  contactEmail: z.string().email().optional(),
   message: z.string().trim().min(1).max(1000),
 });
 

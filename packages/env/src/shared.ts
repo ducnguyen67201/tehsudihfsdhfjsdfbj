@@ -20,8 +20,8 @@ export function isProductionLike(nodeEnv: NodeEnv): boolean {
  */
 export const serverSchemas = {
   NODE_ENV: z.enum([NODE_ENV.DEVELOPMENT, NODE_ENV.TEST, NODE_ENV.STAGING, NODE_ENV.PRODUCTION]),
-  APP_BASE_URL: z.url(),
-  APP_PUBLIC_URL: z.url().optional(),
+  APP_BASE_URL: z.string().url(),
+  APP_PUBLIC_URL: z.string().url().optional(),
 
   // Session
   SESSION_COOKIE_NAME: z.string().min(1),

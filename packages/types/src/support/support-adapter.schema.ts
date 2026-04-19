@@ -30,7 +30,7 @@ export const supportThreadReferenceSchema = z.object({
 });
 
 export const supportAttachmentSchema = z.object({
-  url: z.url(),
+  url: z.string().url(),
   mimeType: z.string().min(1).nullable().optional(),
   title: z.string().trim().min(1).nullable().optional(),
 });
@@ -67,7 +67,7 @@ export const supportAdapterSendRequestSchema = z.object({
 
 export const supportAdapterSendResultSchema = z.object({
   providerMessageId: z.string().min(1),
-  deliveredAt: z.iso.datetime(),
+  deliveredAt: z.string().datetime(),
 });
 
 export type SupportProvider = z.infer<typeof supportProviderSchema>;

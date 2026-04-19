@@ -30,9 +30,9 @@ export const supportDeliveryAttemptSchema = z.object({
   state: supportDeliveryStateSchema,
   errorCode: z.string().trim().min(1).nullable(),
   errorMessage: z.string().trim().min(1).nullable(),
-  nextRetryAt: z.iso.datetime().nullable(),
-  createdAt: z.iso.datetime(),
-  updatedAt: z.iso.datetime(),
+  nextRetryAt: z.string().datetime().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
 });
 
 export const supportDeliveryAttemptListSchema = z.object({
@@ -58,10 +58,10 @@ export const supportDeadLetterEntrySchema = z.object({
   failureClass: z.string().trim().min(1),
   failureReason: z.string().trim().min(1),
   payloadJson: z.record(z.string(), z.unknown()),
-  firstFailedAt: z.iso.datetime(),
-  lastFailedAt: z.iso.datetime(),
+  firstFailedAt: z.string().datetime(),
+  lastFailedAt: z.string().datetime(),
   retryCount: z.number().int().nonnegative(),
-  resolvedAt: z.iso.datetime().nullable(),
+  resolvedAt: z.string().datetime().nullable(),
 });
 
 export const supportDeadLetterListSchema = z.object({

@@ -12,7 +12,7 @@
     "test": "echo 'No tests yet'"
   },
   "dependencies": {
-    "@mastra/core": "latest",
+    "@mastra/core": "1.22.0",
     "@ai-sdk/openai": "^2.0.89",
     "@shared/database": "*",
     "@shared/env": "*",
