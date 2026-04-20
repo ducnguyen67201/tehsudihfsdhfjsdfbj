@@ -11,6 +11,7 @@ This is the active go-to-market workspace for TrustLoop's first users.
 
 ## Files
 
+- `gtm-docs.md` — GTM entrypoint and source-of-truth links
 - `icp-and-positioning.md` — who we are targeting and why
 - `sourcing-playbook.md` — where to find leads and how to qualify them
 - `lead-scoring-rubric.md` — how to score whether a founder is worth messaging

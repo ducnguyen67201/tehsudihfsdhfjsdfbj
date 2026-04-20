@@ -429,6 +429,17 @@ A feature is done only when:
 
 ## Skills + Doc Hygiene
 
+### GTM operating sources of truth
+
+Only load GTM context when the task is explicitly about GTM or founder outreach.
+
+- GTM docs: `business/gtm/gtm-docs.md`
+- Outreach tracker: `https://docs.google.com/spreadsheets/d/11qZFluil7TZel2INiKkyBeYwfPgT-JxwBZBvC3zAnd4/edit?gid=1001#gid=1001`
+
+For GTM tasks, repo docs are the strategy source of truth and the outreach
+tracker is the live execution source of truth for companies, founders, status,
+and notes.
+
 ### Canonical skill location
 
 - Keep canonical skills under `.skills/`.
@@ -550,7 +561,7 @@ The skill has specialized workflows that produce better results than ad-hoc answ
 
 Key routing rules:
 - Product ideas, "is this worth building", brainstorming → invoke office-hours
-- GTM, outreach, founder sourcing, "who should I DM", "find leads", "draft outreach" → invoke gtm-founder-outreach
+- GTM, outreach, founder sourcing, "who should I DM", "find leads", "draft outreach" → invoke `gtm-founder-outreach` and load `business/AGENTS.md`
 - Bugs, errors, "why is this broken", 500 errors → invoke investigate
 - Ship, deploy, push, create PR → invoke ship
 - QA, test the site, find bugs → invoke qa
