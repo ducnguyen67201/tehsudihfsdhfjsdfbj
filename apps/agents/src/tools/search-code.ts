@@ -19,7 +19,19 @@ export const searchCodeTool = createTool({
       ),
     workspaceId: z.string().describe("The workspace ID to search in"),
   }),
-  execute: async (input) => {
+  execute: async (
+    input
+  ): Promise<{
+    message: string;
+    results: Array<{
+      file: string;
+      lines: string;
+      symbol: string | null;
+      repo: string;
+      snippet: string;
+      score: number;
+    }>;
+  }> => {
     const { query, filePattern, workspaceId } = input;
 
     const results = await codex.searchWorkspaceCode(workspaceId, query, {
@@ -37,7 +49,7 @@ export const searchCodeTool = createTool({
 
     return {
       message: `Found ${results.length} results`,
-      results: results.map((r: (typeof results)[number]) => ({
+      results: results.map((r) => ({
         file: r.filePath,
         lines: `${r.lineStart}-${r.lineEnd}`,
         symbol: r.symbolName,
