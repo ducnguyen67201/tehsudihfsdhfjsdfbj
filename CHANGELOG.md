@@ -2,6 +2,14 @@
 
 All notable changes to TrustLoop will be documented in this file.
 
+## [0.1.8.2] - 2026-04-19
+
+### Added
+- **First live TOON section in the support-analysis prompt.** Browser session route history now renders as its own structured prompt block, letting the agent receive the ordered URL trail in TOON format when the payload shape is eligible instead of burying it inside prose formatting.
+
+### Changed
+- **Support-analysis prompt rollout has moved from foundation-only to first measured usage.** The browser session appendix stays readable prose for environment, failure, network, console, and exception context, while the uniform `routeHistory` list becomes the first live TOON-powered section with the existing JSON fallback still intact.
+
 ## [0.1.8.1] - 2026-04-19
 
 ### Added
