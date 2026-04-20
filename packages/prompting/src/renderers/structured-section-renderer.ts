@@ -60,11 +60,19 @@ export function renderStructuredSection(
 }
 
 function shouldPreferToon(payload: unknown): boolean {
+  if (hasUniformPrimitiveArray(payload)) {
+    return true;
+  }
+
   if (hasUniformPrimitiveObjectArray(payload)) {
     return true;
   }
 
   return isShallowPrimitiveObject(payload);
+}
+
+function hasUniformPrimitiveArray(payload: unknown): boolean {
+  return Array.isArray(payload) && payload.length > 0 && payload.every(isPrimitive);
 }
 
 function hasUniformPrimitiveObjectArray(payload: unknown): boolean {
@@ -110,7 +118,7 @@ function isShallowPrimitiveObject(payload: unknown): boolean {
       return true;
     }
 
-    return hasUniformPrimitiveObjectArray(value);
+    return hasUniformPrimitiveArray(value) || hasUniformPrimitiveObjectArray(value);
   });
 }
 

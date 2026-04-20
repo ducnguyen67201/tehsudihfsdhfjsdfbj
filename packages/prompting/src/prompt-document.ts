@@ -7,7 +7,7 @@ export type PromptProseSection = {
 };
 
 export type PromptStructuredSection = {
-  fallbackFormat: typeof import("./prompt-format").PROMPT_INPUT_FORMAT.json;
+  fallbackFormat: "json";
   payload: unknown;
   preferredFormat: PromptInputFormat;
   rationale: string;

@@ -1,6 +1,5 @@
+import { renderPromptDocument } from "@shared/prompting";
 import type { SessionDigest, ToneConfig } from "@shared/types";
-
-import { renderPromptDocument } from "./renderers/prompt-document-renderer";
 import { buildSupportAnalysisPromptDocument } from "./support-analysis-document";
 
 /** System prompt for the TrustLoop AI support analysis agent. */

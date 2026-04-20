@@ -1,11 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import type { PromptStructuredSection } from "../src/prompts/prompt-document";
-import { PROMPT_INPUT_FORMAT } from "../src/prompts/prompt-format";
-import {
-  resolveStructuredSectionFormat,
-  serializeStructuredSection,
-} from "../src/prompts/renderers/structured-section-renderer";
+import type { PromptStructuredSection } from "@shared/prompting";
+import { PROMPT_INPUT_FORMAT } from "@shared/prompting";
+import { resolveStructuredSectionFormat, serializeStructuredSection } from "@shared/prompting";
 
 describe("structured section rendering", () => {
   it("prefers TOON for uniform arrays in auto mode", () => {

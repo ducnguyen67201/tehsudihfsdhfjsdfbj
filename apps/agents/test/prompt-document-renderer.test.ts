@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { PromptDocument } from "../src/prompts/prompt-document";
-import { PROMPT_INPUT_FORMAT } from "../src/prompts/prompt-format";
-import { renderPromptDocument } from "../src/prompts/renderers/prompt-document-renderer";
+import type { PromptDocument } from "@shared/prompting";
+import { PROMPT_INPUT_FORMAT, renderPromptDocument } from "@shared/prompting";
 
 describe("renderPromptDocument", () => {
   it("renders prose-only documents with section spacing", () => {

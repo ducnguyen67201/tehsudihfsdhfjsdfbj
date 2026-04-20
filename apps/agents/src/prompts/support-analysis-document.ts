@@ -1,10 +1,9 @@
+import type { PromptDocument } from "@shared/prompting";
 import {
   POSITIONAL_ANALYSIS_FORMAT_INSTRUCTIONS,
   type SessionDigest,
   type ToneConfig,
 } from "@shared/types";
-
-import type { PromptDocument } from "./prompt-document";
 
 export function buildSupportAnalysisPromptDocument(options?: {
   sessionDigest?: SessionDigest;
