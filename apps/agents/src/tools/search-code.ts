@@ -1,9 +1,26 @@
-import { createTool } from "@mastra/core/tools";
-import {
-  type WorkspaceSearchResult,
-  searchWorkspaceCode,
-} from "@shared/rest/codex/workspace-code-search";
+import { Tool } from "@mastra/core/tools";
+import { searchWorkspaceCode } from "@shared/rest/codex/workspace-code-search";
 import { z } from "zod";
+
+export interface SearchCodeToolInput {
+  query: string;
+  filePattern?: string;
+  workspaceId: string;
+}
+
+export interface SearchCodeToolResult {
+  file: string;
+  lines: string;
+  symbol: string | null;
+  repo: string;
+  snippet: string;
+  score: number;
+}
+
+export interface SearchCodeToolOutput {
+  message: string;
+  results: SearchCodeToolResult[];
+}
 
 const searchCodeInputSchema = z.object({
   query: z.string().describe("Search query: keywords, symbol names, error messages, or file paths"),
@@ -16,41 +33,13 @@ const searchCodeInputSchema = z.object({
   workspaceId: z.string().describe("The workspace ID to search in"),
 });
 
-const searchCodeResultSchema = z.object({
-  file: z.string(),
-  lines: z.string(),
-  symbol: z.string().nullable(),
-  repo: z.string(),
-  snippet: z.string(),
-  score: z.number(),
-});
-
-const searchCodeOutputSchema = z.object({
-  message: z.string(),
-  results: z.array(searchCodeResultSchema),
-});
-
-type SearchCodeToolOutput = z.infer<typeof searchCodeOutputSchema>;
-
-function formatSearchResult(result: WorkspaceSearchResult): z.infer<typeof searchCodeResultSchema> {
-  return {
-    file: result.filePath,
-    lines: `${result.lineStart}-${result.lineEnd}`,
-    symbol: result.symbolName,
-    repo: result.repositoryFullName,
-    snippet: result.snippet.slice(0, 500),
-    score: Math.round(result.mergedScore * 100) / 100,
-  };
-}
-
-export const searchCodeTool = createTool({
+export const searchCodeTool = new Tool<SearchCodeToolInput, SearchCodeToolOutput>({
   id: "search_code",
   description:
     "Search the codebase for relevant code. Returns file paths, line numbers, code snippets, and symbol names. " +
     "Use this to find files related to the customer's question. You can call this multiple times with different queries.",
   inputSchema: searchCodeInputSchema,
-  outputSchema: searchCodeOutputSchema,
-  execute: async (input): Promise<SearchCodeToolOutput> => {
+  execute: async (input: SearchCodeToolInput): Promise<SearchCodeToolOutput> => {
     const { query, filePattern, workspaceId } = input;
 
     const results = await searchWorkspaceCode(workspaceId, query, {
@@ -68,7 +57,14 @@ export const searchCodeTool = createTool({
 
     return {
       message: `Found ${results.length} results`,
-      results: results.map(formatSearchResult),
+      results: results.map((result) => ({
+        file: result.filePath,
+        lines: `${result.lineStart}-${result.lineEnd}`,
+        symbol: result.symbolName,
+        repo: result.repositoryFullName,
+        snippet: result.snippet.slice(0, 500),
+        score: Math.round(result.mergedScore * 100) / 100,
+      })),
     };
   },
 });

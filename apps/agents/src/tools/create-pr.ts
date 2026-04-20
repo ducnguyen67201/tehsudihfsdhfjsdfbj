@@ -1,10 +1,24 @@
-import { createTool } from "@mastra/core/tools";
+import { Tool } from "@mastra/core/tools";
 import {
   type CreateDraftPullRequestResult,
   MAX_FILES_PER_PR,
   createDraftPullRequest,
 } from "@shared/rest/codex/github/draft-pr";
 import { z } from "zod";
+
+export interface CreatePullRequestToolInput {
+  workspaceId: string;
+  repositoryFullName: string;
+  title: string;
+  description: string;
+  changes: Array<{
+    filePath: string;
+    content: string;
+  }>;
+  baseBranch?: string;
+}
+
+export type CreatePullRequestToolOutput = CreateDraftPullRequestResult;
 
 const createPullRequestInputSchema = z.object({
   workspaceId: z.string().describe("The workspace ID"),
@@ -24,28 +38,17 @@ const createPullRequestInputSchema = z.object({
   baseBranch: z.string().optional().describe("Base branch (defaults to repo default branch)"),
 });
 
-const createPullRequestOutputSchema = z.discriminatedUnion("success", [
-  z.object({
-    success: z.literal(true),
-    prUrl: z.string(),
-    prNumber: z.number(),
-    branchName: z.string(),
-  }),
-  z.object({
-    success: z.literal(false),
-    error: z.string(),
-  }),
-]);
-
-export const createPullRequestTool = createTool({
+export const createPullRequestTool = new Tool<
+  CreatePullRequestToolInput,
+  CreatePullRequestToolOutput
+>({
   id: "create_pull_request",
   description:
     "Create a draft GitHub pull request with a code fix. Only use this when you have identified " +
     "a clear, specific fix (wrong config, missing null check, typo). The PR is created in draft mode " +
     "and requires human approval to merge. Max 5 files per PR.",
   inputSchema: createPullRequestInputSchema,
-  outputSchema: createPullRequestOutputSchema,
-  execute: async (input): Promise<CreateDraftPullRequestResult> => {
+  execute: async (input: CreatePullRequestToolInput): Promise<CreatePullRequestToolOutput> => {
     const result = await createDraftPullRequest(input);
 
     if (result.success) {
