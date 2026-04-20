@@ -25,7 +25,7 @@ export const createPullRequestTool = createTool({
       .describe(`File changes (max ${codex.MAX_FILES_PER_PR})`),
     baseBranch: z.string().optional().describe("Base branch (defaults to repo default branch)"),
   }),
-  execute: async (input) => {
+  execute: async (input): Promise<codex.CreateDraftPullRequestResult> => {
     const result = await codex.createDraftPullRequest(input);
 
     if (result.success) {
