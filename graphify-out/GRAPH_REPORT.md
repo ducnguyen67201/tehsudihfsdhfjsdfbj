@@ -1,11 +1,11 @@
 # Graph Report - /home/runner/work/TrustLoop/TrustLoop  (2026-04-20)
 
 ## Corpus Check
-- 436 files · ~256,271 words
+- 436 files · ~256,404 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1190 nodes · 1274 edges · 305 communities detected
+- 1191 nodes · 1276 edges · 305 communities detected
 - Extraction: 81% EXTRACTED · 19% INFERRED · 0% AMBIGUOUS · INFERRED: 244 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
@@ -347,40 +347,40 @@ Cohesion: 0.04
 Nodes (43): extractApiKeyPrefix(), generateWorkspaceApiKeyMaterial(), hashApiKeySecret(), verifyApiKeySecret(), createTRPCContext(), resolveApiKeyAuth(), resolveWorkspaceContext(), aggregateErrors() (+35 more)
 
 ### Community 1 - "Community 1"
+Cohesion: 0.06
+Nodes (50): buildReturnPath(), disconnectGitHubAction(), getActionErrorMessage(), getString(), githubSettingsPath(), preparePrIntentAction(), refreshGitHubReposAction(), searchEvidenceAction() (+42 more)
+
+### Community 2 - "Community 2"
 Cohesion: 0.05
 Nodes (26): captureClicks(), captureConsoleErrors(), captureExceptions(), captureNetworkFailures(), captureRouteChanges(), currentUrl(), pushEvent(), startCapture() (+18 more)
 
-### Community 2 - "Community 2"
-Cohesion: 0.08
-Nodes (41): buildReturnPath(), disconnectGitHubAction(), getActionErrorMessage(), getString(), githubSettingsPath(), preparePrIntentAction(), refreshGitHubReposAction(), searchEvidenceAction() (+33 more)
-
 ### Community 3 - "Community 3"
-Cohesion: 0.07
-Nodes (40): writeAuditEvent(), buildAuthorizationUrl(), autoJoinUserFromVerifiedGoogleProfile(), buildRedirectUri(), determineOutcome(), handleGoogleOAuthCallback(), handleGoogleOAuthStart(), redirectToLogin() (+32 more)
-
-### Community 4 - "Community 4"
 Cohesion: 0.09
 Nodes (28): fetchFileContents(), fetchLatestCommitSha(), fetchRepoTree(), createDraftPullRequest(), tryGetFileSha(), formatVector(), generate(), getCached() (+20 more)
 
-### Community 5 - "Community 5"
+### Community 4 - "Community 4"
 Cohesion: 0.09
-Nodes (24): createSupportAgent(), extractToolCalls(), getDefaultModel(), parseAgentOutput(), resolveProviderConfig(), runAnalysis(), renderPromptDocument(), renderPromptSection() (+16 more)
+Nodes (25): createSupportAgent(), extractToolCalls(), getDefaultModel(), parseAgentOutput(), resolveProviderConfig(), runAnalysis(), renderPromptDocument(), renderPromptSection() (+17 more)
 
-### Community 6 - "Community 6"
+### Community 5 - "Community 5"
 Cohesion: 0.1
 Nodes (19): InvalidDraftDispatchTransitionError, restoreDraftDispatchContext(), transitionDraftDispatch(), InvalidDraftTransitionError, restoreDraftContext(), transitionDraft(), loadDispatch(), loadDraft() (+11 more)
 
-### Community 7 - "Community 7"
+### Community 6 - "Community 6"
 Cohesion: 0.1
 Nodes (22): InvalidAnalysisTransitionError, restoreAnalysisContext(), transitionAnalysis(), extractEmails(), findByEmails(), buildSnapshot(), buildThreadSnapshot(), callAgentService() (+14 more)
 
-### Community 8 - "Community 8"
-Cohesion: 0.08
-Nodes (15): WorkspaceLayout(), NotFound(), closeListenerIfIdle(), ensureListener(), fanOutEvent(), handleNotification(), hasSubscribers(), scheduleReconnect() (+7 more)
+### Community 7 - "Community 7"
+Cohesion: 0.11
+Nodes (27): buildAuthorizationUrl(), autoJoinUserFromVerifiedGoogleProfile(), buildRedirectUri(), determineOutcome(), handleGoogleOAuthCallback(), handleGoogleOAuthStart(), redirectToLogin(), resolveWorkspaceAfterLogin() (+19 more)
 
-### Community 9 - "Community 9"
+### Community 8 - "Community 8"
 Cohesion: 0.09
 Nodes (15): extractRawFiles(), isRecord(), normalizeSlackMessageEvent(), readString(), shouldDropIngressEvent(), fetchEmail(), getCachedProfile(), refreshProfile() (+7 more)
+
+### Community 9 - "Community 9"
+Cohesion: 0.08
+Nodes (14): WorkspaceLayout(), NotFound(), closeListenerIfIdle(), ensureListener(), fanOutEvent(), handleNotification(), hasSubscribers(), scheduleReconnect() (+6 more)
 
 ### Community 10 - "Community 10"
 Cohesion: 0.09
@@ -395,24 +395,24 @@ Cohesion: 0.1
 Nodes (10): ConversationView(), NoWorkspacePage(), useAnalysis(), useAuthSession(), useConversationPolling(), useConversationReply(), useSessionReplay(), useSupportInbox() (+2 more)
 
 ### Community 13 - "Community 13"
+Cohesion: 0.16
+Nodes (14): writeAuditEvent(), handleSlackOAuthCallback(), redirectToSettings(), base64UrlDecode(), base64UrlEncode(), completeInstall(), disconnect(), exchangeCode() (+6 more)
+
+### Community 14 - "Community 14"
 Cohesion: 0.17
 Nodes (12): WorkspaceHomePage(), WorkspaceSettingsPage(), replaceWorkspaceInPath(), workspaceAiAnalysisPath(), workspaceApiKeysPath(), workspaceGeneralPath(), workspaceGithubPath(), workspaceIntegrationsPath() (+4 more)
 
-### Community 14 - "Community 14"
+### Community 15 - "Community 15"
 Cohesion: 0.22
 Nodes (13): processSlackWebhookFromHttpRequest(), handleSlackEventsWebhook(), assertReplayWindow(), buildSlackBaseString(), computeSlackSignature(), getSlackSigningSecret(), toBuffer(), verifyRequest() (+5 more)
 
-### Community 15 - "Community 15"
+### Community 16 - "Community 16"
 Cohesion: 0.29
 Nodes (13): addReaction(), buildSlackMessageText(), findReplyByClientMsgId(), formatAttachmentLines(), isRecord(), isTransientSlackError(), readString(), removeReaction() (+5 more)
 
-### Community 16 - "Community 16"
+### Community 17 - "Community 17"
 Cohesion: 0.23
 Nodes (8): computeCutoff(), countSoftDeletedRecords(), hardDeleteById(), lowerFirst(), purgeDeletedRecords(), runPurgeDeletedRecords(), purgeDeletedRecords(), purgeDeletedRecordsWorkflow()
-
-### Community 17 - "Community 17"
-Cohesion: 0.26
-Nodes (9): handleGithubOAuthCallback(), redirectToSettings(), base64UrlDecode(), base64UrlEncode(), generateGithubInstallUrl(), getSigningKey(), hmacSign(), verifyAndDecodeGithubState() (+1 more)
 
 ### Community 18 - "Community 18"
 Cohesion: 0.2
@@ -1995,12 +1995,12 @@ Nodes (0):
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `GET()` connect `Community 0` to `Community 1`, `Community 2`, `Community 3`, `Community 4`, `Community 8`, `Community 14`, `Community 17`?**
-  _High betweenness centrality (0.141) - this node is a cross-community bridge._
-- **Why does `emitConversationChanged()` connect `Community 11` to `Community 8`, `Community 9`, `Community 15`?**
-  _High betweenness centrality (0.048) - this node is a cross-community bridge._
-- **Why does `reciprocalRankFusion()` connect `Community 4` to `Community 0`?**
-  _High betweenness centrality (0.044) - this node is a cross-community bridge._
+- **Why does `GET()` connect `Community 0` to `Community 1`, `Community 2`, `Community 3`, `Community 7`, `Community 9`, `Community 13`, `Community 15`?**
+  _High betweenness centrality (0.132) - this node is a cross-community bridge._
+- **Why does `emitConversationChanged()` connect `Community 11` to `Community 16`, `Community 9`, `Community 8`?**
+  _High betweenness centrality (0.047) - this node is a cross-community bridge._
+- **Why does `sendWithRetry()` connect `Community 2` to `Community 0`?**
+  _High betweenness centrality (0.035) - this node is a cross-community bridge._
 - **Are the 30 inferred relationships involving `GET()` (e.g. with `sendWithRetry()` and `resolveApiKeyAuth()`) actually correct?**
   _`GET()` has 30 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 10 inferred relationships involving `handleGoogleOAuthCallback()` (e.g. with `GET()` and `consumeOauthStateCookie()`) actually correct?**
