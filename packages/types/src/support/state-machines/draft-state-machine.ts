@@ -14,7 +14,12 @@ export type DraftEvent =
   | { type: "generated" }
   | { type: "approve"; approvedBy: string }
   | { type: "dismiss"; reason?: string }
-  | { type: "send" }
+  | { type: "startSending" }
+  | { type: "sendSucceeded"; slackMessageTs: string }
+  | { type: "sendFailed"; error: string; retryable: boolean }
+  | { type: "deliveryUnknown"; error: string }
+  | { type: "reconcileFound"; slackMessageTs: string }
+  | { type: "reconcileRetry" }
   | { type: "failed"; error: string }
   | { type: "retry" };
 
@@ -73,11 +78,11 @@ const awaitingApprovalState: DraftState = {
 
 const approvedState: DraftState = {
   status: DRAFT_STATUS.approved,
-  allowedEvents: ["send", "failed"],
+  allowedEvents: ["startSending", "failed"],
   handle(event, context) {
     switch (event.type) {
-      case "send":
-        return { ...context, status: DRAFT_STATUS.sent };
+      case "startSending":
+        return { ...context, status: DRAFT_STATUS.sending };
       case "failed":
         return {
           ...context,
@@ -90,10 +95,72 @@ const approvedState: DraftState = {
   },
 };
 
+// Slack delivery in progress. Three outcomes:
+//  - success (200 + message ts) -> SENT
+//  - transport error we can't confirm (network timeout, 5xx after local timeout)
+//    -> DELIVERY_UNKNOWN so a reconciler can check Slack for our client_msg_id
+//  - hard failure (permanent, non-retryable) -> SEND_FAILED
+const sendingState: DraftState = {
+  status: DRAFT_STATUS.sending,
+  allowedEvents: ["sendSucceeded", "sendFailed", "deliveryUnknown"],
+  handle(event, context) {
+    switch (event.type) {
+      case "sendSucceeded":
+        return { ...context, status: DRAFT_STATUS.sent, errorMessage: null };
+      case "sendFailed":
+        return event.retryable
+          ? { ...context, status: DRAFT_STATUS.deliveryUnknown, errorMessage: event.error }
+          : { ...context, status: DRAFT_STATUS.sendFailed, errorMessage: event.error };
+      case "deliveryUnknown":
+        return {
+          ...context,
+          status: DRAFT_STATUS.deliveryUnknown,
+          errorMessage: event.error,
+        };
+      default:
+        throw new InvalidDraftTransitionError(this.status, event.type);
+    }
+  },
+};
+
 const sentState: DraftState = {
   status: DRAFT_STATUS.sent,
   allowedEvents: [],
   handle(event, context) {
+    throw new InvalidDraftTransitionError(this.status, event.type);
+  },
+};
+
+// Reconciler landed here because we didn't get a confirmed Slack ts.
+// It queries Slack for our client_msg_id. Found -> SENT. Not found -> retry SENDING.
+const deliveryUnknownState: DraftState = {
+  status: DRAFT_STATUS.deliveryUnknown,
+  allowedEvents: ["reconcileFound", "reconcileRetry", "failed"],
+  handle(event, context) {
+    switch (event.type) {
+      case "reconcileFound":
+        return { ...context, status: DRAFT_STATUS.sent, errorMessage: null };
+      case "reconcileRetry":
+        return { ...context, status: DRAFT_STATUS.sending, errorMessage: null };
+      case "failed":
+        return {
+          ...context,
+          status: DRAFT_STATUS.sendFailed,
+          errorMessage: event.error,
+        };
+      default:
+        throw new InvalidDraftTransitionError(this.status, event.type);
+    }
+  },
+};
+
+const sendFailedState: DraftState = {
+  status: DRAFT_STATUS.sendFailed,
+  allowedEvents: ["retry"],
+  handle(event, context) {
+    if (event.type === "retry") {
+      return { ...context, status: DRAFT_STATUS.approved, errorMessage: null };
+    }
     throw new InvalidDraftTransitionError(this.status, event.type);
   },
 };
@@ -127,7 +194,10 @@ const STATE_MAP: Record<DraftStatusValue, DraftState> = {
   [DRAFT_STATUS.generating]: generatingState,
   [DRAFT_STATUS.awaitingApproval]: awaitingApprovalState,
   [DRAFT_STATUS.approved]: approvedState,
+  [DRAFT_STATUS.sending]: sendingState,
   [DRAFT_STATUS.sent]: sentState,
+  [DRAFT_STATUS.sendFailed]: sendFailedState,
+  [DRAFT_STATUS.deliveryUnknown]: deliveryUnknownState,
   [DRAFT_STATUS.dismissed]: dismissedState,
   [DRAFT_STATUS.failed]: failedState,
 };

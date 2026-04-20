@@ -213,12 +213,76 @@ describe("draft state machine", () => {
     expect(next.status).toBe(DRAFT_STATUS.dismissed);
   });
 
-  it("APPROVED → send → SENT", () => {
+  it("APPROVED → startSending → SENDING → sendSucceeded → SENT", () => {
     let ctx = createDraftContext("dr_1");
     ctx = transitionDraft(ctx, { type: "generated" });
     ctx = transitionDraft(ctx, { type: "approve", approvedBy: "user_1" });
-    const next = transitionDraft(ctx, { type: "send" });
+    ctx = transitionDraft(ctx, { type: "startSending" });
+    expect(ctx.status).toBe(DRAFT_STATUS.sending);
+    const next = transitionDraft(ctx, {
+      type: "sendSucceeded",
+      slackMessageTs: "1234567890.000100",
+    });
     expect(next.status).toBe(DRAFT_STATUS.sent);
+  });
+
+  it("SENDING → sendFailed (retryable) → DELIVERY_UNKNOWN", () => {
+    let ctx = createDraftContext("dr_1");
+    ctx = transitionDraft(ctx, { type: "generated" });
+    ctx = transitionDraft(ctx, { type: "approve", approvedBy: "user_1" });
+    ctx = transitionDraft(ctx, { type: "startSending" });
+    const next = transitionDraft(ctx, {
+      type: "sendFailed",
+      error: "network timeout",
+      retryable: true,
+    });
+    expect(next.status).toBe(DRAFT_STATUS.deliveryUnknown);
+    expect(next.errorMessage).toBe("network timeout");
+  });
+
+  it("SENDING → sendFailed (permanent) → SEND_FAILED", () => {
+    let ctx = createDraftContext("dr_1");
+    ctx = transitionDraft(ctx, { type: "generated" });
+    ctx = transitionDraft(ctx, { type: "approve", approvedBy: "user_1" });
+    ctx = transitionDraft(ctx, { type: "startSending" });
+    const next = transitionDraft(ctx, {
+      type: "sendFailed",
+      error: "channel_archived",
+      retryable: false,
+    });
+    expect(next.status).toBe(DRAFT_STATUS.sendFailed);
+  });
+
+  it("DELIVERY_UNKNOWN → reconcileFound → SENT", () => {
+    let ctx = createDraftContext("dr_1");
+    ctx = transitionDraft(ctx, { type: "generated" });
+    ctx = transitionDraft(ctx, { type: "approve", approvedBy: "user_1" });
+    ctx = transitionDraft(ctx, { type: "startSending" });
+    ctx = transitionDraft(ctx, {
+      type: "sendFailed",
+      error: "timeout",
+      retryable: true,
+    });
+    const next = transitionDraft(ctx, {
+      type: "reconcileFound",
+      slackMessageTs: "1234567890.000100",
+    });
+    expect(next.status).toBe(DRAFT_STATUS.sent);
+    expect(next.errorMessage).toBeNull();
+  });
+
+  it("SEND_FAILED → retry → APPROVED (allows re-send)", () => {
+    let ctx = createDraftContext("dr_1");
+    ctx = transitionDraft(ctx, { type: "generated" });
+    ctx = transitionDraft(ctx, { type: "approve", approvedBy: "user_1" });
+    ctx = transitionDraft(ctx, { type: "startSending" });
+    ctx = transitionDraft(ctx, {
+      type: "sendFailed",
+      error: "x",
+      retryable: false,
+    });
+    const next = transitionDraft(ctx, { type: "retry" });
+    expect(next.status).toBe(DRAFT_STATUS.approved);
   });
 
   it("APPROVED → failed → FAILED", () => {
@@ -241,7 +305,11 @@ describe("draft state machine", () => {
     let ctx = createDraftContext("dr_1");
     ctx = transitionDraft(ctx, { type: "generated" });
     ctx = transitionDraft(ctx, { type: "approve", approvedBy: "user_1" });
-    ctx = transitionDraft(ctx, { type: "send" });
+    ctx = transitionDraft(ctx, { type: "startSending" });
+    ctx = transitionDraft(ctx, {
+      type: "sendSucceeded",
+      slackMessageTs: "1234567890.000100",
+    });
     expect(() => transitionDraft(ctx, { type: "retry" })).toThrow(InvalidDraftTransitionError);
   });
 
@@ -267,11 +335,15 @@ describe("draft state machine", () => {
     expect(getAllowedDraftEvents(awaiting)).toEqual(["approve", "dismiss"]);
   });
 
-  it("full happy path: generate → approve → send", () => {
+  it("full happy path: generate → approve → startSending → sendSucceeded", () => {
     let ctx = createDraftContext("dr_1");
     ctx = transitionDraft(ctx, { type: "generated" });
     ctx = transitionDraft(ctx, { type: "approve", approvedBy: "user_1" });
-    ctx = transitionDraft(ctx, { type: "send" });
+    ctx = transitionDraft(ctx, { type: "startSending" });
+    ctx = transitionDraft(ctx, {
+      type: "sendSucceeded",
+      slackMessageTs: "1234567890.000100",
+    });
     expect(ctx.status).toBe(DRAFT_STATUS.sent);
   });
 });
