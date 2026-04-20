@@ -33,6 +33,12 @@ interface ThreadSnapshotResult {
   threadSnapshot: string;
   customerEmail: string | null;
   sessionDigest: SessionDigest | null;
+  // Surfaced so the workflow can drive the failure-frame render activity
+  // without re-fetching the digest. Both null when no correlated session
+  // was found or the session has no failurePoint.
+  sessionRecordId: string | null;
+  failurePointTimestamp: string | null;
+  precedingActionsCount: number;
 }
 
 interface AnalysisAgentInput {
@@ -41,6 +47,8 @@ interface AnalysisAgentInput {
   analysisId: string;
   threadSnapshot: string;
   sessionDigest?: SessionDigest | null;
+  failureFrames?: import("@shared/types").FailureFrame[];
+  failureFrameCaptions?: import("@shared/types").FailureFrameCaption[];
 }
 
 interface EscalateInput {
@@ -76,6 +84,7 @@ export async function buildThreadSnapshot(
   // --- Session Correlation (best-effort) ---
   // Priority: Slack user email (resolved via API) > regex-scraped emails from messages
   let sessionDigest: SessionDigest | null = null;
+  let sessionRecordId: string | null = null;
   try {
     const correlationEmails: string[] = [];
 
@@ -105,6 +114,7 @@ export async function buildThreadSnapshot(
 
       if (correlation) {
         sessionDigest = sessionCorrelation.compileDigest(correlation.record, correlation.events);
+        sessionRecordId = correlation.record.id;
       }
     }
   } catch (error) {
@@ -127,6 +137,9 @@ export async function buildThreadSnapshot(
     threadSnapshot: JSON.stringify(snapshot, null, 2),
     customerEmail,
     sessionDigest,
+    sessionRecordId,
+    failurePointTimestamp: sessionDigest?.failurePoint?.timestamp ?? null,
+    precedingActionsCount: sessionDigest?.failurePoint?.precedingActions.length ?? 0,
   };
 }
 
@@ -296,6 +309,12 @@ async function callAgentService(input: AnalysisAgentInput, config: { toneConfig:
       conversationId: input.conversationId,
       threadSnapshot: input.threadSnapshot,
       ...(input.sessionDigest ? { sessionDigest: input.sessionDigest } : {}),
+      ...(input.failureFrames && input.failureFrames.length > 0
+        ? { failureFrames: input.failureFrames }
+        : {}),
+      ...(input.failureFrameCaptions && input.failureFrameCaptions.length > 0
+        ? { failureFrameCaptions: input.failureFrameCaptions }
+        : {}),
       config,
     }),
     signal: AbortSignal.timeout(AGENT_TIMEOUT_MS),

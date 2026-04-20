@@ -1,5 +1,6 @@
 import { sessionDigestSchema } from "@shared/types/session-replay/session-digest.schema";
 import { z } from "zod";
+import { failureFrameCaptionSchema, failureFrameSchema } from "./failure-frames.schema";
 import { toneConfigSchema } from "./tone-config.schema";
 
 export const ANALYSIS_STATUS = {
@@ -170,6 +171,12 @@ export const analyzeRequestSchema = z.object({
   conversationId: z.string().min(1),
   threadSnapshot: z.string().min(1),
   sessionDigest: sessionDigestSchema.optional(),
+  // Visual evidence around the digest's failurePoint. Either raw frames (for
+  // vision-capable models) OR captions (for text-only models). Never both —
+  // the workflow decides which channel to use based on the workspace's chosen
+  // model. Either may be empty if no failurePoint exists or rendering failed.
+  failureFrames: z.array(failureFrameSchema).optional(),
+  failureFrameCaptions: z.array(failureFrameCaptionSchema).optional(),
   config: z
     .object({
       maxSteps: z.number().int().positive().optional(),

@@ -87,15 +87,25 @@ export const SUPPORT_AGENT_SYSTEM_PROMPT = buildSupportAgentSystemPrompt();
 /**
  * Build the complete analysis prompt, injecting session replay context
  * when a correlated browser session was found.
+ *
+ * `hasVisualEvidence` controls whether the prompt warns the agent that it
+ * will receive visual evidence (rendered rrweb frames or their text captions)
+ * via separate user-message parts. The frames themselves are passed via the
+ * messages array, not in this system prompt.
  */
 export function buildAnalysisPromptWithContext(options: {
   sessionDigest?: SessionDigest;
+  hasVisualEvidence?: boolean;
 }): string {
   if (!options.sessionDigest) {
     return SUPPORT_AGENT_SYSTEM_PROMPT;
   }
 
-  return `${SUPPORT_AGENT_SYSTEM_PROMPT}\n\n## Browser Session Context\n\nThe following session data was captured from the end-user's browser. Use it to understand what the user did before reporting the issue.\n\n${formatSessionDigestForPrompt(options.sessionDigest)}`;
+  const visualEvidenceSection = options.hasVisualEvidence
+    ? "\n\n## Visual evidence will be attached\n\nYou will receive 3-7 screenshots (or text captions of those screenshots) of the customer's screen around the moment of the failure, included as separate user-message parts. Treat them as primary evidence: cite specific UI elements you can see (button states, visible text, modal contents, error toasts, partially-filled forms). Do not hallucinate visual elements that are not in the frames or captions."
+    : "";
+
+  return `${SUPPORT_AGENT_SYSTEM_PROMPT}${visualEvidenceSection}\n\n## Browser Session Context\n\nThe following session data was captured from the end-user's browser. Use it to understand what the user did before reporting the issue.\n\n${formatSessionDigestForPrompt(options.sessionDigest)}`;
 }
 
 function formatSessionDigestForPrompt(digest: SessionDigest): string {
