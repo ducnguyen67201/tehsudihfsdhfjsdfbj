@@ -80,6 +80,32 @@ When you pick this up: add a `hostedDomain String?` field to `Workspace`, pass i
 **Priority:** P3
 **Depends on:** Billing/metering work shipping (Deliverable D in the MVP plan).
 
+## Auth
+
+### Lock read-side of support routers against workspace API keys
+
+**What:** `supportInboxRouter.listConversations`, `supportInboxRouter.getConversationTimeline`, `supportAnalysisRouter.getLatestAnalysis`, and the `sessionReplayRouter` queries (`list`, `getEvents`, `correlate`, `getSession`, `getReplayChunks`) all ride `workspaceProcedure`, which still accepts workspace API keys (`tlk_*`). After the operator-mutation role gate, mutations are safe — but reads still expose conversation timelines (operator reply bodies, draft content), analysis output (override reasons, suggested drafts), and session replay events (user email, click streams) to any holder of a valid workspace API key.
+
+**Why:** Workspace API keys are intended for customer-facing ingest endpoints (SDK ingestion, webhook inbound). They are not meant to read operator-private data. A leaked key today means the attacker can tail every customer support conversation.
+
+**Context:** Flagged by both Claude + Codex adversarial reviewers during `/ship` on 2026-04-19 (commit locking operator mutations). The mutation fix was landed; reads were scoped to a follow-up at user direction. Cited files: `packages/rest/src/support-inbox-router.ts:31,43`, `packages/rest/src/support-analysis-router.ts:41`, `packages/rest/src/session-replay-router.ts:7,48,78,141,155`.
+
+When you pick this up: the mechanical fix is to route the listed queries through `workspaceRoleProcedure(WORKSPACE_ROLE.MEMBER)` (same pattern used by the mutations). The larger design question is whether to split `workspaceProcedure` into two explicit variants (`workspaceSessionProcedure` for user-UI reads, `workspaceApiKeyProcedure` for SDK/ingest endpoints with a scope check) so the "API keys can't read operator data" invariant is enforced structurally rather than procedure-by-procedure.
+
+**Effort:** S (human: ~2 hr / CC: ~20 min)
+**Priority:** P1 — actively exposed read path in a pre-product auth model.
+**Depends on:** None.
+
+### Stale role cache after workspace membership demotion
+
+**What:** `ctx.role` is captured once at context build from `resolveWorkspaceContext`. A user demoted ADMIN→MEMBER or removed from a workspace mid-session keeps operating at the old role until the session cookie expires.
+
+**Why:** Flagged by Claude adversarial review on 2026-04-19. Not a currently-exploitable hole (demotion requires an admin action and the user has to still have a session), but it's a silent privilege persistence bug that matters when a workspace rotates staff. `packages/rest/src/context.ts:31-42` reads membership per-request — actually confirmed by Codex to be read every request. Re-validate this claim before shipping a fix; if per-request, the risk is lower than Claude's finding implied.
+
+**Effort:** S (human: ~1 hr / CC: ~15 min)
+**Priority:** P2
+**Depends on:** Verifying the per-request membership read claim.
+
 ## Code Indexing
 
 ### Unified Escalation Timeline Panel
@@ -311,6 +337,20 @@ When you pick this up: wrap the `tx.sessionRecord.create(...)` in a try/catch on
 **Depends on:** File attachment feature stable in production. Trigger: DB size growth from attachments becomes noticeable.
 
 ## Completed
+
+### Lock operator mutations + remove unauthenticated `dispatchWorkflow` tRPC procedure
+
+**What:** Two related auth holes closed in one PR:
+
+1. **Operator mutation role-gate.** `supportInboxRouter` (6 mutations: `assignConversation`, `updateConversationStatus`, `markDoneWithOverrideReason`, `retryDelivery`, `sendReply`, `toggleReaction`) and `supportAnalysisRouter` (3 mutations: `triggerAnalysis`, `approveDraft`, `dismissDraft`) moved from `workspaceProcedure` to `workspaceRoleProcedure(WORKSPACE_ROLE.MEMBER)`. `workspaceRoleProcedure` now explicitly rejects non-session actors with `UNAUTHORIZED`.
+
+2. **Removed unauthenticated workflow dispatch from tRPC.** `dispatchWorkflow` was mounted on `publicProcedure` in `packages/rest/src/router.ts`, letting any unauthenticated caller enqueue support, support-analysis, send-draft-to-slack, codex, and repository-index workflows (including posting arbitrary messages into customer Slack channels via send-draft-to-slack). Zero callers used the tRPC procedure. Removed it entirely; internal dispatch now lives exclusively at the authenticated REST endpoint `/api/rest/workflows/dispatch` (protected by `withServiceAuth`).
+
+**Implementation:** `packages/rest/src/trpc.ts` — `workspaceRoleProcedure` asserts `ctx.session && ctx.user` and narrows downstream ctx. `packages/rest/src/support-inbox-router.ts` + `packages/rest/src/support-analysis-router.ts` — `operatorProcedure = workspaceRoleProcedure(WORKSPACE_ROLE.MEMBER)` alias, dropped `ctx.apiKeyAuth?.keyId ?? "system"` fallback. `packages/rest/src/router.ts` — removed the `dispatchWorkflow` procedure. `packages/rest/test/procedure-auth.test.ts` — 6 regression tests.
+
+**Tests:** 178 tests in rest package still pass. Full monorepo type-check clean.
+
+**Completed:** 2026-04-19. Mutation hole flagged by Codex during /autoplan eng review of the SupportConversation FSM plan; `dispatchWorkflow` hole flagged by Codex during /ship adversarial pass (on the same day, scope expanded by user at the /ship gate).
 
 ### Tighten bot-message filter to installation.botUserId
 
