@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
 import type { SessionDigest } from "@shared/types";
+import { describe, expect, it } from "vitest";
 import {
   SUPPORT_AGENT_SYSTEM_PROMPT,
   buildAnalysisPromptWithContext,
@@ -59,9 +59,7 @@ describe("buildAnalysisPromptWithContext", () => {
         sessionDigest: baseDigest,
       });
 
-      expect(result).toContain(
-        "- Current URL: https://app.example.com/billing"
-      );
+      expect(result).toContain("- Current URL: https://app.example.com/billing");
       expect(result).toContain("- Browser: Chrome/120");
       expect(result).toContain("- Viewport: 1920x1080");
       expect(result).toContain("- Release: v1.2.3");
@@ -150,9 +148,7 @@ describe("buildAnalysisPromptWithContext", () => {
       });
 
       expect(result).toContain("### Failure Point");
-      expect(result).toContain(
-        "**click** at 2024-01-15T10:30:00Z: Submit button on billing form"
-      );
+      expect(result).toContain("**click** at 2024-01-15T10:30:00Z: Submit button on billing form");
     });
 
     it("formats preceding actions with type and description", () => {
@@ -225,9 +221,7 @@ describe("buildAnalysisPromptWithContext", () => {
       });
 
       expect(result).toContain("### Console Errors");
-      expect(result).toContain(
-        "- [error] Uncaught TypeError: Cannot read property 'x'"
-      );
+      expect(result).toContain("- [error] Uncaught TypeError: Cannot read property 'x'");
     });
 
     it("appends count suffix for repeated errors", () => {
@@ -292,9 +286,7 @@ describe("buildAnalysisPromptWithContext", () => {
       });
 
       expect(result).toContain("### Exceptions");
-      expect(result).toContain(
-        "- TypeError: Cannot read properties of null (x2)"
-      );
+      expect(result).toContain("- TypeError: Cannot read properties of null (x2)");
     });
 
     it("omits count suffix for single occurrences", () => {
