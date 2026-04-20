@@ -389,7 +389,7 @@ A feature is done only when:
 
 Only load GTM context when the task is explicitly about GTM or founder outreach.
 
-- GTM docs: `business/gtm/README.md`
+- GTM docs: `business/gtm/gtm-docs.md`
 - Outreach tracker: `https://docs.google.com/spreadsheets/d/11qZFluil7TZel2INiKkyBeYwfPgT-JxwBZBvC3zAnd4/edit?gid=1001#gid=1001`
 
 For GTM tasks, repo docs are the strategy source of truth and the outreach
