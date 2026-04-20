@@ -16,6 +16,18 @@ All notable changes to TrustLoop will be documented in this file.
 - **Slack delivery adapter** accepts a `clientMsgId` and forwards it as `chat.postMessage.client_msg_id`. New `findReplyByClientMsgId` helper wraps `conversations.replies` for the reconciler.
 - **`approveDraft()` signature** now takes the workflow dispatcher alongside the input. The tRPC router passes it through.
 
+## [0.1.8.1] - 2026-04-19
+
+### Added
+- **Local prompt-rendering foundation for the agents runtime.** Support analysis prompts now build through a typed prompt document and renderer seam inside `apps/agents`, instead of assembling everything through one growing string builder. The new seam stays local to the agents service, which keeps `packages/types` free of renderer-only abstractions while making future prompt growth easier to manage.
+- **TOON input-serialization support and benchmark fixtures.** Added the official `@toon-format/toon` SDK plus renderer utilities for JSON and TOON serialization. TOON is not live by default yet, but the branch now has fixture tests that compare candidate structured payloads and prove fallback behavior before any production rollout.
+- **Agents package test coverage for prompt infrastructure.** `@trustloop/agents` now has a real `vitest` test suite and Biome lint coverage for `src/` and `test/`, including new tests for prompt document rendering, TOON format selection, serializer fallback, and benchmark fixtures.
+- **Implementation plan for staged TOON rollout.** Added `docs/plans/impl-plan-toon-prompt-foundation.md`, documenting the reviewed rollout: local-first renderer seam, measurement before live TOON enablement, delayed shared-package extraction, and explicit follow-up work for the `threadSnapshot` contract.
+
+### Changed
+- **Support-analysis prompt assembly now uses the new local renderer seam without changing live behavior.** `buildSupportAgentSystemPrompt()` and `buildAnalysisPromptWithContext()` now render from a prompt document, but the current support-analysis prompt text stays JSON-equivalent and session-context behavior remains intact while TOON stays behind the seam.
+- **Prompt rollout strategy is now benchmark-led, not format-led.** The plan and TODOs now explicitly defer shared-package extraction and `threadSnapshot` contract redesign, and treat TOON as a measured optimization rather than a new repo-wide prompt platform.
+
 ## [0.1.8.0] - 2026-04-19
 
 ### Added
