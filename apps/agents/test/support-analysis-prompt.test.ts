@@ -28,6 +28,16 @@ const baseDigest: SessionDigest = {
 
 // ── Tests ────────────────────────────────────────────────────────────
 
+describe("SUPPORT_AGENT_SYSTEM_PROMPT (regression guards)", () => {
+  it("does not mention Sentry — the Sentry integration was removed", () => {
+    expect(SUPPORT_AGENT_SYSTEM_PROMPT).not.toMatch(/sentry/i);
+  });
+
+  it("positively asserts the session digest as the observability source", () => {
+    expect(SUPPORT_AGENT_SYSTEM_PROMPT).toMatch(/session digest/i);
+  });
+});
+
 describe("buildAnalysisPromptWithContext", () => {
   it("returns the base prompt when called with empty options", () => {
     const result = buildAnalysisPromptWithContext({});

@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
-    "build": "tsc --noEmit",
-    "type-check": "tsc --noEmit",
+    "build": "tsgo --noEmit",
+    "type-check": "tsgo --noEmit",
     "lint": "biome check src/ test/",
     "test": "vitest run"
   },
@@ -15,9 +15,9 @@
     "@ai-sdk/openai": "^2.0.89",
     "@hono/node-server": "^1.0.0",
     "@mastra/core": "1.22.0",
-    "@shared/prompting": "*",
     "@shared/database": "*",
     "@shared/env": "*",
+    "@shared/prompting": "*",
     "@shared/rest": "*",
     "@shared/types": "*",
     "hono": "^4.0.0",
