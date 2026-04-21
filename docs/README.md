@@ -1,26 +1,20 @@
 # TrustLoop docs
 
-> Engineering docs for the TrustLoop monorepo. Organized to mirror the code: cross-cutting **conventions** apply everywhere, **domains/** match `apps/queue/src/domains/*` and `packages/rest/src/services/*`, **plans/** hold multi-phase roadmaps, **contracts/** hold generated schemas. Agents: start here, scan the list, pull only the one doc you need.
+> Engineering docs for the TrustLoop monorepo. Current-reality only: stable contracts + cross-cutting conventions. Forward-looking plans, specs, and impl checklists do NOT live here — they belong in PR descriptions, GitHub issues, or local `~/.gstack/projects/<slug>/` scratch. See the root `AGENTS.md` "Doc Philosophy" section for the rule.
 
 ## How this folder is organized
 
-- **`conventions/`** — rules that apply across the whole repo (service layer, UI, REST auth, positional JSON, soft-delete, foundation setup). If a rule is load-bearing for every feature, it lives here.
-- **`domains/<domain>/`** — specs, impl checklists, and design notes scoped to one product domain. Domain names match the code: `support`, `auth`, `ai-analysis`, `session-replay`, `codex`, `workspace`.
-- **`plans/`** — multi-phase roadmaps and cross-domain execution plans.
+- **`conventions/`** — stable contracts and operating rules that apply across the repo (service layer, UI, REST auth, positional JSON, soft-delete, foundation setup). Update these alongside the code when a contract changes.
 - **`contracts/`** — generated schema artifacts (OpenAPI, etc.).
 
-Filename prefix signals lifecycle stage, not topic:
-- `spec-*` — what we're building (requirements + design)
-- `impl-*` — how we're building it (checklists, codex prompts)
-- `design-*` — rationale for a specific decision
+That's it. No `plans/`, no `domains/`, no `specs/`. If you need a forward-looking plan, write it in a PR description or `~/.gstack/` scratch and let it disappear when the work lands.
 
 ## Reading order for a new agent
 
-1. `../AGENTS.md` (symlinked as `../CLAUDE.md`) — the operating rules.
+1. `../AGENTS.md` (symlinked as `../CLAUDE.md`) — the operating rules, including the "Doc Philosophy" section.
 2. `conventions/foundation-setup-and-conventions.md` — stack, layering, dependency direction.
 3. `conventions/service-layer-conventions.md` — how all business logic is organized.
-4. `plans/impl-plan-first-customer-happy-path-mvp.md` — the current MVP roadmap.
-5. Then pull the specific domain under `domains/<domain>/` that matches your task.
+4. The code itself — `apps/web/src/domains/*`, `apps/queue/src/domains/*`, `packages/rest/src/services/*`. The code is authoritative; docs only tell you how to navigate it.
 
 ## Conventions (cross-cutting)
 
@@ -32,57 +26,9 @@ Filename prefix signals lifecycle stage, not topic:
 | [conventions/spec-rest-api-key-auth.md](conventions/spec-rest-api-key-auth.md) | Internal (`tli_`) vs workspace (`tlk_`) API key auth. `withServiceAuth` / `withWorkspaceApiKeyAuth` guards. |
 | [conventions/spec-positional-json-format.md](conventions/spec-positional-json-format.md) | The compressed LLM output format: numeric enums, reconstruction, max 2-level nesting. Required for all structured LLM output. |
 | [conventions/spec-soft-delete-strategy.md](conventions/spec-soft-delete-strategy.md) | Prisma soft-delete extension, `findIncludingDeleted`, partial unique indexes, transaction rules. |
+| [conventions/spec-conversation-progress-insights.md](conventions/spec-conversation-progress-insights.md) | Conversation progress insights contract: shape, lifecycle, update rules. |
 
-## Domains
-
-### `domains/auth/` — workspace identity, membership, access control
-
-| Doc | What it covers |
-|---|---|
-| [domains/auth/spec-auth-workspace-security-p0.md](domains/auth/spec-auth-workspace-security-p0.md) | Google OAuth, workspace auto-join from verified email, membership roles, P0 security checklist. |
-| [domains/auth/impl-auth-workspace-security-p0-checklist.md](domains/auth/impl-auth-workspace-security-p0-checklist.md) | Step-by-step execution checklist for the P0 auth build. |
-
-### `domains/support/` — Slack ingestion, inbox, message grouping
-
-| Doc | What it covers |
-|---|---|
-| [domains/support/design-slack-message-grouping.md](domains/support/design-slack-message-grouping.md) | Design rationale for how Slack messages collapse into conversations. |
-| [domains/support/spec-slack-ingestion-thread-grouping-p0.md](domains/support/spec-slack-ingestion-thread-grouping-p0.md) | P0 spec for Slack webhook ingestion and thread grouping — the core inbox pipeline. |
-| [domains/support/impl-slack-ingestion-thread-grouping-p0-checklist.md](domains/support/impl-slack-ingestion-thread-grouping-p0-checklist.md) | Execution checklist for the Slack ingestion P0. |
-| [domains/support/impl-slack-ingestion-thread-grouping-p0-codex-prompts.md](domains/support/impl-slack-ingestion-thread-grouping-p0-codex-prompts.md) | Codex prompts used to drive the ingestion implementation. |
-| [domains/support/spec-slack-oauth-install-flow.md](domains/support/spec-slack-oauth-install-flow.md) | End-to-end Slack OAuth install flow: callback, signature verification, workspace linkage. |
-
-### `domains/ai-analysis/` — LLM analysis pipeline and draft generation
-
-| Doc | What it covers |
-|---|---|
-| [domains/ai-analysis/spec-ai-analysis-pipeline.md](domains/ai-analysis/spec-ai-analysis-pipeline.md) | The analysis pipeline: stages, tools, streaming, data flow. |
-| [domains/ai-analysis/spec-ai-analysis-draft-generation.md](domains/ai-analysis/spec-ai-analysis-draft-generation.md) | Draft-generation spec — how analyses become customer-ready replies. |
-
-### `domains/session-replay/` — in-app session capture and replay
-
-| Doc | What it covers |
-|---|---|
-| [domains/session-replay/spec-session-replay-sdk.md](domains/session-replay/spec-session-replay-sdk.md) | SDK spec: what the browser captures, privacy redaction, ingestion shape. |
-| [domains/session-replay/impl-session-replay-checklist.md](domains/session-replay/impl-session-replay-checklist.md) | Implementation checklist for the SDK + ingest path. |
-
-### `domains/codex/` — code search, embeddings, PR intent
-
-| Doc | What it covers |
-|---|---|
-| [domains/codex/spec-embedding-hybrid-search.md](domains/codex/spec-embedding-hybrid-search.md) | Hybrid semantic + lexical search over indexed code. Feeds codex agent tools. |
-
-### `domains/workspace/` — settings UI and workspace-scoped config
-
-| Doc | What it covers |
-|---|---|
-| [domains/workspace/spec-workspace-settings-page.md](domains/workspace/spec-workspace-settings-page.md) | Settings page layout, tabs, and which workspace fields each tab owns. |
-
-## Plans
-
-| Doc | What it covers |
-|---|---|
-| [plans/impl-plan-first-customer-happy-path-mvp.md](plans/impl-plan-first-customer-happy-path-mvp.md) | The MVP roadmap: phases A–E, blocked-by relationships, owners, and the focused specs each phase pulls from. |
+The `spec-*` files under `conventions/` are stable contracts (schemas, formats, auth patterns) — not forward-looking specs. They describe what the system guarantees, not what we plan to build.
 
 ## Contracts
 
@@ -92,9 +38,11 @@ Filename prefix signals lifecycle stage, not topic:
 
 ## Adding a new doc
 
-1. **Cross-cutting rule?** → `conventions/`
-2. **Scoped to one product domain?** → `domains/<domain>/`, matching the code's domain name
-3. **Multi-phase roadmap spanning domains?** → `plans/`
-4. **Generated schema artifact?** → `contracts/`
+Before adding anything under `docs/`, ask: does this describe current reality, or future intent?
 
-Prefix the filename with `spec-` / `impl-` / `design-` to signal lifecycle stage. Don't rename existing files (breaks git blame). Add a row to the right table in this README so the next agent finds it in one scan.
+- **Current-reality contract or convention** → `conventions/` (update alongside the code that implements it)
+- **Generated schema** → `contracts/`
+- **Forward-looking plan, spec, or impl checklist** → **do not commit here.** Write it in your PR description, a GitHub issue, or `~/.gstack/projects/<slug>/`. Let it disappear when the work ships.
+- **In-flight migration that needs shared state across sessions** → `docs/refactor/<feature>-status.md` (a status doc, not a plan). Delete when the migration lands.
+
+If you need to explain rationale long-term, fold it into the matching `conventions/*.md` or root `AGENTS.md`. Commit the reasoning, not the plan.

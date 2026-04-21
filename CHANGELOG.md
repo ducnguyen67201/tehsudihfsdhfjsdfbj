@@ -2,6 +2,12 @@
 
 All notable changes to TrustLoop will be documented in this file.
 
+## [0.2.9.0] - 2026-04-21
+
+### Changed
+- **Engineering docs now describe current reality only.** Dropped `docs/plans/`, `docs/domains/`, and `docs/specs/` (23 forward-looking `impl-plan-*`, `spec-*`, `impl-*`, `design-*` files). Remaining docs under `docs/conventions/` and `docs/contracts/` describe stable contracts and operating rules — planning artifacts belong in PR descriptions, GitHub issues, or local `~/.gstack/` scratch, not in the repo. Added a "Doc Philosophy" section to `AGENTS.md` codifying the rule. In-flight plans (MVP roadmap, elite-agent-handoff) preserved in `~/.gstack/projects/ducnguyen67201-TrustLoop/`; all other removed files remain in git history.
+- **Code comments no longer link to committed plan docs.** Swept 12 `// Plan: docs/plans/...` and `// See docs/plans/...` references from production code (hooks, components, services, Prisma schema, migration SQL). Comments that explained surrounding behavior kept; comments that were only pointers to plan sections removed. Rationale now lives in the code itself or in commit history.
+
 ## [0.2.8.0] - 2026-04-20
 
 ### Added

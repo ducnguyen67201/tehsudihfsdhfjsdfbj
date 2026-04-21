@@ -422,10 +422,26 @@ A feature is done only when:
 
 - Architecture/conventions baseline:
   - `docs/conventions/foundation-setup-and-conventions.md`
-- Implementation plan (MVP):
-  - `docs/plans/impl-plan-first-customer-happy-path-mvp.md`
 - Service layer conventions (namespace imports, naming rules, rollout status):
   - `docs/conventions/service-layer-conventions.md`
+
+## Doc Philosophy
+
+- **No forward-looking spec/plan docs committed.** Planning happens in PR
+  descriptions, GitHub issues, or local `~/.gstack/projects/<slug>/` scratch.
+  Committed docs describe *current reality* only.
+- `docs/conventions/` = stable contracts and operating rules (service layer,
+  schemas, auth, formats). Update alongside code when contracts change.
+- No `spec-*`, `impl-*`, `design-*` files under `docs/` going forward. If an
+  architecture/concept explanation matters long-term, fold it into the matching
+  `docs/conventions/*.md` or this file. Commit the reasoning, not the plan.
+- If an in-flight migration needs shared state across sessions, use
+  `docs/refactor/<feature>-status.md` (a status doc, not a plan). Delete when
+  the migration lands.
+- Why: forward-looking plans become hallucination fuel for AI agents — the docs
+  diverge from reality the moment a plan ships, and agents read stale plans as
+  authoritative. Reference: openclaw/openclaw (docs/concepts + docs/reference +
+  scoped AGENTS.md files, zero committed plans).
 
 ## Skills + Doc Hygiene
 
