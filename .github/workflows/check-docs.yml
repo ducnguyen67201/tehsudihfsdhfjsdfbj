@@ -28,7 +28,7 @@ on:
 
 jobs:
   check-docs:
-    runs-on: [self-hosted, docker]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
