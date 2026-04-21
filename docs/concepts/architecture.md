@@ -176,3 +176,14 @@ Load-bearing rules that never change silently. Violating any of these is a bug.
 | Where is the FSM for a SupportConversation? | `packages/types/src/support/state-machines/conversation-state-machine.ts` |
 | Where is the compressed LLM output format? | `packages/types/src/positional-format/` |
 | Where is the codex hybrid search? | `packages/rest/src/codex/hybrid-search.ts` |
+
+## Keep this doc honest
+
+Update when you:
+- Add or remove a deployed service (changes the "three services" count)
+- Change the Temporal task queue split
+- Change the auth surfaces (new key prefix, new guard, new OAuth provider)
+- Switch the realtime transport (SSE → WebSocket, or pg_notify → a broker)
+- Change the storage backend (Postgres → anything)
+- Add or retire a major domain (would need a new concept doc too)
+
