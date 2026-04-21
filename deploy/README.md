@@ -152,9 +152,13 @@ each one.
 
 ### Manual deploy workflow
 
-1. Merge PR to `main`.
-2. Railway notices the commit but does not build.
+1. Merge PR to `staging` for a staging release, or merge PR to `production` for a production release.
+2. Railway notices the branch update but does not build.
 3. Click **Deploy** in the service's Deployments tab (or `railway up`)
-   when ready. Railway checks out `main`, builds, and rolls out.
+   when ready. Railway checks out that environment's branch, builds, and rolls out.
+
+This branch mapping must stay aligned with `.github/workflows/migrate.yml`:
+- push to `staging` => auto-apply staging DB migrations
+- push to `production` => auto-apply production DB migrations
 
 Do this per-service per-environment. There is no "deploy everything" button.
