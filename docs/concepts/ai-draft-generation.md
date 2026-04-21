@@ -1,3 +1,13 @@
+---
+summary: "Draft lifecycle: state machine, idempotent delivery via slackClientMsgId, reconciliation, dismiss and retry flows"
+read_when:
+  - Working on draft approval, send, or dismiss flows
+  - Touching Slack chat.postMessage delivery or reconciliation
+  - Adding a new draft state or event
+  - Debugging DELIVERY_UNKNOWN or SEND_FAILED drafts
+title: "AI Draft Generation"
+---
+
 # AI Draft Generation
 
 How a `SupportDraft` goes from "the agent produced a draft" to "the message actually landed in Slack."
@@ -127,6 +137,15 @@ Each draft carries two parallel fields:
 Plus `citations`: an array of `{ file, line, snippet }` references from the codex search. The inbox UI renders these under the draft so operators can verify the claim before approving.
 
 `tone` is stored as an enum matching the positional format (`professional`, `empathetic`, `technical`).
+
+## Invariants
+
+- **`slackClientMsgId` is generated once at draft creation and never regenerated.** Reconciliation depends on it being stable across every retry attempt for this draft. Regenerating it breaks delivery-unknown recovery.
+- **Drafts are produced inline in the analysis agent loop, not via a separate LLM call.** If the positional output's `d` field is null, no draft row is created (analysis status → `NEEDS_CONTEXT`).
+- **All draft state transitions go through `transitionDraft()`.** Direct `status:` writes on `SupportDraft` are bugs. Invalid transitions throw `InvalidDraftTransitionError` → 409 Conflict at tRPC.
+- **`approve` uses compare-and-swap** (`updateMany` guarded by `status: AWAITING_APPROVAL`) to prevent double-approve races. Direct `update` would race under concurrent operator clicks.
+- **`SENT` and `DISMISSED` are terminal.** A terminal draft cannot be edited, reused, or re-sent. Re-sending requires a new draft (typically via re-analysis).
+- **`SEND_FAILED` retries return to `APPROVED`, keeping the same `slackClientMsgId`.** Reconciliation still works after retry because the idempotency key is preserved.
 
 ## Related concepts
 

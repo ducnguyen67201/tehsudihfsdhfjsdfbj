@@ -1,3 +1,13 @@
+---
+summary: "Browser SDK recording, ingest endpoint, storage model, and SessionDigest correlation into analysis"
+read_when:
+  - Working on the browser SDK recorder or transport
+  - Touching the session ingest endpoint or storage models
+  - Changing how SessionDigest is built or fed into the analysis prompt
+  - Wiring raw rrweb chunks into agent context (currently not wired)
+title: "Session Replay Capture"
+---
+
 # Session Replay Capture
 
 How a browser session gets recorded, ingested, stored, and (eventually) fed into an analysis as evidence.
@@ -142,6 +152,15 @@ Wiring rrweb chunks into the prompt is flagged as P2 in `TODOS.md` → "Wire rrw
 - **No operator UI to view replay.** Chunks are stored but there's no "play this session" button in the inbox yet. The inflight `impl-plan-elite-agent-handoff` work (now archived to `~/.gstack/`) was building toward that.
 - **No `sessionId` on `SupportConversation`.** Makes back-queries ("which sessions did this customer have around the time of this conversation?") a correlation query instead of a join.
 - **Ingest race on concurrent first-batch-ever.** Two flushes from the same session in the same second can both see "no SessionRecord yet" and both try to create, leading to a unique-violation error on the second. Currently logged and the SDK's next retry recovers. Known TODO.
+
+## Invariants
+
+- **All ingest requests authenticate with a `tlk_`-prefixed workspace API key via `withWorkspaceApiKeyAuth`.** Ingest is never anonymous. No unauthenticated session writes reach the DB.
+- **Raw rrweb chunks are stored but never reach the agent prompt.** Only `SessionDigest` (summary: actions, errors, network, console, failure point, environment) is prompted. Wiring rrweb in is a prompt-shape migration.
+- **`SessionRecord` uses a partial unique index `(workspaceId, sessionId) WHERE deletedAt IS NULL`.** Writes use manual `findFirst → update | create`, never Prisma `upsert()` — upsert cannot target partial indexes and the extension-level conversion breaks soft-delete semantics.
+- **Correlation to `SupportConversation` is runtime-computed from email + time window.** There is no foreign key from `SupportConversation` to `SessionRecord`. Changing this is a schema migration, not a refactor.
+- **The transport uses `fetch` with `keepalive: true` on page unload, not `navigator.sendBeacon`.** `sendBeacon` drops the `Authorization` header, which breaks auth. Replacing the transport path is a one-way door.
+- **Never embed secrets, PII, or credentials in replay payloads.** The ingest endpoint accepts whatever the SDK sends; redaction is the SDK's responsibility and must stay on by default.
 
 ## Related concepts
 

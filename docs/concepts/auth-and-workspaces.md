@@ -1,3 +1,13 @@
+---
+summary: "Google OAuth, workspace auto-join, role hierarchy, and the three auth surfaces (tli_ / tlk_ / operator session)"
+read_when:
+  - Working on sign-in, workspace provisioning, or membership roles
+  - Adding or changing API key auth (tli_ or tlk_)
+  - Touching tRPC context, CSRF, or session handling
+  - Adding a new OAuth provider or auth path
+title: "Auth and Workspaces"
+---
+
 # Auth and Workspaces
 
 How a user becomes an authenticated operator inside a workspace, and how the three different auth surfaces (operator / internal service / customer API key) stay separated.
@@ -146,6 +156,16 @@ Flagged as P3 in `TODOS.md`. Would let a workspace admin restrict Google sign-in
 - Reject with a clear error if mismatched
 
 Not urgent — no customer has asked.
+
+## Invariants
+
+- **Workspace auto-join requires `email_verified === true` from Google.** Unverified emails never attach to a workspace. No "trust the header" bypass.
+- **Personal email domains (gmail, outlook, yahoo, proton, icloud, etc.) are rejected at the caller** before any DB lookup. They never spawn or attach to a workspace.
+- **`tli_` and `tlk_` keys validate through different guards.** `withServiceAuth` (tli_, env-var compare) is for internal traffic only. `withWorkspaceApiKeyAuth` (tlk_, DB + HMAC) is for customer traffic. Using the wrong guard on an endpoint is a security bug.
+- **`ensureMembership` uses explicit find-then-create, not Prisma `upsert`.** The partial unique index `(workspaceId, userId) WHERE deletedAt IS NULL` cannot be targeted by upsert.
+- **Google OAuth uses PKCE (S256), nonce, and `prompt=select_account`.** Removing any of these weakens auth. PKCE protects against intercepted codes, nonce protects against CSRF, and `select_account` prevents silent sign-in with the wrong Google account.
+- **`id_token` verification always uses the current JWKS** (rotates automatically via `jose`). Never hardcode a public key.
+- **Session cookies are HTTP-only + SameSite=Lax.** Never readable from client-side JS.
 
 ## Related concepts
 

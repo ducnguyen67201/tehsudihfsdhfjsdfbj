@@ -1,3 +1,12 @@
+---
+summary: "Three-service TrustLoop architecture, the two Temporal task queues, and the master data flow"
+read_when:
+  - You need the big picture before drilling into any subsystem
+  - You're adding a new service, workflow, or cross-cutting capability
+  - You're onboarding and want one doc that covers the whole shape
+title: "Architecture"
+---
+
 # Architecture
 
 How the TrustLoop system is wired end-to-end. Read this first when you need the big picture; every other concept doc zooms in on one piece of it.
@@ -143,6 +152,18 @@ The inbox UI is push-driven via SSE. Internally:
 - Analysis progress uses a 500ms DB poll SSE instead (Prisma's connection pool doesn't expose raw LISTEN channels cleanly — accepted latency tradeoff)
 
 See `slack-ingestion.md` for the pg_notify path and `ai-analysis-pipeline.md` for the polling stream.
+
+## Invariants
+
+Load-bearing rules that never change silently. Violating any of these is a bug.
+
+- **Dependency direction is one-way.** `apps/*` may depend on `packages/*`. `packages/*` never imports from `apps/*`. `packages/types` stays dependency-light; everything else can depend on it.
+- **All Prisma reads/writes go through a service.** Routers, workflows, activities, UI server components, and tRPC procedures call functions in `packages/rest/src/services/**`. Direct `prisma.*` calls from those call sites are not allowed. See `docs/conventions/service-layer-conventions.md`.
+- **The two Temporal task queues stay isolated.** `TASK_QUEUES.SUPPORT` and `TASK_QUEUES.CODEX` are separate even when they run in one worker runtime. A runaway on one queue cannot starve the other.
+- **All LLM structured output uses Positional JSON.** Compressed format → Zod validation → reconstruction at the call boundary. The compressed shape never leaks past that boundary. See `docs/conventions/spec-positional-json-format.md`.
+- **Workflows are deterministic; activities do all I/O.** Temporal workflow code must not call DB, network, or any non-deterministic API. All side effects live in activities with explicit timeouts.
+- **Auth guards are not interchangeable.** `withServiceAuth` (`tli_`) and `withWorkspaceApiKeyAuth` (`tlk_`) validate different key shapes for different callers. Using the wrong guard on an endpoint is a security bug.
+- **`pg_notify` uses `$executeRaw`, not `$queryRaw`.** `$queryRaw` silently no-ops because NOTIFY has no resultset.
 
 ## What lives where (quick lookup)
 

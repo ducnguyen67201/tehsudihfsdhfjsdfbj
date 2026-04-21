@@ -1,3 +1,13 @@
+---
+summary: "End-to-end analysis flow: trigger, Temporal workflow, agent service call, positional JSON output, SSE progress"
+read_when:
+  - Working on analysis triggers (debounce or manual)
+  - Touching the queue ↔ agents HTTP boundary
+  - Changing the analysis agent prompt or tool set
+  - Debugging analysis latency, failures, or missing drafts
+title: "AI Analysis Pipeline"
+---
+
 # AI Analysis Pipeline
 
 End-to-end flow from "new customer message arrives" to "operator sees a drafted reply in the inbox."
@@ -205,6 +215,15 @@ The inbox UI polls an SSE endpoint to see analysis progress in near-realtime:
 - **Polling stream has 500ms latency floor.** Acceptable for pilot; a future migration to true pg_notify would require either exposing a dedicated LISTEN client or moving this out of the Prisma connection pool.
 - **Session replay content is digested, not raw.** Model sees actions/errors/console output, not rrweb DOM snapshots. This was a conscious tradeoff on token cost + complexity.
 - **No guardrail on agent cost per conversation.** `maxSteps` (default 8) is the only knob. A runaway conversation could spend $10+ on a single analysis. Add a per-workspace budget if volume picks up.
+
+## Invariants
+
+- **The analysis workflow gates on three preconditions: `OPENAI_API_KEY` present, workspace has ≥1 indexed repository, no existing analysis is in-progress for this conversation.** Any trigger that bypasses these gates is a bug.
+- **The agent receives `SessionDigest` (summary), not raw rrweb chunks.** Raw rrweb is stored but does not reach the prompt. Changing this is a prompt-shape migration, not a flag flip.
+- **All LLM structured output uses the positional JSON format** in `packages/types/src/positional-format/support-analysis.ts`. The compressed shape is validated by Zod and reconstructed immediately after parse — it never leaks past the agent-call boundary.
+- **The 3-activity workflow breakdown (buildThreadSnapshot → markAnalyzing → runAnalysisAgent) is stable.** Changing the activity list or their order requires a Temporal workflow version bump; in-flight workflows continue on the old version.
+- **The queue → agents call is internal traffic authenticated with `tli_` service keys via `withServiceAuth`.** Never expose `/analyze` publicly, never validate with `withWorkspaceApiKeyAuth`.
+- **The SSE progress stream has a 500ms poll floor.** Latency below that requires migrating to true pg_notify + LISTEN, which is a non-trivial connection-pool change.
 
 ## Related concepts
 

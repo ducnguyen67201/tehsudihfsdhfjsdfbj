@@ -1,3 +1,13 @@
+---
+summary: "Repository indexing, embedding, hybrid search (RRF + LLM reranker), citations, PR intent skeleton"
+read_when:
+  - Working on code search, the hybrid ranking pipeline, or the LLM reranker
+  - Changing embedding model or dimensions
+  - Adding a new scoring pass or agent tool on top of codex search
+  - Wiring up PR creation on top of pr-intent.ts
+title: "Codex Search"
+---
+
 # Codex Search
 
 How TrustLoop indexes a customer's GitHub repos and returns code snippets as evidence during an analysis.
@@ -139,6 +149,15 @@ For each returned result:
 - **No per-query cost tracking.** `CodeSearchQuery` records the query, not the model spend on embedding or reranking.
 - **Agent tool dispatch layer has no explicit doc.** The path from agent-SDK tool call → HTTP endpoint → `searchRepositoryCode` is slightly implicit depending on which SDK is in use. Making this explicit would help if we switch SDKs.
 - **PR generation is stub.** `pr-intent.ts` stores intent; no downstream writer.
+
+## Invariants
+
+- **Search refuses to run against repositories with `status !== ready`.** Stale or partial index state never returns search results. This prevents the agent from citing chunks that no longer exist.
+- **The reranker has a hard 800ms timeout.** On timeout, RRF top-5 is returned without rerank — search always completes. The reranker is a quality booster, not a dependency.
+- **The pgvector HNSW index is managed in a raw SQL migration, not Prisma.** Running `db:push` on the codex schema will not recreate the HNSW index. Only `db:migrate` preserves it.
+- **Every search query and result set is persisted to `CodeSearchQuery` + `CodeSearchResult`.** Never skip the audit writes — the audit trail is the tuning signal for ranking quality and reranker evaluation.
+- **Embedding content is preprocessed with `splitIdentifiers()`** (camelCase + snake_case → spaces). Changing the preprocessor requires re-embedding every chunk, not a config flag.
+- **The `searchCode` agent tool name is stable across SDK migrations.** Renaming it breaks every prompt baseline.
 
 ## Related concepts
 

@@ -1,3 +1,13 @@
+---
+summary: "How Slack messages collapse into SupportConversation records; merge, reassign, and undo"
+read_when:
+  - Working on conversation grouping logic
+  - Adding or changing a grouping signal
+  - Touching merge, reassign, or undo correction code
+  - Debugging why two messages did or didn't end up in the same conversation
+title: "Thread Grouping"
+---
+
 # Thread Grouping
 
 How Slack messages collapse into `SupportConversation` records. Separate from `slack-ingestion.md` because the grouping algorithm has its own moving parts and operator corrections (merge / reassign / undo).
@@ -117,6 +127,15 @@ The alias table is the seam that makes merges stick. It's the reason the merge c
 - **No semantic similarity in grouping.** Only time window + user + channel. A customer opening a new thread about the same issue a week later gets a fresh conversation. Future work: an optional embedding-based "suggest merge" signal in the UI.
 - **Session correlation is one-way.** The analysis pipeline correlates SupportConversations to browser sessions via email extraction, but the grouping algorithm doesn't use session data. Thread routing is purely Slack-metadata-driven.
 - **Undo dependency check is expensive.** `supportGroupingCorrection.count()` with an OR clause runs on every undo. Fine at pilot scale, will need an index hint or materialized view at volume.
+
+## Invariants
+
+- **Tier 1 (thread-alias) always wins over Tier 2 (grouping anchor).** Tier order is load-bearing; reordering changes grouping behavior for every merged conversation.
+- **The alias chain is bounded at 5 hops.** Deeper chains indicate data corruption and are treated as such.
+- **Merge uses two-phase commit: alias rows land before secondaries are archived.** Reordering the phases creates a race with inbound Slack webhooks where alias writes arrive after archival and messages leak into new conversations.
+- **Soft-deletes on `SupportConversation` use `updateMany({ data: { deletedAt } })` inside transactions.** Never `.delete()` — the soft-delete Prisma extension escapes the transaction boundary. See `docs/conventions/spec-soft-delete-strategy.md`.
+- **Undo's dependency check is load-bearing.** Correction X blocks undo of Y if X is later in time, X is not itself undone, and X touches the same source/target/event as Y. Skipping this check creates orphaned-alias states that can't be recovered.
+- **Grouping anchors respect `maxGroupingWindowMinutes`.** The window slides on each new message but never extends past the cap — no unbounded grouping.
 
 ## Related concepts
 

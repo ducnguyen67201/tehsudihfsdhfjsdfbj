@@ -1,3 +1,12 @@
+---
+summary: "SupportConversation finite state machine: states, events, transitions, guards"
+read_when:
+  - Adding a new conversation event or status
+  - Debugging an InvalidConversationTransitionError
+  - Touching any code that reads or writes SupportConversation.status
+title: "SupportConversation FSM"
+---
+
 # SupportConversation FSM
 
 The finite state machine that governs status transitions on every `SupportConversation`.
@@ -83,6 +92,15 @@ await prisma.supportConversation.update({
 ```
 
 The machine is pure. No I/O, no `Date.now()` captured inside. If a transition needs a timestamp, the event carries it.
+
+## Invariants
+
+- **Writers never touch `status` directly.** All transitions go through `transitionConversation()`. Direct `status:` writes in services, activities, or migrations are bugs.
+- **`operatorSetDone` requires `deliveryConfirmed === true`.** The FSM throws `InvalidConversationTransitionError` if the flag is missing or false. Services must catch this and surface a 409.
+- **`customerMessageReceived` from DONE always transitions to UNREAD.** This auto-reopen is intentional — analysis triggers skip DONE conversations, so keeping a conversation in DONE on a new customer message would silently skip re-analysis.
+- **`operatorReplied` on DONE is an idempotent self-loop, not a transition.** Protects a real read-after-write race where a reply lands in Slack just before `operatorSetDone` settles.
+- **The machine is pure.** No I/O, no `Date.now()` captured inside the machine. Timestamps come in via the event.
+- **Every new state and every new event requires a unit test** in `packages/types/test/state-machines.test.ts`. No exceptions.
 
 ## Related state machines
 

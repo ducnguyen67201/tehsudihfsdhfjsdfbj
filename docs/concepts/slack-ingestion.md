@@ -1,3 +1,12 @@
+---
+summary: "Slack webhook lifecycle: signature verify, dedup, Temporal dispatch, realtime fanout"
+read_when:
+  - Working on the Slack webhook intake path
+  - Touching signature verification or replay-window logic
+  - Debugging why a Slack event did or didn't become a conversation event
+title: "Slack Ingestion"
+---
+
 # Slack Ingestion
 
 How a Slack event becomes a `SupportConversationEvent` on a `SupportConversation`.
@@ -113,6 +122,15 @@ Once `resolvedThreadTs` is known, the activity:
 | Thread-alias chain has a cycle | Bounded at 5 hops; chain beyond that is treated as data corruption and logged |
 | Grouping anchor window expired mid-processing | Falls through to tier 3 (new conversation) — correct behavior |
 | `pg_notify` payload exceeds 8KB | Postgres rejects; emit fails. We keep payloads tiny (ids + reason) to stay well under |
+
+## Invariants
+
+- **Every inbound Slack request must pass HMAC-SHA256 signature verification before any DB write or Temporal dispatch.** No exceptions, no bypass flag.
+- **The canonical idempotency key `${installationId}:${teamId}:${channelId}:${eventTs}:${eventType}` is the single source of dedup truth.** Duplicate keys never re-run the workflow.
+- **Thread routing is purely deterministic** — channel + thread_ts + user + time window + conversation status. No semantic similarity, no content-based clustering, no ML signal.
+- **The webhook handler returns 200 within Slack's 3-second timeout.** All downstream work (grouping, FSM, analysis) runs asynchronously via Temporal. Adding synchronous work to the handler breaks Slack's retry behavior.
+- **The thread-alias chain is bounded at 5 hops.** Chains beyond that are treated as data corruption and logged; they do not extend forever.
+- **The `pg_notify` payload stays small** (ids + reason only, never full event data). Postgres rejects payloads over 8KB.
 
 ## Related concepts
 
