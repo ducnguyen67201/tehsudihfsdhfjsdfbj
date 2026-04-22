@@ -14,6 +14,8 @@ import {
   recordEvents,
   serializeRunRollup,
 } from "@shared/rest/services/agent-team/run-event-service";
+import * as supportDrafts from "@shared/rest/services/support/support-draft-service";
+import { emitConversationChanged } from "@shared/rest/services/support/support-realtime-service";
 import type { AgentTeamRunEventDraft } from "@shared/types";
 import {
   AGENT_TEAM_EVENT_ACTOR_SYSTEM,
@@ -35,6 +37,7 @@ import {
   type AgentTeamRoleTurnInput,
   type AgentTeamRoleTurnOutput,
   type AgentTeamRunWorkflowInput,
+  SUPPORT_REALTIME_REASON,
   agentTeamDialogueMessageSchema,
   agentTeamFactSchema,
   agentTeamOpenQuestionSchema,
@@ -42,6 +45,7 @@ import {
   agentTeamRoleSlugSchema,
   agentTeamRoleTurnInputSchema,
   agentTeamRoleTurnOutputSchema,
+  readToolStructuredResult,
 } from "@shared/types";
 import { heartbeat } from "@temporalio/activity";
 
@@ -273,248 +277,315 @@ export async function persistRoleTurnResult(
     messages: normalizedMessages,
   });
 
-  const { snapshot, recordedEvents } = await prisma.$transaction(async (tx) => {
-    // workspaceId is required on every event. Fetch once per turn so callers
-    // don't need to thread it through the activity input.
-    const run = await tx.agentTeamRun.findUniqueOrThrow({
-      where: { id: input.runId },
-      select: { workspaceId: true },
-    });
-
-    const messageCount = await tx.agentTeamMessage.count({
-      where: { runId: input.runId },
-    });
-    if (messageCount + normalizedMessages.length > MAX_AGENT_TEAM_MESSAGES) {
-      throw new Error(
-        `Agent team run exceeded the ${MAX_AGENT_TEAM_MESSAGES} message budget for run ${input.runId}`
-      );
-    }
-
-    // Collect event drafts as we project; flush in one batch at the end of
-    // the transaction so the event log + its projections share atomicity.
-    const eventDrafts: AgentTeamRunEventDraft[] = [];
-
-    const createdMessages: AgentTeamDialogueMessage[] = [];
-    for (const message of normalizedMessages) {
-      const created = await tx.agentTeamMessage.create({
-        data: {
-          runId: input.runId,
-          threadId: message.parentMessageId ?? `thread:${input.role.slug}`,
-          fromRoleSlug: input.role.slug,
-          fromRoleLabel: input.role.label,
-          toRoleSlug: message.toRoleSlug,
-          kind: message.kind,
-          subject: message.subject,
-          content: message.content,
-          parentMessageId: message.parentMessageId ?? null,
-          refs: message.refs,
-          toolName: message.toolName ?? null,
-          metadata: toNullableJsonValue(message.metadata),
-        },
+  const { snapshot, recordedEvents, prLinkedConversationId, prLinkedWorkspaceId } =
+    await prisma.$transaction(async (tx) => {
+      // workspaceId is required on every event. Fetch once per turn so callers
+      // don't need to thread it through the activity input. conversationId is
+      // also pulled because if a tool result later in this turn carries a
+      // create_pull_request success, we link it back to the most recent
+      // operator-relevant SupportDraft on the conversation.
+      const run = await tx.agentTeamRun.findUniqueOrThrow({
+        where: { id: input.runId },
+        select: { workspaceId: true, conversationId: true },
       });
-      createdMessages.push(mapMessageRow(created));
 
-      eventDrafts.push(
-        buildMessageSentDraft({
-          runId: input.runId,
-          workspaceId: run.workspaceId,
-          senderRoleSlug: input.role.slug,
-          messageId: created.id,
-          message,
-        })
-      );
+      const messageCount = await tx.agentTeamMessage.count({
+        where: { runId: input.runId },
+      });
+      if (messageCount + normalizedMessages.length > MAX_AGENT_TEAM_MESSAGES) {
+        throw new Error(
+          `Agent team run exceeded the ${MAX_AGENT_TEAM_MESSAGES} message budget for run ${input.runId}`
+        );
+      }
 
-      // Tool calls/results arrive as regular dialogue messages with kind =
-      // tool_call | tool_result and a toolName. Mirror them to the event log
-      // as tool_called / tool_returned so the observability layer has
-      // first-class timing + latency data per tool invocation.
-      if (message.kind === AGENT_TEAM_MESSAGE_KIND.toolCall && message.toolName) {
-        eventDrafts.push({
-          kind: AGENT_TEAM_EVENT_KIND.toolCalled,
-          runId: input.runId,
-          workspaceId: run.workspaceId,
-          actor: input.role.slug,
-          payload: {
-            toolName: message.toolName,
-            argsPreview: message.content.slice(0, 1024),
+      // Collect event drafts as we project; flush in one batch at the end of
+      // the transaction so the event log + its projections share atomicity.
+      const eventDrafts: AgentTeamRunEventDraft[] = [];
+
+      const createdMessages: AgentTeamDialogueMessage[] = [];
+      for (const message of normalizedMessages) {
+        const created = await tx.agentTeamMessage.create({
+          data: {
+            runId: input.runId,
+            threadId: message.parentMessageId ?? `thread:${input.role.slug}`,
+            fromRoleSlug: input.role.slug,
+            fromRoleLabel: input.role.label,
+            toRoleSlug: message.toRoleSlug,
+            kind: message.kind,
+            subject: message.subject,
+            content: message.content,
+            parentMessageId: message.parentMessageId ?? null,
+            refs: message.refs,
+            toolName: message.toolName ?? null,
+            metadata: toNullableJsonValue(message.metadata),
           },
         });
-      } else if (message.kind === AGENT_TEAM_MESSAGE_KIND.toolResult && message.toolName) {
+        createdMessages.push(mapMessageRow(created));
+
+        eventDrafts.push(
+          buildMessageSentDraft({
+            runId: input.runId,
+            workspaceId: run.workspaceId,
+            senderRoleSlug: input.role.slug,
+            messageId: created.id,
+            message,
+          })
+        );
+
+        // Tool calls/results arrive as regular dialogue messages with kind =
+        // tool_call | tool_result and a toolName. Mirror them to the event log
+        // as tool_called / tool_returned so the observability layer has
+        // first-class timing + latency data per tool invocation.
+        if (message.kind === AGENT_TEAM_MESSAGE_KIND.toolCall && message.toolName) {
+          eventDrafts.push({
+            kind: AGENT_TEAM_EVENT_KIND.toolCalled,
+            runId: input.runId,
+            workspaceId: run.workspaceId,
+            actor: input.role.slug,
+            payload: {
+              toolName: message.toolName,
+              argsPreview: message.content.slice(0, 1024),
+            },
+          });
+        } else if (message.kind === AGENT_TEAM_MESSAGE_KIND.toolResult && message.toolName) {
+          eventDrafts.push({
+            kind: AGENT_TEAM_EVENT_KIND.toolReturned,
+            runId: input.runId,
+            workspaceId: run.workspaceId,
+            actor: input.role.slug,
+            payload: {
+              toolName: message.toolName,
+              ok: message.kind === AGENT_TEAM_MESSAGE_KIND.toolResult,
+              resultSummary: message.content.slice(0, 2048),
+            },
+          });
+        }
+      }
+
+      for (const fact of input.result.proposedFacts) {
+        const factRow = await tx.agentTeamFact.create({
+          data: {
+            runId: input.runId,
+            statement: fact.statement,
+            confidence: fact.confidence,
+            sourceMessageIds: fact.sourceMessageIds,
+            acceptedBy: fact.confidence >= 0.75 ? [input.role.slug] : [],
+            status:
+              fact.confidence >= 0.75
+                ? AGENT_TEAM_FACT_STATUS.accepted
+                : AGENT_TEAM_FACT_STATUS.proposed,
+          },
+          select: { id: true },
+        });
         eventDrafts.push({
-          kind: AGENT_TEAM_EVENT_KIND.toolReturned,
+          kind: AGENT_TEAM_EVENT_KIND.factProposed,
           runId: input.runId,
           workspaceId: run.workspaceId,
           actor: input.role.slug,
           payload: {
-            toolName: message.toolName,
-            ok: message.kind === AGENT_TEAM_MESSAGE_KIND.toolResult,
-            resultSummary: message.content.slice(0, 2048),
+            factId: factRow.id,
+            statement: fact.statement,
+            confidence: fact.confidence,
           },
         });
       }
-    }
 
-    for (const fact of input.result.proposedFacts) {
-      const factRow = await tx.agentTeamFact.create({
-        data: {
-          runId: input.runId,
-          statement: fact.statement,
-          confidence: fact.confidence,
-          sourceMessageIds: fact.sourceMessageIds,
-          acceptedBy: fact.confidence >= 0.75 ? [input.role.slug] : [],
-          status:
-            fact.confidence >= 0.75
-              ? AGENT_TEAM_FACT_STATUS.accepted
-              : AGENT_TEAM_FACT_STATUS.proposed,
-        },
-        select: { id: true },
-      });
-      eventDrafts.push({
-        kind: AGENT_TEAM_EVENT_KIND.factProposed,
-        runId: input.runId,
-        workspaceId: run.workspaceId,
-        actor: input.role.slug,
-        payload: {
-          factId: factRow.id,
-          statement: fact.statement,
-          confidence: fact.confidence,
-        },
-      });
-    }
-
-    if (input.result.resolvedQuestionIds.length > 0) {
-      await tx.agentTeamOpenQuestion.updateMany({
-        where: {
-          runId: input.runId,
-          id: { in: input.result.resolvedQuestionIds },
-        },
-        data: {
-          status: AGENT_TEAM_OPEN_QUESTION_STATUS.answered,
-        },
-      });
-    }
-
-    const openQuestionsToCreate = createdMessages
-      .filter((message) => shouldCreateOpenQuestion(message.kind))
-      .map((message) => buildOpenQuestionRow(message, input.role.slug));
-
-    if (openQuestionsToCreate.length > 0) {
-      // Use createManyAndReturn so we have row ids for the matching events;
-      // old path was createMany which doesn't return rows.
-      const createdQuestions = await tx.agentTeamOpenQuestion.createManyAndReturn({
-        data: openQuestionsToCreate,
-      });
-      for (const question of createdQuestions) {
-        eventDrafts.push({
-          kind: AGENT_TEAM_EVENT_KIND.questionOpened,
-          runId: input.runId,
-          workspaceId: run.workspaceId,
-          actor: input.role.slug,
-          target: question.ownerRoleSlug,
-          payload: {
-            questionId: question.id,
-            question: question.question,
-            ownerRoleSlug: question.ownerRoleSlug,
+      if (input.result.resolvedQuestionIds.length > 0) {
+        await tx.agentTeamOpenQuestion.updateMany({
+          where: {
+            runId: input.runId,
+            id: { in: input.result.resolvedQuestionIds },
+          },
+          data: {
+            status: AGENT_TEAM_OPEN_QUESTION_STATUS.answered,
           },
         });
       }
-    }
 
-    const hasReviewerApproval = await reviewerApprovalExists(tx, input.runId, createdMessages);
-    const queueTargets = collectQueuedTargets({
-      senderRoleSlug: input.role.slug,
-      messages: normalizedMessages,
-      nextSuggestedRoles: input.result.nextSuggestedRoles,
-      hasReviewerApproval,
-    });
+      const openQuestionsToCreate = createdMessages
+        .filter((message) => shouldCreateOpenQuestion(message.kind))
+        .map((message) => buildOpenQuestionRow(message, input.role.slug));
 
-    for (const roleSlug of queueTargets) {
-      const wakeReason = buildWakeReason(input.role.slug, normalizedMessages);
-      await tx.agentTeamRoleInbox.upsert({
+      if (openQuestionsToCreate.length > 0) {
+        // Use createManyAndReturn so we have row ids for the matching events;
+        // old path was createMany which doesn't return rows.
+        const createdQuestions = await tx.agentTeamOpenQuestion.createManyAndReturn({
+          data: openQuestionsToCreate,
+        });
+        for (const question of createdQuestions) {
+          eventDrafts.push({
+            kind: AGENT_TEAM_EVENT_KIND.questionOpened,
+            runId: input.runId,
+            workspaceId: run.workspaceId,
+            actor: input.role.slug,
+            target: question.ownerRoleSlug,
+            payload: {
+              questionId: question.id,
+              question: question.question,
+              ownerRoleSlug: question.ownerRoleSlug,
+            },
+          });
+        }
+      }
+
+      const hasReviewerApproval = await reviewerApprovalExists(tx, input.runId, createdMessages);
+      const queueTargets = collectQueuedTargets({
+        senderRoleSlug: input.role.slug,
+        messages: normalizedMessages,
+        nextSuggestedRoles: input.result.nextSuggestedRoles,
+        hasReviewerApproval,
+      });
+
+      for (const roleSlug of queueTargets) {
+        const wakeReason = buildWakeReason(input.role.slug, normalizedMessages);
+        await tx.agentTeamRoleInbox.upsert({
+          where: {
+            runId_roleSlug: {
+              runId: input.runId,
+              roleSlug,
+            },
+          },
+          create: {
+            runId: input.runId,
+            roleSlug,
+            state: AGENT_TEAM_ROLE_INBOX_STATE.queued,
+            unreadCount: 1,
+            wakeReason,
+          },
+          update: {
+            state: AGENT_TEAM_ROLE_INBOX_STATE.queued,
+            unreadCount: { increment: 1 },
+            wakeReason,
+          },
+        });
+        eventDrafts.push({
+          kind: AGENT_TEAM_EVENT_KIND.roleQueued,
+          runId: input.runId,
+          workspaceId: run.workspaceId,
+          actor: input.role.slug,
+          target: roleSlug,
+          payload: { roleSlug, wakeReason },
+        });
+      }
+
+      // Self-role terminal state. done → role_completed, blockedReason →
+      // role_blocked. "idle" is the normal between-turn state; no event.
+      const selfState = input.result.done
+        ? AGENT_TEAM_ROLE_INBOX_STATE.done
+        : input.result.blockedReason
+          ? AGENT_TEAM_ROLE_INBOX_STATE.blocked
+          : AGENT_TEAM_ROLE_INBOX_STATE.idle;
+
+      await tx.agentTeamRoleInbox.update({
         where: {
           runId_roleSlug: {
             runId: input.runId,
-            roleSlug,
+            roleSlug: input.role.slug,
           },
         },
-        create: {
-          runId: input.runId,
-          roleSlug,
-          state: AGENT_TEAM_ROLE_INBOX_STATE.queued,
-          unreadCount: 1,
-          wakeReason,
-        },
-        update: {
-          state: AGENT_TEAM_ROLE_INBOX_STATE.queued,
-          unreadCount: { increment: 1 },
-          wakeReason,
-        },
-      });
-      eventDrafts.push({
-        kind: AGENT_TEAM_EVENT_KIND.roleQueued,
-        runId: input.runId,
-        workspaceId: run.workspaceId,
-        actor: input.role.slug,
-        target: roleSlug,
-        payload: { roleSlug, wakeReason },
-      });
-    }
-
-    // Self-role terminal state. done → role_completed, blockedReason →
-    // role_blocked. "idle" is the normal between-turn state; no event.
-    const selfState = input.result.done
-      ? AGENT_TEAM_ROLE_INBOX_STATE.done
-      : input.result.blockedReason
-        ? AGENT_TEAM_ROLE_INBOX_STATE.blocked
-        : AGENT_TEAM_ROLE_INBOX_STATE.idle;
-
-    await tx.agentTeamRoleInbox.update({
-      where: {
-        runId_roleSlug: {
-          runId: input.runId,
-          roleSlug: input.role.slug,
-        },
-      },
-      data: {
-        state: selfState,
-        lastReadMessageId: createdMessages.at(-1)?.id ?? null,
-        unreadCount: 0,
-        wakeReason: input.result.blockedReason ?? null,
-      },
-    });
-
-    if (selfState === AGENT_TEAM_ROLE_INBOX_STATE.done) {
-      eventDrafts.push({
-        kind: AGENT_TEAM_EVENT_KIND.roleCompleted,
-        runId: input.runId,
-        workspaceId: run.workspaceId,
-        actor: input.role.slug,
-        payload: { roleSlug: input.role.slug },
-      });
-    } else if (selfState === AGENT_TEAM_ROLE_INBOX_STATE.blocked) {
-      eventDrafts.push({
-        kind: AGENT_TEAM_EVENT_KIND.roleBlocked,
-        runId: input.runId,
-        workspaceId: run.workspaceId,
-        actor: input.role.slug,
-        payload: {
-          roleSlug: input.role.slug,
+        data: {
+          state: selfState,
+          lastReadMessageId: createdMessages.at(-1)?.id ?? null,
+          unreadCount: 0,
           wakeReason: input.result.blockedReason ?? null,
         },
       });
-    }
 
-    // Flush accumulated event drafts inside the same transaction. Projections
-    // and the event log share atomicity: if any write fails, the turn rolls
-    // back as a whole.
-    const recordedEvents = await recordEvents(tx, eventDrafts);
+      if (selfState === AGENT_TEAM_ROLE_INBOX_STATE.done) {
+        eventDrafts.push({
+          kind: AGENT_TEAM_EVENT_KIND.roleCompleted,
+          runId: input.runId,
+          workspaceId: run.workspaceId,
+          actor: input.role.slug,
+          payload: { roleSlug: input.role.slug },
+        });
+      } else if (selfState === AGENT_TEAM_ROLE_INBOX_STATE.blocked) {
+        eventDrafts.push({
+          kind: AGENT_TEAM_EVENT_KIND.roleBlocked,
+          runId: input.runId,
+          workspaceId: run.workspaceId,
+          actor: input.role.slug,
+          payload: {
+            roleSlug: input.role.slug,
+            wakeReason: input.result.blockedReason ?? null,
+          },
+        });
+      }
 
-    const snapshot = await getRunProgressSnapshot(tx, input.runId);
-    return { snapshot, recordedEvents };
-  });
+      // Flush accumulated event drafts inside the same transaction. Projections
+      // and the event log share atomicity: if any write fails, the turn rolls
+      // back as a whole.
+      const recordedEvents = await recordEvents(tx, eventDrafts);
+
+      // Detect a successful create_pull_request tool result anywhere in this
+      // turn and link the PR back to the operator-relevant SupportDraft. Inside
+      // the tx so the link rolls back together with the event log if anything
+      // here fails. The realtime emit must NOT happen inside the tx — see the
+      // post-commit block below.
+      let prLinkedConversationId: string | null = null;
+      let prLinkedWorkspaceId: string | null = null;
+      if (run.conversationId) {
+        const prSuccess = findSuccessfulPrCreation(normalizedMessages);
+        if (prSuccess) {
+          const linkResult = await supportDrafts.linkPullRequest(tx, {
+            workspaceId: run.workspaceId,
+            conversationId: run.conversationId,
+            prUrl: prSuccess.prUrl,
+            prNumber: prSuccess.prNumber,
+          });
+          if (linkResult.linked && !linkResult.alreadyLinked) {
+            prLinkedConversationId = run.conversationId;
+            prLinkedWorkspaceId = run.workspaceId;
+          }
+        }
+      }
+
+      const snapshot = await getRunProgressSnapshot(tx, input.runId);
+      return { snapshot, recordedEvents, prLinkedConversationId, prLinkedWorkspaceId };
+    });
+
+  // Post-commit: emit realtime invalidation only after the tx succeeded so
+  // SSE subscribers cannot see a refresh for a write that was rolled back.
+  if (prLinkedConversationId && prLinkedWorkspaceId) {
+    await emitConversationChanged({
+      workspaceId: prLinkedWorkspaceId,
+      conversationId: prLinkedConversationId,
+      reason: SUPPORT_REALTIME_REASON.prLinked,
+    });
+  }
 
   logRecordedEvents(recordedEvents);
   return snapshot;
+}
+
+interface PrSuccessSummary {
+  prUrl: string;
+  prNumber: number;
+}
+
+// Scan turn messages for the first create_pull_request structured tool
+// result whose payload validates as success. Returns null when:
+//   - no tool result message has a toolStructuredResult metadata key
+//   - the structured result is for a different tool
+//   - the structured result reports failure
+//
+// Exported for unit testing. Callers should still go through
+// persistRoleTurnResult which performs the linkPullRequest write.
+export function findSuccessfulPrCreation(
+  messages: AgentTeamDialogueMessageDraft[]
+): PrSuccessSummary | null {
+  for (const message of messages) {
+    if (message.kind !== AGENT_TEAM_MESSAGE_KIND.toolResult) continue;
+    const structured = readToolStructuredResult(message.metadata);
+    if (!structured) continue;
+    if (structured.kind !== "create_pull_request") continue;
+    if (!structured.result.success) continue;
+    return {
+      prUrl: structured.result.prUrl,
+      prNumber: structured.result.prNumber,
+    };
+  }
+  return null;
 }
 
 export async function getRunProgress(runId: string): Promise<RunProgressSnapshot> {
