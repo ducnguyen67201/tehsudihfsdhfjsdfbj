@@ -122,6 +122,11 @@ npm run dev:web
 npm run dev:queue
 ```
 
+Dev commands (`npm run dev`, `npm run dev:web`, `npm run dev:queue`, `npm run dev:agents`,
+and their `doppler:dev*` variants) gate on `npm run db:check-drift` — they fail
+fast with a clear remediation message if your local DB schema is out of sync
+with committed migrations. See `docs/conventions/dev-drift-check.md`.
+
 ## Type Safety Rules (Non-Negotiable)
 
 - **No `any` types. No `as unknown as` casts.** Every variable, parameter, and return value must have an explicit or inferred type. If a helper function loses type information (e.g. generic returns `Record<string, unknown>`), fix the helper's generics or use a follow-up query with proper includes instead of casting. Type assertions (`as`) are a last resort for third-party library boundaries only — never for internal code.
