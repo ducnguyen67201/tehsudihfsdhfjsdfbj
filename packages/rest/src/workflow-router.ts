@@ -31,5 +31,6 @@ export async function dispatchWorkflow(
     return dispatcher.startSendDraftToSlackWorkflow(parsed.payload);
   }
 
-  return dispatcher.startCodexWorkflow(parsed.payload);
+  const exhaustiveCheck: never = parsed;
+  throw new Error(`Unsupported workflow dispatch request: ${JSON.stringify(exhaustiveCheck)}`);
 }
