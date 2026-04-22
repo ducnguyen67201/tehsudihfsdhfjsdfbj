@@ -30,15 +30,17 @@ Read these when relevant:
 
 - `business/gtm/call-notes-template.md` for discovery calls
 - `business/gtm/learnings.md` when updating patterns after replies or calls
+- the outreach tracker when the user shares it or references the live sheet
 
 ## Purpose
 
-Use this skill to help with four jobs:
+Use this skill to help with five jobs:
 
 1. find candidate companies
 2. find the founder to contact
 3. score whether the lead is worth messaging
 4. draft a short, founder-specific DM
+5. turn scored leads into the next concrete outreach actions
 
 The current wedge is narrow on purpose. Do not broaden it unless the repo docs
 have been updated.
@@ -52,7 +54,20 @@ Before sourcing or writing copy, restate the current target in one sentence.
 If the request would push beyond the current wedge, say so and keep the output
 anchored to the documented ICP unless the user explicitly wants to change it.
 
-### 2. Source Companies
+### 2. Check The Tracker Before Sourcing
+
+If the tracker is available, inspect it before doing new research.
+
+Default operating order:
+
+- if there are `8+` scored leads with no DM sent, prioritize messaging them now
+- if there are open follow-ups, write those before sourcing new names
+- only source fresh leads when the current message queue is thin or exhausted
+
+The goal is to avoid doing more list-building when the real bottleneck is
+execution.
+
+### 3. Source Companies
 
 Prefer the cheapest-good stack documented in `business/gtm/sourcing-playbook.md`:
 
@@ -66,7 +81,15 @@ When sourcing companies:
 - avoid consumer apps, agencies, generic marketplaces, and obviously too-large teams
 - only keep companies where you can form a pain hypothesis about founder-led support
 
-### 3. Find and Qualify the Founder
+Warm-signal refinement:
+
+- intent signals can raise priority, but they do not replace ICP fit
+- treat recent hiring, funding, product launches, support-heavy product updates,
+  and founder posts about customers or bugs as useful tie-breakers
+- do not keep a lead just because they engaged with "AI" content or a competitor
+- when possible, separate `fit` from `why now`
+
+### 4. Find and Qualify the Founder
 
 For each company, look for:
 
@@ -81,7 +104,14 @@ Before accepting a lead, write one sentence answering:
 
 If that sentence is weak, the lead is weak.
 
-### 4. Score the Lead
+Then write one sentence answering:
+
+`What public signal suggests they may already be trying to solve it now?`
+
+If there is no signal, say `No clear public intent signal found` instead of
+inventing one.
+
+### 5. Score the Lead
 
 Use `business/gtm/lead-scoring-rubric.md`.
 
@@ -91,6 +121,8 @@ Default output per lead:
 - founder
 - one-line pain hypothesis
 - score out of `10`
+- intent signal: `high`, `medium`, or `low`
+- one-line why-now reason
 - short reason for the score
 
 Default recommendation:
@@ -99,7 +131,7 @@ Default recommendation:
 - `5-7` keep as backup
 - `0-4` skip
 
-### 5. Draft the DM
+### 6. Draft The Outreach Sequence
 
 Use `business/gtm/outreach-copy.md` as the base voice.
 
@@ -110,13 +142,23 @@ Rules:
 - do not ask for a demo
 - personalize the first line when possible
 - optimize for a reply, not a conversion
+- use curiosity first, proof second
+
+Sequence rules:
+
+- first touch: `2-4` short lines, ending in one easy question
+- follow-up: brief bump tied to the same pain hypothesis, not a new pitch
+- positive reply: mirror their language, then ask for a short chat
+- only offer a Loom, example, or product detail after interest is confirmed
 
 When drafting outreach, output:
 
-- the DM
+- the first-touch DM
+- the follow-up DM
+- the reply-handling DM if they respond with pain or curiosity
 - one sentence explaining why it fits this founder
 
-### 6. Update the Tracker or Prepare Rows
+### 7. Update the Tracker or Prepare Rows
 
 If the user provides a tracker destination, update it directly.
 
@@ -133,7 +175,20 @@ If not, return rows that can be pasted into the tracker with these fields:
 - Pain Guess
 - Fit Score
 
-### 7. Capture Learnings
+When the tracker already exists, prefer adding execution guidance alongside the
+rows:
+
+- recommended send order
+- personalization hook
+- next action
+
+If the tracker has room for extra fields, prefer adding:
+
+- `Intent Signal`
+- `Why Now`
+- `Signal Source`
+
+### 8. Capture Learnings
 
 After real replies or calls, summarize the signal into `business/gtm/learnings.md`
 or propose the exact update.
@@ -151,6 +206,7 @@ Prioritize:
 - Do not call a founder a good lead without a concrete pain hypothesis.
 - Do not write long generic outreach.
 - Do not confuse curiosity with painful demand.
+- Do not confuse generic startup activity with intent.
 - Ten sharp leads beat one hundred vague ones.
 
 ## Default Deliverables
@@ -159,14 +215,16 @@ For sourcing tasks, return the best concise artifact for the user's request:
 
 - `Top leads`: table of `5-10` qualified founders with scores and pain hypotheses
 - `Lead review`: scored keep/skip recommendation
-- `Outreach draft`: `1-3` DMs and optional follow-up
+- `Message queue`: the next `3-5` leads to contact, in order, with one-line why now
+- `Outreach draft`: first-touch, follow-up, and reply-handling DMs
 - `Tracker update`: rows written or ready to paste
 
 ## Completion Checklist
 
 - ICP was used explicitly
+- tracker was checked first when available
 - every lead has a one-line reason
 - every lead has a score
 - every DM is short and specific
+- the next action is obvious
 - tracker rows or structured output are ready to use
-
