@@ -10,13 +10,17 @@ import {
 } from "@shared/types";
 import { useCallback, useEffect, useState } from "react";
 
+interface StartRunOptions {
+  analysisId?: string;
+}
+
 interface UseAgentTeamRunResult {
   run: AgentTeamRunSummary | null;
   isLoading: boolean;
   isMutating: boolean;
   isStreaming: boolean;
   error: string | null;
-  startRun: () => Promise<void>;
+  startRun: (options?: StartRunOptions) => Promise<void>;
   refetch: () => Promise<void>;
 }
 
@@ -63,27 +67,33 @@ export function useAgentTeamRun(
     }
   }, [conversationId]);
 
-  const startRun = useCallback(async () => {
-    if (!conversationId) {
-      return;
-    }
+  const startRun = useCallback(
+    async (options?: StartRunOptions) => {
+      if (!conversationId) {
+        return;
+      }
 
-    setError(null);
-    setIsMutating(true);
+      setError(null);
+      setIsMutating(true);
 
-    try {
-      const created = await trpcMutation<StartAgentTeamRunInput, AgentTeamRunSummary>(
-        "agentTeam.startRun",
-        { conversationId },
-        { withCsrf: true }
-      );
-      setRun(created);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to start agent-team run");
-    } finally {
-      setIsMutating(false);
-    }
-  }, [conversationId]);
+      try {
+        const created = await trpcMutation<StartAgentTeamRunInput, AgentTeamRunSummary>(
+          "agentTeam.startRun",
+          {
+            conversationId,
+            ...(options?.analysisId ? { analysisId: options.analysisId } : {}),
+          },
+          { withCsrf: true }
+        );
+        setRun(created);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to start agent-team run");
+      } finally {
+        setIsMutating(false);
+      }
+    },
+    [conversationId]
+  );
 
   useEffect(() => {
     void fetchLatest();

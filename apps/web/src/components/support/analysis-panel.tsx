@@ -7,9 +7,19 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import { useAgentTeamRun } from "@/hooks/use-agent-team-run";
 import { useAnalysisStream } from "@/hooks/use-analysis-stream";
-import type { SupportAnalysisWithRelations } from "@shared/types";
+import { AGENT_TEAM_RUN_STATUS, type SupportAnalysisWithRelations } from "@shared/types";
 import { useState } from "react";
+
+// Statuses where a fix-team run is in flight: a new run would race the old.
+// `waiting` blocks too because the team is parked on an open question — adding
+// a parallel run would just confuse the operator.
+const ACTIVE_RUN_STATUSES: ReadonlyArray<string> = [
+  AGENT_TEAM_RUN_STATUS.queued,
+  AGENT_TEAM_RUN_STATUS.running,
+  AGENT_TEAM_RUN_STATUS.waiting,
+];
 
 interface AnalysisPanelProps {
   analysis: SupportAnalysisWithRelations | null;
@@ -46,6 +56,12 @@ export function AnalysisPanel({
     analysisId: isAnalyzing ? (analysis?.id ?? null) : null,
     enabled: isAnalyzing,
   });
+
+  // Agent-team run status drives the "Run fix team" button + a small inline
+  // status pill. Hook lazily fetches the latest run for the conversation
+  // and subscribes to its SSE stream while one is active.
+  const agentTeamRun = useAgentTeamRun(conversationId, workspaceId);
+  const teamRunActive = agentTeamRun.run && ACTIVE_RUN_STATUSES.includes(agentTeamRun.run.status);
 
   // State: no analysis yet
   if (!analysis && !isAnalyzing) {
@@ -128,6 +144,34 @@ export function AnalysisPanel({
         >
           Suggested fix: PR #{draft.prNumber} →
         </a>
+      )}
+
+      {/* Run-fix-team trigger. Shown only when an analysis exists and no run
+          is in flight. We pass analysisId so the eventual run is correlated
+          with the analysis the operator is looking at. */}
+      {analysis && !teamRunActive && (
+        <div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void agentTeamRun.startRun({ analysisId: analysis.id })}
+            disabled={agentTeamRun.isMutating || agentTeamRun.isLoading}
+            data-testid="run-fix-team"
+          >
+            {agentTeamRun.run ? "Run fix team again" : "Run fix team"}
+          </Button>
+          {agentTeamRun.error && (
+            <p className="mt-1 text-xs text-destructive">{agentTeamRun.error}</p>
+          )}
+        </div>
+      )}
+
+      {/* In-flight pill so the operator knows the team is working without
+          having to scroll to the agent-team panel. */}
+      {teamRunActive && agentTeamRun.run && (
+        <Badge variant="outline" className="text-xs font-mono">
+          Fix team: {agentTeamRun.run.status.toLowerCase()}
+        </Badge>
       )}
 
       <Separator />

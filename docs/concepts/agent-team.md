@@ -80,13 +80,23 @@ Schema in `packages/database/prisma/schema/agent-team.prisma`:
 
 ## Trigger surface
 
-Today the only entry point is the `agentTeam.startRun` tRPC mutation,
-called from the operator UI. Inputs:
+The entry point is the `agentTeam.startRun` tRPC mutation. Inputs:
 
 - `conversationId` (required)
 - `teamId` (optional — defaults to the workspace's `isDefault` team)
 - `analysisId` (optional — links the run to a specific analysis so the
   UI can correlate)
+
+It is called from two places in the operator UI:
+
+1. **"Run fix team" button on the analysis panel**
+   (`apps/web/src/components/support/analysis-panel.tsx`). Visible
+   whenever an analysis exists and no run is in flight (queued/running/
+   waiting). Passes the current analysisId. The button label flips to
+   "Run fix team again" once a previous run has terminated. While a run
+   is in flight, an inline pill shows `Fix team: queued | running |
+   waiting` so the operator knows without scrolling.
+2. The standalone agent-team panel for ad-hoc runs.
 
 There is **no auto-trigger** on draft approval. Adding one would mean
 a new LLM run per approved bug-fix draft — defer that until we have
