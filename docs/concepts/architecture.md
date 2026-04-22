@@ -87,9 +87,18 @@ Slack event webhook
                                                ├─▶ persist SupportAnalysis
                                                ├─▶ persist SupportDraft (AWAITING_APPROVAL)
                                                └─▶ pg_notify → SSE → inbox UI
+
+[Optional follow-up — operator clicks "Run fix team"]
+
+  agentTeam.startRun (tRPC)
+       └─▶ Temporal dispatch: agentTeamRun workflow (TASK_QUEUES.CODEX)
+            └─▶ multi-role loop (architect, code_reader, reviewer, pr_creator, rca_analyst)
+                 └─▶ tool: createPullRequest → codex.createDraftPullRequest (Octokit)
+                      └─▶ on success: supportDrafts.linkPullRequest (in tx)
+                           └─▶ post-commit: pg_notify (PR_LINKED) → inbox refreshes prUrl
 ```
 
-See `slack-ingestion.md`, `thread-grouping.md`, `ai-analysis-pipeline.md`, `ai-draft-generation.md`.
+See `slack-ingestion.md`, `thread-grouping.md`, `ai-analysis-pipeline.md`, `ai-draft-generation.md`, `agent-team.md`.
 
 ### Browser session → correlation → evidence (session replay)
 

@@ -147,10 +147,40 @@ Plus `citations`: an array of `{ file, line, snippet }` references from the code
 - **`SENT` and `DISMISSED` are terminal.** A terminal draft cannot be edited, reused, or re-sent. Re-sending requires a new draft (typically via re-analysis).
 - **`SEND_FAILED` retries return to `APPROVED`, keeping the same `slackClientMsgId`.** Reconciliation still works after retry because the idempotency key is preserved.
 
+## Linking a follow-up PR
+
+The `prUrl` and `prNumber` columns on `SupportDraft` are populated when an
+**agent-team run** finishes a successful `create_pull_request` tool call.
+Today this is the only writer to those fields.
+
+Mechanism:
+
+1. Operator clicks "Run fix team" on the analysis panel (PR 6 wires the button).
+2. `agent-team-run` workflow runs the multi-role pipeline; the `pr-creator` role
+   may invoke the `create_pull_request` tool, which calls
+   `codex.createDraftPullRequest()` against Octokit.
+3. The agent service attaches the typed result under
+   `metadata.toolStructuredResult` on the `tool_result` dialogue message
+   (validated against `createDraftPullRequestResultSchema`).
+4. `persistRoleTurnResult` activity scans turn messages for that structured
+   result and, inside the same transaction that writes the events, calls
+   `supportDrafts.linkPullRequest(tx, …)` to set `prUrl`/`prNumber` on the
+   most operator-relevant draft for the conversation. Selection rule:
+   `AWAITING_APPROVAL > APPROVED > SENT`, ties broken by `createdAt DESC`.
+5. After the transaction commits, the activity emits
+   `supportRealtime.emitConversationChanged({reason: "PR_LINKED"})` so the
+   inbox SSE stream invalidates the panel and the link appears.
+
+The Slack reply is **not modified** when a PR is linked after the draft is
+already SENT. The PR link renders in a distinct "Suggested fix" row in
+`analysis-panel.tsx`, so the operator sees it as a follow-up artefact, not
+as part of the original reply.
+
 ## Related concepts
 
 - `ai-analysis-pipeline.md` — how the draft is born inside the analysis loop
 - `support-conversation-fsm.md` — the parallel state machine for the enclosing conversation
+- `agent-team.md` — the multi-role pipeline that produces the PR link
 - `codex-search.md` — where `citations` come from
 
 ## Keep this doc honest
@@ -161,3 +191,4 @@ Update when you:
 - Change the reconciliation algorithm or `client_msg_id` usage
 - Change the dismiss reason schema
 - Start generating drafts in a separate LLM call instead of inline
+- Change which writer sets `prUrl`/`prNumber` or how the link surfaces in the UI
