@@ -1,6 +1,6 @@
 {
   "name": "trustloop",
-  "version": "0.1.0",
+  "version": "0.2.9.0",
   "private": true,
   "type": "module",
   "packageManager": "npm@11.6.2",
@@ -28,9 +28,11 @@
     "test": "turbo run test",
     "db:generate": "npm --workspace @shared/database run db:generate && npm --workspace @shared/types run prisma:sync",
     "db:migrate": "npm --workspace @shared/database run db:migrate",
+    "db:migrate:deploy": "npm --workspace @shared/database run db:migrate:deploy",
     "db:new-workspace": "npm --workspace @shared/database run db:new-workspace --",
     "openapi:generate": "npm --workspace @shared/rest run openapi:generate",
     "openapi:check": "npm --workspace @shared/rest run openapi:check",
+    "check:docs": "node scripts/check-docs-frontmatter.mjs && node scripts/check-docs-links.mjs",
     "clean:artifacts": "rm -rf .turbo apps/*/.turbo packages/*/.turbo apps/*/dist packages/*/dist apps/web/.next coverage && find . -name '*.tsbuildinfo' -type f -delete",
     "prepare": "husky"
   },
@@ -47,5 +49,13 @@
     "turbo": "^2.5.0",
     "typescript": "^5.9.0",
     "vitest": "^3.1.1"
+  },
+  "optionalDependencies": {
+    "@swc/core-linux-arm64-gnu": "1.15.21",
+    "@swc/core-linux-x64-gnu": "1.15.21",
+    "@node-rs/argon2-linux-arm64-gnu": "2.0.2",
+    "@node-rs/argon2-linux-x64-gnu": "2.0.2",
+    "@tailwindcss/oxide-linux-arm64-gnu": "4.2.2",
+    "@tailwindcss/oxide-linux-x64-gnu": "4.2.2"
   }
 }

@@ -1,4 +1,6 @@
 import { env } from "@shared/env";
+import { buildTemporalConnectionOptions } from "@shared/rest/temporal-connection";
+import { TASK_QUEUES } from "@shared/types";
 import { Client, type Connection } from "@temporalio/client";
 
 const SCHEDULE_ID = "agent-team-event-archive";
@@ -42,7 +44,7 @@ export async function registerAgentTeamArchiveSchedule(
     action: {
       type: "startWorkflow",
       workflowType: "agentTeamArchiveWorkflow",
-      taskQueue: env.TEMPORAL_TASK_QUEUE,
+      taskQueue: TASK_QUEUES.CODEX,
       args: [{ retentionDays: DEFAULT_RETENTION_DAYS }],
     },
   });
@@ -55,13 +57,13 @@ async function main(): Promise<void> {
   // Late import so the file-with-side-effects doesn't execute when imported
   // from worker-runtime.ts; only the exported function matters there.
   const { Connection } = await import("@temporalio/client");
-  const connection: Connection = await Connection.connect({ address: env.TEMPORAL_ADDRESS });
+  const connection: Connection = await Connection.connect(buildTemporalConnectionOptions());
   const client = new Client({ connection, namespace: env.TEMPORAL_NAMESPACE });
 
   const { existed } = await registerAgentTeamArchiveSchedule(client);
   console.log(
     `${existed ? "Updated" : "Created"} schedule "${SCHEDULE_ID}" → ${CRON_EXPRESSION} ` +
-      `(retention ${DEFAULT_RETENTION_DAYS}d, queue ${env.TEMPORAL_TASK_QUEUE})`
+      `(retention ${DEFAULT_RETENTION_DAYS}d, queue ${TASK_QUEUES.CODEX})`
   );
   await connection.close();
 }

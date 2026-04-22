@@ -1,5 +1,57 @@
 # TODOS
 
+## Doc Philosophy Enforcement
+
+### Scoped `AGENTS.md` per subtree
+
+**What:** Add a scoped `AGENTS.md` under `apps/web/`, `apps/queue/`, `apps/agents/`, `packages/rest/`, `packages/types/`, `packages/database/`. Each file lists the rules that apply inside that subtree (e.g. "all Prisma reads/writes go through services", "no direct `prisma.*` calls in routers"). Mirror openclaw/openclaw's per-subtree AGENTS.md pattern.
+
+**Why:** Root AGENTS.md is 450+ lines and agents don't always read it end-to-end for scoped tasks. Per-subtree files let agents pull only the rules relevant to the file they're editing. Openclaw's "no plans committed" discipline holds because every subtree enforces its own rules; TrustLoop just adopted "no plans" but lacks the matching enforcement structure.
+
+**Context:** Deferred from the 2026-04-21 docs-cleanup /autoplan. Both CEO dual voices flagged that a philosophy section without scoped enforcement will erode.
+
+**Effort:** M (human) / M (CC — ~1 hour per subtree, 6 subtrees)
+**Priority:** P2
+**Depends on:** Nothing. Do as small PRs, one subtree at a time.
+
+### CI lint blocking forward-looking doc patterns
+
+**What:** Add a CI check that fails the build if any of: `docs/plans/**/*.md`, `docs/specs/**/*.md`, `docs/domains/**/*.md`, `docs/**/impl-plan-*.md`, `docs/**/spec-*.md` (outside `docs/conventions/`), `docs/**/design-*.md`, `docs/**/impl-*.md` (outside `docs/conventions/`) exist.
+
+**Why:** The Doc Philosophy section in AGENTS.md is prose-only. Without mechanical enforcement, a contributor (or an AI agent following old habits) will recreate `docs/plans/impl-plan-*.md` within months. A CI guard catches it at PR time.
+
+**Context:** Deferred from the 2026-04-21 docs-cleanup /autoplan. CEO dual voices (Claude + Codex) both flagged this as the missing enforcement layer.
+
+**Effort:** S (human: ~30 min / CC: ~10 min)
+**Priority:** P3
+**Depends on:** Nothing.
+
+## AI Analysis
+
+### Per-workspace Sentry adapter (only if a paying customer asks)
+
+**What:** A per-workspace BYO-Sentry integration. OAuth or PAT, encrypted token in a new `sentryConnection` table, `getConfig(workspaceId)` lookup, gated `searchSentry` tool registration when a workspace has a connection. Mirrors the existing GitHub install pattern.
+
+**Why:** The original env-based Sentry tool was removed on 2026-04-19 because it leaked across tenants and duplicated SDK-collected signals. A per-workspace adapter is fine to revisit if an enterprise customer with existing Sentry history asks for cross-correlation. Until then, the SDK is the source.
+
+**Context:** Removed on 2026-04-19. Both /autoplan dual-voice CEO/Eng reviews recommended disconnect-first; user chose hard-delete and accepted the rebuild cost if BYO-Sentry returns.
+
+**Effort:** M (human) / S (CC)
+**Priority:** P3
+**Depends on:** A paying customer explicitly asking for it.
+
+### Wire rrweb chunks into the agent prompt
+
+**What:** Frames at the failure timestamp = "the agent saw what the user saw." Pull the rrweb session replay chunk corresponding to the failure point, render keyframes, inject into the prompt context.
+
+**Why:** Natural follow-up to the Sentry removal. Rrweb is already captured by `packages/sdk-browser/src/recorder.ts` and stored in `sessionReplayChunk` — but never reaches the agent. This is the highest-leverage upgrade to draft quality.
+
+**Context:** Flagged in `/autoplan` cross-phase themes as the natural follow-up to Sentry removal. Out of scope for that PR.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** Sentry removal (done in chore/remove-sentry-integration).
+
 ## Auth & Onboarding
 
 ### Self-serve workspace creation UI
@@ -54,11 +106,37 @@ When you pick this up: add a `hostedDomain String?` field to `Workspace`, pass i
 **Priority:** P3
 **Depends on:** Billing/metering work shipping (Deliverable D in the MVP plan).
 
+## Auth
+
+### Lock read-side of support routers against workspace API keys
+
+**What:** `supportInboxRouter.listConversations`, `supportInboxRouter.getConversationTimeline`, `supportAnalysisRouter.getLatestAnalysis`, and the `sessionReplayRouter` queries (`list`, `getEvents`, `correlate`, `getSession`, `getReplayChunks`) all ride `workspaceProcedure`, which still accepts workspace API keys (`tlk_*`). After the operator-mutation role gate, mutations are safe — but reads still expose conversation timelines (operator reply bodies, draft content), analysis output (override reasons, suggested drafts), and session replay events (user email, click streams) to any holder of a valid workspace API key.
+
+**Why:** Workspace API keys are intended for customer-facing ingest endpoints (SDK ingestion, webhook inbound). They are not meant to read operator-private data. A leaked key today means the attacker can tail every customer support conversation.
+
+**Context:** Flagged by both Claude + Codex adversarial reviewers during `/ship` on 2026-04-19 (commit locking operator mutations). The mutation fix was landed; reads were scoped to a follow-up at user direction. Cited files: `packages/rest/src/support-inbox-router.ts:31,43`, `packages/rest/src/support-analysis-router.ts:41`, `packages/rest/src/session-replay-router.ts:7,48,78,141,155`.
+
+When you pick this up: the mechanical fix is to route the listed queries through `workspaceRoleProcedure(WORKSPACE_ROLE.MEMBER)` (same pattern used by the mutations). The larger design question is whether to split `workspaceProcedure` into two explicit variants (`workspaceSessionProcedure` for user-UI reads, `workspaceApiKeyProcedure` for SDK/ingest endpoints with a scope check) so the "API keys can't read operator data" invariant is enforced structurally rather than procedure-by-procedure.
+
+**Effort:** S (human: ~2 hr / CC: ~20 min)
+**Priority:** P1 — actively exposed read path in a pre-product auth model.
+**Depends on:** None.
+
+### Stale role cache after workspace membership demotion
+
+**What:** `ctx.role` is captured once at context build from `resolveWorkspaceContext`. A user demoted ADMIN→MEMBER or removed from a workspace mid-session keeps operating at the old role until the session cookie expires.
+
+**Why:** Flagged by Claude adversarial review on 2026-04-19. Not a currently-exploitable hole (demotion requires an admin action and the user has to still have a session), but it's a silent privilege persistence bug that matters when a workspace rotates staff. `packages/rest/src/context.ts:31-42` reads membership per-request — actually confirmed by Codex to be read every request. Re-validate this claim before shipping a fix; if per-request, the risk is lower than Claude's finding implied.
+
+**Effort:** S (human: ~1 hr / CC: ~15 min)
+**Priority:** P2
+**Depends on:** Verifying the per-request membership read claim.
+
 ## Code Indexing
 
 ### Unified Escalation Timeline Panel
 
-**What:** Build a single timeline that stitches Slack messages, Sentry events, Linear updates, Git activity, and index freshness into one chronological view.
+**What:** Build a single timeline that stitches Slack messages, in-product SDK session events, Linear updates, Git activity, and index freshness into one chronological view.
 
 **Why:** On-call engineers currently context-switch across tools; this deferred expansion unlocks faster root-cause analysis and safer PR intent decisions.
 
@@ -66,7 +144,7 @@ When you pick this up: add a `hostedDomain String?` field to `Workspace`, pass i
 
 **Effort:** L
 **Priority:** P2
-**Depends on:** Shipping the v1 indexing/search foundation and event ingestion contracts (Slack/Sentry/Linear/GitHub)
+**Depends on:** Shipping the v1 indexing/search foundation and event ingestion contracts (Slack/SDK session events/Linear/GitHub)
 
 ### No-Flag Rollout Runbook + Rollback Drill
 
@@ -79,6 +157,32 @@ When you pick this up: add a `hostedDomain String?` field to `Workspace`, pass i
 **Effort:** M
 **Priority:** P1
 **Depends on:** Initial indexing/search implementation branch reaching deployable state
+
+## Prompting
+
+### Promote `threadSnapshot` from pre-rendered string to typed prompt context
+
+**What:** Change the support-analysis request boundary so `threadSnapshot` is no longer flattened to a pretty-printed JSON string in queue before it reaches the agents service. Pass a typed object instead, and let the prompt renderer own the final JSON or TOON serialization choice.
+
+**Why:** The TOON prompt-foundation review found that the biggest structured input is still upstream-pre-rendered as a string, which limits how much leverage any serializer can have. Until this boundary is fixed, prompt rendering only owns part of the structured-input problem.
+
+**Context:** Deferred during TOON prompt foundation work on 2026-04-19. The approved path keeps PR 1 local to `apps/agents` and avoids hiding a larger queue/types/agents contract rewrite inside the serializer refactor.
+
+**Effort:** M (human) / S-M (CC)
+**Priority:** P2
+**Depends on:** Local prompt renderer seam landing first.
+
+### Extract prompt renderer to a shared package after a second real consumer exists
+
+**What:** Move the prompt document model and serializer helpers out of `apps/agents` into a dedicated shared package once another runtime or a second materially different agent prompt needs the same rendering layer.
+
+**Why:** Shared abstractions are worth it when reuse is real. Doing it earlier turns one prompt refactor into a mini-platform project with extra maintenance surface and weaker local clarity.
+
+**Context:** Deferred during TOON prompt foundation work on 2026-04-19. The review explicitly narrowed scope away from `packages/types` for renderer-local concerns.
+
+**Effort:** S (human) / S (CC)
+**Priority:** P3
+**Depends on:** A second prompt/runtime proving reuse.
 
 ## Slack Ingestion
 
@@ -287,6 +391,20 @@ When you pick this up: the `AgentTeamRunEvent` table already supports JSONB payl
 **Depends on:** `AgentTeamRunEvent` table shipped, S3 credentials configured.
 
 ## Completed
+
+### Lock operator mutations + remove unauthenticated `dispatchWorkflow` tRPC procedure
+
+**What:** Two related auth holes closed in one PR:
+
+1. **Operator mutation role-gate.** `supportInboxRouter` (6 mutations: `assignConversation`, `updateConversationStatus`, `markDoneWithOverrideReason`, `retryDelivery`, `sendReply`, `toggleReaction`) and `supportAnalysisRouter` (3 mutations: `triggerAnalysis`, `approveDraft`, `dismissDraft`) moved from `workspaceProcedure` to `workspaceRoleProcedure(WORKSPACE_ROLE.MEMBER)`. `workspaceRoleProcedure` now explicitly rejects non-session actors with `UNAUTHORIZED`.
+
+2. **Removed unauthenticated workflow dispatch from tRPC.** `dispatchWorkflow` was mounted on `publicProcedure` in `packages/rest/src/router.ts`, letting any unauthenticated caller enqueue support, support-analysis, send-draft-to-slack, codex, and repository-index workflows (including posting arbitrary messages into customer Slack channels via send-draft-to-slack). Zero callers used the tRPC procedure. Removed it entirely; internal dispatch now lives exclusively at the authenticated REST endpoint `/api/rest/workflows/dispatch` (protected by `withServiceAuth`).
+
+**Implementation:** `packages/rest/src/trpc.ts` — `workspaceRoleProcedure` asserts `ctx.session && ctx.user` and narrows downstream ctx. `packages/rest/src/support-inbox-router.ts` + `packages/rest/src/support-analysis-router.ts` — `operatorProcedure = workspaceRoleProcedure(WORKSPACE_ROLE.MEMBER)` alias, dropped `ctx.apiKeyAuth?.keyId ?? "system"` fallback. `packages/rest/src/router.ts` — removed the `dispatchWorkflow` procedure. `packages/rest/test/procedure-auth.test.ts` — 6 regression tests.
+
+**Tests:** 178 tests in rest package still pass. Full monorepo type-check clean.
+
+**Completed:** 2026-04-19. Mutation hole flagged by Codex during /autoplan eng review of the SupportConversation FSM plan; `dispatchWorkflow` hole flagged by Codex during /ship adversarial pass (on the same day, scope expanded by user at the /ship gate).
 
 ### Tighten bot-message filter to installation.botUserId
 

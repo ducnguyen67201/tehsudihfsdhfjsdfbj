@@ -27,5 +27,9 @@ export async function dispatchWorkflow(
     return dispatcher.startAgentTeamRunWorkflow(parsed.payload);
   }
 
+  if (parsed.type === "send-draft-to-slack") {
+    return dispatcher.startSendDraftToSlackWorkflow(parsed.payload);
+  }
+
   return dispatcher.startCodexWorkflow(parsed.payload);
 }

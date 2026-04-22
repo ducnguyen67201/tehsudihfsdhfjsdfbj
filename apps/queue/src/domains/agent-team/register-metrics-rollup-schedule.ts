@@ -1,4 +1,6 @@
 import { env } from "@shared/env";
+import { buildTemporalConnectionOptions } from "@shared/rest/temporal-connection";
+import { TASK_QUEUES } from "@shared/types";
 import { Client, type Connection } from "@temporalio/client";
 
 const SCHEDULE_ID = "agent-team-metrics-rollup";
@@ -37,7 +39,7 @@ export async function registerAgentTeamMetricsRollupSchedule(
     action: {
       type: "startWorkflow",
       workflowType: "agentTeamMetricsRollupWorkflow",
-      taskQueue: env.TEMPORAL_TASK_QUEUE,
+      taskQueue: TASK_QUEUES.CODEX,
       args: [{}],
     },
   });
@@ -46,13 +48,13 @@ export async function registerAgentTeamMetricsRollupSchedule(
 
 async function main(): Promise<void> {
   const { Connection } = await import("@temporalio/client");
-  const connection: Connection = await Connection.connect({ address: env.TEMPORAL_ADDRESS });
+  const connection: Connection = await Connection.connect(buildTemporalConnectionOptions());
   const client = new Client({ connection, namespace: env.TEMPORAL_NAMESPACE });
 
   const { existed } = await registerAgentTeamMetricsRollupSchedule(client);
   console.log(
     `${existed ? "Updated" : "Created"} schedule "${SCHEDULE_ID}" → ${CRON_EXPRESSION} ` +
-      `(queue ${env.TEMPORAL_TASK_QUEUE})`
+      `(queue ${TASK_QUEUES.CODEX})`
   );
   await connection.close();
 }

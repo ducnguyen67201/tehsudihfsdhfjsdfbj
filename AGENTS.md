@@ -30,10 +30,12 @@ Use **3 deployed services**:
    - runs agent reasoning loops (OpenAI Agents SDK, migrating to Mastra)
    - tools call back to TrustLoop search API or shared DB
 
-Use **2 Temporal task queues** (must stay separate):
+Use **2 Temporal task queues** (must stay separate). Names live in
+`packages/types/src/workflow.schema.ts` as `TASK_QUEUES` — not in env.
+Dispatcher and worker import the same constant so they can never drift.
 
-- `TEMPORAL_TASK_QUEUE` for support/inbox workflows
-- `CODEX_TASK_QUEUE` for codex indexing/fix-PR workflows
+- `TASK_QUEUES.SUPPORT` → support/inbox workflows
+- `TASK_QUEUES.CODEX` → codex indexing/fix-PR workflows
 
 Queue-level isolation is mandatory even if both are run in one worker runtime.
 
@@ -124,6 +126,7 @@ npm run dev:queue
 
 - **No `any` types. No `as unknown as` casts.** Every variable, parameter, and return value must have an explicit or inferred type. If a helper function loses type information (e.g. generic returns `Record<string, unknown>`), fix the helper's generics or use a follow-up query with proper includes instead of casting. Type assertions (`as`) are a last resort for third-party library boundaries only — never for internal code.
 - **All apps must pass `tsc --noEmit` and `biome check`** before merge. This includes `apps/web`, `apps/queue`, and `apps/agents`.
+- **All app/runtime imports of `zod` must resolve to Zod 4 in every service (`web`, `queue`, `agents`).** Treat any service-specific Zod 3 resolution as a dependency/deploy mismatch bug. Shared app code may use Zod 4 APIs (`z.email()`, `z.url()`, `z.iso.datetime()`) freely. Transitive third-party packages may carry their own private Zod versions, but the app's direct `zod` import must stay on Zod 4 everywhere, including Docker/Railway builds.
 - Define request/response schemas in shared contracts (`packages/types`) with Zod.
 - Infer TypeScript types from Zod; do not duplicate DTOs per app.
 - Share workflow input/output payload types via `@shared/types`.
@@ -146,6 +149,18 @@ All LLM-generated structured output must use Positional JSON — compressed fiel
 - **Max nesting depth: 2 levels.** LLMs produce unreliable output beyond 2 levels of JSON nesting. If a field needs deeper structure, flatten it (e.g. `"filepath:line|snippet"` instead of `{"f":"filepath","l":line,"t":"snippet"}`). Arrays of primitives (strings, numbers) are fine. Arrays of objects are a smell — prefer flat encoded strings.
 - See `docs/conventions/spec-positional-json-format.md` for the full spec, reliability layers, and extension guide.
 
+### Prompt Input Format: TOON In, Positional JSON Out
+
+Prompt-side structured context should use TOON when it improves token efficiency, while LLM structured output must remain Positional JSON.
+
+- Canonical rule: **TOON in, Positional JSON out.**
+- Use TOON only for prompt/input serialization of structured data passed into the model.
+- Never ask the model to emit TOON. Model output contracts stay Positional JSON with Zod validation + reconstruction.
+- Shared prompt rendering and serialization utilities live in `packages/prompting`.
+- Prefer TOON for shallow, uniform structured payloads (for example arrays of similarly shaped records).
+- Fall back to JSON for deeply nested, irregular, or readability-sensitive payloads.
+- When format choice is dynamic, make the decision in the prompt renderer layer — not in feature code or output parsers.
+
 ### Contract source of truth order
 
 1. Zod schema
@@ -162,6 +177,37 @@ Do not manually maintain parallel OpenAPI and TS contracts for the same payload.
 - Set explicit activity timeouts.
 - Retry only transient failures with bounded backoff.
 - Fail fast on validation/configuration errors.
+- Classify activity failures in workflows by `ApplicationFailure.type` (or `ActivityFailure.cause.type`), not by string-matching `error.message`. Temporal reformats the envelope across the boundary; message prefixes are not a stable contract. Pair with `nonRetryableErrorTypes` in the retry policy so permanent errors fail fast.
+
+## State Machine Conventions
+
+Domain entities with non-trivial status transitions must be driven by a finite-state machine, not scattered `status: "..."` writes across services and activities.
+
+**Canonical pattern:** `packages/types/src/support/state-machines/draft-state-machine.ts` — pure `transition(context, event)` function, each state declares its `allowedEvents` list, illegal transitions throw `Invalid<Entity>TransitionError`. All writers (services, activities, workflows) call `transitionDraft(ctx, event)` to compute the next status — nobody writes the status column directly.
+
+**When to use:**
+- The entity has 4+ statuses AND at least one branching transition (not just a linear A → B → C).
+- Multiple call sites (service, activity, reconciler, sweep) can drive the status.
+- An illegal transition would be a real bug (double-send, skipped approval, race-lost update).
+
+**When NOT to use:**
+- Flat outbox-style tables (`PENDING → DISPATCHED/FAILED`) with a single writer — direct `updateMany` is simpler and equally safe.
+- Boolean flags with a timestamp (`deletedAt`, `completedAt`).
+- One-shot status that never revisits a prior state.
+
+**Rules:**
+- State machines live in `packages/types/src/<domain>/state-machines/<entity>-state-machine.ts`.
+- Status enum + `<entity>StatusValues` array live next to the schema (`<entity>.schema.ts`), imported by the machine — never re-declared.
+- Events are a discriminated union on `type`. Every event shape is exhaustively handled; use `default: throw new Invalid<Entity>TransitionError(...)`.
+- Transitions are pure: input context + event → next context. No I/O, no `Date.now()` captured at machine level — pass timestamps in via the event if needed.
+- Reconcile/retry paths get explicit events (`reconcileFound`, `retry`) — do not piggyback on the happy-path event.
+- Every new state and every new event needs a unit test in `packages/types/test/state-machines.test.ts`.
+
+Current machines:
+- `draft-state-machine.ts` (SupportDraft)
+
+Follow-ups the codebase would benefit from (not yet migrated):
+- `SupportAnalysis` status transitions.
 
 ## Database + Prisma Rules
 
@@ -374,14 +420,65 @@ A feature is done only when:
 
 ## Additional Docs
 
+- Big-picture architecture (start here):
+  - `docs/concepts/architecture.md`
 - Architecture/conventions baseline:
   - `docs/conventions/foundation-setup-and-conventions.md`
-- Implementation plan (MVP):
-  - `docs/plans/impl-plan-first-customer-happy-path-mvp.md`
 - Service layer conventions (namespace imports, naming rules, rollout status):
   - `docs/conventions/service-layer-conventions.md`
+- Full concept + conventions index:
+  - `docs/README.md`
+
+## Doc Philosophy
+
+Three pillars, no more:
+
+- **`docs/concepts/`** — architecture explainers. How each major piece of the
+  system works today, in present tense. Read these for big-picture understanding.
+  (slack-ingestion, thread-grouping, support-conversation-fsm, ai-analysis-pipeline,
+  ai-draft-generation, session-replay-capture, auth-and-workspaces, codex-search,
+  plus the master `architecture.md`.)
+- **`docs/conventions/`** — stable contracts and operating rules (service layer,
+  schemas, auth, formats). The rules you follow when you edit. Update alongside
+  code when contracts change.
+- **`docs/contracts/`** — generated schema artifacts (OpenAPI).
+
+Rules:
+
+- **No forward-looking spec/plan docs committed.** Planning happens in PR
+  descriptions, GitHub issues, or local `~/.gstack/projects/<slug>/` scratch.
+  Committed docs describe *current reality* only.
+- **No `impl-plan-*`, `spec-*`, `impl-*`, `design-*` files under `docs/` going
+  forward** — the `spec-*` files inside `docs/conventions/` are stable contracts
+  and stay. But don't add new `spec-*` prefixes anywhere else.
+- **Keep concept docs in sync with code.** When you change behavior that a
+  `docs/concepts/*.md` file describes, update that concept doc in the **same
+  PR** as the code change. Every concept doc ends with a "Keep this doc honest"
+  checklist listing the conditions that should trigger an update. If you catch
+  yourself skipping that step, stop and update the doc — rotten concept docs
+  are worse than no docs, because agents trust them.
+- **In-flight migrations that need shared state** go to
+  `docs/refactor/<feature>-status.md` (a status doc, not a plan). Delete when
+  the migration lands.
+- **Why this shape:** forward-looking plans become hallucination fuel for AI
+  agents — the docs diverge from reality the moment a plan ships, and agents
+  read stale plans as authoritative. Concept docs (current-state, updated with
+  code) give agents a reliable mental model. Reference: openclaw/openclaw
+  (docs/concepts + docs/reference + scoped AGENTS.md files, zero committed
+  forward-looking plans).
 
 ## Skills + Doc Hygiene
+
+### GTM operating sources of truth
+
+Only load GTM context when the task is explicitly about GTM or founder outreach.
+
+- GTM docs: `business/gtm/gtm-docs.md`
+- Outreach tracker: `https://docs.google.com/spreadsheets/d/11qZFluil7TZel2INiKkyBeYwfPgT-JxwBZBvC3zAnd4/edit?gid=1001#gid=1001`
+
+For GTM tasks, repo docs are the strategy source of truth and the outreach
+tracker is the live execution source of truth for companies, founders, status,
+and notes.
 
 ### Canonical skill location
 
@@ -504,6 +601,7 @@ The skill has specialized workflows that produce better results than ad-hoc answ
 
 Key routing rules:
 - Product ideas, "is this worth building", brainstorming → invoke office-hours
+- GTM, outreach, founder sourcing, "who should I DM", "find leads", "draft outreach" → invoke `gtm-founder-outreach` and load `business/AGENTS.md`
 - Bugs, errors, "why is this broken", 500 errors → invoke investigate
 - Ship, deploy, push, create PR → invoke ship
 - QA, test the site, find bugs → invoke qa
@@ -515,3 +613,12 @@ Key routing rules:
 - Architecture review → invoke plan-eng-review
 - Save progress, checkpoint, resume → invoke checkpoint
 - Code quality, health check → invoke health
+
+## graphify
+
+This project has a graphify knowledge graph at graphify-out/.
+
+Rules:
+- Before answering architecture or codebase questions, read graphify-out/GRAPH_REPORT.md for god nodes and community structure
+- If graphify-out/wiki/index.md exists, navigate it instead of reading raw files
+- After modifying code files in this session, run `graphify update .` to keep the graph current (AST-only, no API cost)

@@ -1,56 +1,42 @@
-import { createTool } from "@mastra/core/tools";
-import * as sentry from "@shared/rest/services/sentry/sentry-service";
+import { Tool } from "@mastra/core/tools";
 import { z } from "zod";
 
-export const searchSentryTool = createTool({
+export interface SearchSentryToolInput {
+  query: string;
+  workspaceId: string;
+}
+
+export interface SearchSentryToolResult {
+  title: string;
+  detail: string;
+}
+
+export interface SearchSentryToolOutput {
+  message: string;
+  results: SearchSentryToolResult[];
+}
+
+const searchSentryInputSchema = z.object({
+  query: z.string().describe("Search query: error message, exception type, or keyword"),
+  workspaceId: z.string().describe("The workspace ID"),
+});
+
+export const searchSentryTool = new Tool<SearchSentryToolInput, SearchSentryToolOutput>({
   id: "search_sentry",
   description:
-    "Search Sentry for error issues related to the customer's problem. " +
-    "Returns issue titles, error counts, last seen timestamps, and truncated stack traces. " +
-    "Use this when the customer mentions errors, crashes, 500s, or unexpected behavior.",
-  inputSchema: z.object({
-    query: z.string().describe("Search query: error message, exception type, or keyword"),
-    workspaceId: z.string().describe("The workspace ID"),
-  }),
-  execute: async (input) => {
-    if (!sentry.isConfigured()) {
-      return {
-        message: "Sentry is not configured for this workspace.",
-        results: [],
-      };
-    }
-
-    const issues = await sentry.fetchIssuesByQuery(input.query);
-
-    if (issues.length === 0) {
-      return {
-        message: "No matching Sentry issues found. Try different keywords.",
-        results: [],
-      };
-    }
-
-    const topIssues = issues.slice(0, 5);
-    const enriched = await Promise.all(
-      topIssues.map(async (issue) => {
-        const event = await sentry.fetchLatestEvent(issue.id);
-        const stackLines = event ? sentry.truncateStackTrace(event) : [];
-        return {
-          id: issue.shortId,
-          title: issue.title,
-          level: issue.level,
-          count: issue.count,
-          firstSeen: issue.firstSeen,
-          lastSeen: issue.lastSeen,
-          culprit: issue.culprit,
-          stack: stackLines.join("\n"),
-          tags: event?.tags.slice(0, 5).map((t) => `${t.key}=${t.value}`) ?? [],
-        };
-      })
-    );
-
+    "Search production error evidence related to the customer's problem. " +
+    "Use this when a role wants runtime confirmation for crashes, 500s, or unexpected behavior.",
+  inputSchema: searchSentryInputSchema,
+  execute: async (input: SearchSentryToolInput): Promise<SearchSentryToolOutput> => {
     return {
-      message: `Found ${issues.length} issues, showing top ${enriched.length}`,
-      results: enriched,
+      message:
+        "Sentry search is not configured in this environment. Continue with code search and session evidence instead.",
+      results: [
+        {
+          title: `Unavailable for query: ${input.query}`,
+          detail: `No Sentry backend is wired for workspace ${input.workspaceId}.`,
+        },
+      ],
     };
   },
 });

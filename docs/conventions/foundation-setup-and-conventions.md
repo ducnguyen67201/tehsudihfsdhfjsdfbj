@@ -15,9 +15,9 @@ For your current product shape (`web + queue + codex workflows`), use:
 - **Deploy exactly 2 services**:
   - `web` (Next.js + API routes + tRPC caller layer)
   - `worker` (single worker deployment)
-- **Keep 2 Temporal task queues**:
-  - `TEMPORAL_TASK_QUEUE` (support/general workflows)
-  - `CODEX_TASK_QUEUE` (codex-intensive workflows)
+- **Keep 2 Temporal task queues** (names in `packages/types/src/workflow.schema.ts` as `TASK_QUEUES`):
+  - `TASK_QUEUES.SUPPORT` (support/inbox workflows)
+  - `TASK_QUEUES.CODEX` (codex indexing + fix-PR workflows)
 
 Inside the single `worker` deployment, run both queue consumers (support + codex) so you keep queue-level isolation without managing separate worker services.
 
@@ -39,7 +39,7 @@ Inside the single `worker` deployment, run both queue consumers (support + codex
 Optional but strongly recommended:
 
 - Doppler for secrets management
-- Sentry for app and workflow observability
+- TrustLoop's in-product SDK (`packages/sdk-browser`) for first-party session telemetry consumed by AI analysis
 
 ## 3) Monorepo Boundaries
 
@@ -165,8 +165,8 @@ Avoid maintaining parallel, manually-written OpenAPI and TypeScript contracts fo
 
 ### Queue separation
 
-- Support workflows on `TEMPORAL_TASK_QUEUE`.
-- Codex/fix workflows on `CODEX_TASK_QUEUE`.
+- Support workflows on `TASK_QUEUES.SUPPORT`.
+- Codex/fix workflows on `TASK_QUEUES.CODEX`.
 - Never mix these concerns in one queue.
 - Queue separation is mandatory even when both workers run in one process/service.
 
@@ -221,7 +221,7 @@ Avoid maintaining parallel, manually-written OpenAPI and TypeScript contracts fo
 - One file should have one clear reason to change.
 - Prefer pure functions for business logic.
 - Keep orchestration in service/router/workflow layers.
-- Keep adapters at edges (GitHub, Sentry, OpenAI, Discord, etc.).
+- Keep adapters at edges (GitHub, OpenAI, Slack, Discord, etc.).
 
 ### Imports
 
@@ -280,7 +280,7 @@ Nice-to-have:
 - Use `@shared/env` only; no scattered direct `process.env` reads in business code.
 - Never log raw tokens or credentials.
 - Keep webhook and internal API secrets validated and centrally defined.
-- Use least privilege for provider tokens (`CODEX_GITHUB_TOKEN`, Sentry token, etc.).
+- Use least privilege for provider tokens (`CODEX_GITHUB_TOKEN`, Slack tokens, etc.).
 
 ## 13) Practical Growth Plan
 

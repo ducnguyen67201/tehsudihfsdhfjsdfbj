@@ -76,7 +76,10 @@ function createSupportAgent(
     name: "TrustLoop AI Support Agent",
     instructions,
     model: resolveModel(providerConfig),
-    tools: AVAILABLE_TOOLS,
+    tools: {
+      searchCode: searchCodeTool,
+      createPullRequest: createPullRequestTool,
+    },
   });
 }
 

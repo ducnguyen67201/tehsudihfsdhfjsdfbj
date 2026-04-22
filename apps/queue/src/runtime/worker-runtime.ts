@@ -1,6 +1,8 @@
 import { registerAgentTeamArchiveSchedule } from "@/domains/agent-team/register-archive-schedule";
 import { registerAgentTeamMetricsRollupSchedule } from "@/domains/agent-team/register-metrics-rollup-schedule";
 import { env } from "@shared/env";
+import { buildTemporalConnectionOptions } from "@shared/rest/temporal-connection";
+import { TASK_QUEUES } from "@shared/types";
 import { Client, Connection } from "@temporalio/client";
 import { NativeConnection, Worker } from "@temporalio/worker";
 
@@ -12,12 +14,12 @@ import { NativeConnection, Worker } from "@temporalio/worker";
  * impossible on a healthy deploy.
  */
 export async function startQueueWorkers(workflowsPath: string, activities: object): Promise<void> {
-  const connection = await NativeConnection.connect({ address: env.TEMPORAL_ADDRESS });
+  const connection = await NativeConnection.connect(buildTemporalConnectionOptions());
 
   const supportWorker = await Worker.create({
     connection,
     namespace: env.TEMPORAL_NAMESPACE,
-    taskQueue: env.TEMPORAL_TASK_QUEUE,
+    taskQueue: TASK_QUEUES.SUPPORT,
     workflowsPath,
     activities,
   });
@@ -25,7 +27,7 @@ export async function startQueueWorkers(workflowsPath: string, activities: objec
   const codexWorker = await Worker.create({
     connection,
     namespace: env.TEMPORAL_NAMESPACE,
-    taskQueue: env.CODEX_TASK_QUEUE,
+    taskQueue: TASK_QUEUES.CODEX,
     workflowsPath,
     activities,
   });
@@ -41,7 +43,7 @@ export async function startQueueWorkers(workflowsPath: string, activities: objec
  * log + rethrow — a healthy deploy must have both schedules registered.
  */
 async function ensureAgentTeamSchedules(): Promise<void> {
-  const clientConnection = await Connection.connect({ address: env.TEMPORAL_ADDRESS });
+  const clientConnection = await Connection.connect(buildTemporalConnectionOptions());
   try {
     const client = new Client({ connection: clientConnection, namespace: env.TEMPORAL_NAMESPACE });
     const [archive, rollup] = await Promise.all([
