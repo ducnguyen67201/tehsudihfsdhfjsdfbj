@@ -34,6 +34,8 @@ describe("TeamListSection", () => {
 
     expect(screen.getByText("Backend Review Team")).toBeTruthy();
     expect(screen.getByText("Default")).toBeTruthy();
-    expect(screen.getByText(/0 roles/i)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /backend review team/i }).textContent ?? "").toMatch(
+      /0\s+roles\s+·\s+0\s+connections/i
+    );
   });
 });

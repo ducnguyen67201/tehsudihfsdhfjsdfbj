@@ -47,18 +47,17 @@ export function TeamListSection({
         {teams.map((team) => {
           const isSelected = team.id === selectedTeamId;
           return (
-            <button
-              key={team.id}
-              type="button"
-              aria-pressed={isSelected}
-              className={`group w-full border p-3 text-left transition-colors ${
-                isSelected
-                  ? "border-primary bg-primary/5"
-                  : "border-border hover:bg-muted/40 hover:border-foreground/30"
-              }`}
-              onClick={() => onSelectTeam(team.id)}
-            >
-              <div className="flex items-start justify-between gap-2">
+            <div key={team.id} className="group flex items-start gap-2">
+              <button
+                type="button"
+                aria-pressed={isSelected}
+                className={`min-w-0 flex-1 border p-3 text-left transition-colors ${
+                  isSelected
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:bg-muted/40 hover:border-foreground/30"
+                }`}
+                onClick={() => onSelectTeam(team.id)}
+              >
                 <div className="min-w-0">
                   <div className="mb-0.5 flex items-center gap-2">
                     <p className="truncate text-sm font-medium">{team.name}</p>
@@ -76,39 +75,37 @@ export function TeamListSection({
                     <span className="tabular-nums">{team.edges.length}</span> connections
                   </p>
                 </div>
+              </button>
 
-                {canManage ? (
-                  <div className="flex shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
-                    {!team.isDefault ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-xs"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          void onSetDefaultTeam(team.id);
-                        }}
-                      >
-                        Set default
-                      </Button>
-                    ) : null}
+              {canManage ? (
+                <div className="flex shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                  {!team.isDefault ? (
                     <Button
                       type="button"
                       variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        void onDeleteTeam(team.id);
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => {
+                        void onSetDefaultTeam(team.id);
                       }}
                     >
-                      <RiDeleteBinLine className="size-3.5 text-destructive" />
+                      Set default
                     </Button>
-                  </div>
-                ) : null}
-              </div>
-            </button>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => {
+                      void onDeleteTeam(team.id);
+                    }}
+                  >
+                    <RiDeleteBinLine className="size-3.5 text-destructive" />
+                  </Button>
+                </div>
+              ) : null}
+            </div>
           );
         })}
       </CardContent>
