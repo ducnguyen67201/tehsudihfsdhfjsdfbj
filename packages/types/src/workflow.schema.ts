@@ -8,6 +8,7 @@ import { z } from "zod";
 export const workflowNames = {
   supportInbox: "supportInboxWorkflow",
   supportAnalysis: "supportAnalysisWorkflow",
+  supportSummary: "supportSummaryWorkflow",
   sendDraftToSlack: "sendDraftToSlackWorkflow",
   repositoryIndex: "repositoryIndexWorkflow",
 } as const;

@@ -19,6 +19,11 @@ function createDispatcher(): WorkflowDispatcher {
       runId: "run_analysis_1",
       queue: "support-general",
     })),
+    startSupportSummaryWorkflow: vi.fn(async () => ({
+      workflowId: "support-summary-conv_1",
+      runId: "run_summary_1",
+      queue: "support-general",
+    })),
     startSendDraftToSlackWorkflow: vi.fn(async () => ({
       workflowId: "send-draft-draft_1",
       runId: "run_send_draft_1",
