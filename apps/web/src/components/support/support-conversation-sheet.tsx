@@ -380,6 +380,7 @@ export function SupportConversationSheet({
 
                 <TabsContent value="session" className="mt-3">
                   <SessionTab
+                    workspaceId={workspaceId}
                     isLoading={sessionReplay.isLoading}
                     error={sessionReplay.error}
                     match={sessionReplay.match}
@@ -393,6 +394,9 @@ export function SupportConversationSheet({
                     totalReplayChunks={sessionReplay.totalReplayChunks}
                     isLoadingReplayChunks={sessionReplay.isLoadingReplayChunks}
                     replayLoadError={sessionReplay.replayLoadError}
+                    isAttachingSession={sessionReplay.isAttachingSession}
+                    attachSessionError={sessionReplay.attachSessionError}
+                    onAttachSession={sessionReplay.attachSession}
                     onRetryReplayLoad={sessionReplay.retryReplayLoad}
                     onLoadReplayChunks={sessionReplay.loadReplayChunks}
                   />

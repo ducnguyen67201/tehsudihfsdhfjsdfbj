@@ -62,6 +62,8 @@ function matchSourceLabel(match: SessionConversationMatch | null): string | null
       return "Matched by Slack profile";
     case SESSION_REPLAY_MATCH_SOURCE.messageRegexEmail:
       return "Matched by message email";
+    case SESSION_REPLAY_MATCH_SOURCE.manual:
+      return "Manually attached";
   }
 }
 

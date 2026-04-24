@@ -176,6 +176,29 @@ export const sessionReplayRouter = router({
       };
     }),
 
+  attachToConversation: operatorProcedure
+    .input(
+      z.object({
+        conversationId: z.string().min(1),
+        sessionRecordId: z.string().min(1),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const context = await sessionThreadMatch.attachSessionToConversation({
+        workspaceId: ctx.workspaceId,
+        conversationId: input.conversationId,
+        sessionRecordId: input.sessionRecordId,
+      });
+
+      return {
+        match: context.match,
+        session: context.session,
+        sessionBrief: context.sessionBrief,
+        events: context.events,
+        failurePointId: context.failurePointId,
+      };
+    }),
+
   getReplayChunks: operatorProcedure
     .input(z.object({ sessionRecordId: z.string().min(1) }))
     .query(async ({ ctx, input }) => {

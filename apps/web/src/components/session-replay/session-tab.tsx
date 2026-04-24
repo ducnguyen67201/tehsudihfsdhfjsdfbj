@@ -2,6 +2,7 @@
 
 import { SessionContextBar } from "@/components/session-replay/session-context-bar";
 import { SessionEventTimeline } from "@/components/session-replay/session-event-timeline";
+import { SessionManualAttachDialog } from "@/components/session-replay/session-manual-attach-dialog";
 import { SessionReplayModal } from "@/components/session-replay/session-replay-modal";
 import { Button } from "@/components/ui/button";
 import type {
@@ -15,6 +16,7 @@ import type {
 import { useState } from "react";
 
 interface SessionTabProps {
+  workspaceId: string;
   isLoading: boolean;
   error: string | null;
   match: SessionConversationMatch | null;
@@ -28,6 +30,9 @@ interface SessionTabProps {
   totalReplayChunks: number;
   isLoadingReplayChunks: boolean;
   replayLoadError: string | null;
+  isAttachingSession: boolean;
+  attachSessionError: string | null;
+  onAttachSession: (sessionRecordId: string) => Promise<void>;
   onRetryReplayLoad: () => void;
   onLoadReplayChunks: () => void;
 }
@@ -47,6 +52,7 @@ function formatDuration(startIso: string, endIso: string): string {
  * Per design review: tab-based navigation, replay opens in full-width modal.
  */
 export function SessionTab({
+  workspaceId,
   isLoading,
   error,
   match,
@@ -60,6 +66,9 @@ export function SessionTab({
   totalReplayChunks,
   isLoadingReplayChunks,
   replayLoadError,
+  isAttachingSession,
+  attachSessionError,
+  onAttachSession,
   onRetryReplayLoad,
   onLoadReplayChunks,
 }: SessionTabProps) {
@@ -79,13 +88,23 @@ export function SessionTab({
     return (
       <div className="space-y-3 p-4">
         <p className="text-muted-foreground text-sm">
-          No session data for this thread. Install the TrustLoop AI SDK to capture browser context.
+          No session was automatically matched to this thread. If the SDK captured the browser
+          session, browse recent sessions and attach the right one manually.
         </p>
-        <Button variant="outline" size="sm" asChild>
-          <a href="/docs/sdk-install" target="_blank" rel="noopener noreferrer">
-            SDK setup guide
-          </a>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <SessionManualAttachDialog
+            workspaceId={workspaceId}
+            triggerLabel="Browse sessions"
+            isAttaching={isAttachingSession}
+            attachError={attachSessionError}
+            onAttach={onAttachSession}
+          />
+          <Button variant="outline" size="sm" asChild>
+            <a href="/docs/sdk-install" target="_blank" rel="noopener noreferrer">
+              SDK setup guide
+            </a>
+          </Button>
+        </div>
       </div>
     );
   }
@@ -103,6 +122,16 @@ export function SessionTab({
         matchConfidence={matchConfidence}
         error={error}
       />
+
+      <div className="flex justify-end">
+        <SessionManualAttachDialog
+          workspaceId={workspaceId}
+          triggerLabel="Change attached session"
+          isAttaching={isAttachingSession}
+          attachError={attachSessionError}
+          onAttach={onAttachSession}
+        />
+      </div>
 
       {/* Event timeline */}
       <div className="border">

@@ -26,11 +26,13 @@ import {
   type SessionTimelineEvent,
   type SupportCustomerIdentitySource,
 } from "@shared/types";
+import { TRPCError } from "@trpc/server";
 
 const WINDOW_BEFORE_FIRST_CUSTOMER_MESSAGE_MS = 30 * 60 * 1000;
 const WINDOW_AFTER_LAST_CUSTOMER_MESSAGE_MS = 15 * 60 * 1000;
 const MAX_TIMELINE_EVENTS = 200;
 const MATCH_SOURCE_WEIGHT: Record<SessionReplayMatchSource, number> = {
+  [SESSION_REPLAY_MATCH_SOURCE.manual]: 5,
   [SESSION_REPLAY_MATCH_SOURCE.userId]: 4,
   [SESSION_REPLAY_MATCH_SOURCE.conversationEmail]: 3,
   [SESSION_REPLAY_MATCH_SOURCE.slackProfileEmail]: 2,
@@ -44,6 +46,7 @@ const IDENTITY_SOURCE_PRIORITY: Record<SupportCustomerIdentitySource, number> = 
   [SUPPORT_CUSTOMER_IDENTITY_SOURCE.messageRegex]: 1,
 };
 const STRONG_MATCH_SOURCES = new Set<SessionReplayMatchSource>([
+  SESSION_REPLAY_MATCH_SOURCE.manual,
   SESSION_REPLAY_MATCH_SOURCE.userId,
   SESSION_REPLAY_MATCH_SOURCE.conversationEmail,
   SESSION_REPLAY_MATCH_SOURCE.slackProfileEmail,
@@ -122,6 +125,11 @@ export async function getConversationSessionContext(input: {
   conversationId: string;
   eventLimit?: number;
 }): Promise<ConversationSessionContext> {
+  const manualContext = await loadManualSessionContext(input);
+  if (manualContext) {
+    return manualContext;
+  }
+
   const identity = await resolveConversationIdentity(input);
   if (!identity) {
     await clearPrimaryMatch(input.workspaceId, input.conversationId);
@@ -174,6 +182,64 @@ export async function getConversationSessionContext(input: {
       matchConfidence === SESSION_MATCH_CONFIDENCE.confirmed &&
       STRONG_MATCH_SOURCES.has(primaryCandidate.matchSource),
   };
+}
+
+export async function attachSessionToConversation(input: {
+  workspaceId: string;
+  conversationId: string;
+  sessionRecordId: string;
+  eventLimit?: number;
+}): Promise<ConversationSessionContext> {
+  const [conversation, session] = await Promise.all([
+    prisma.supportConversation.findFirst({
+      where: {
+        id: input.conversationId,
+        workspaceId: input.workspaceId,
+        deletedAt: null,
+      },
+      select: { id: true },
+    }),
+    prisma.sessionRecord.findFirst({
+      where: {
+        id: input.sessionRecordId,
+        workspaceId: input.workspaceId,
+        deletedAt: null,
+      },
+      select: sessionRecordResponseSelect,
+    }),
+  ]);
+
+  if (!conversation) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+  }
+
+  if (!session) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Session not found" });
+  }
+
+  const match = await upsertPrimarySessionMatch({
+    workspaceId: input.workspaceId,
+    conversationId: input.conversationId,
+    candidate: {
+      record: session,
+      matchSource: SESSION_REPLAY_MATCH_SOURCE.manual,
+      matchConfidence: SESSION_MATCH_CONFIDENCE.confirmed,
+      matchedIdentifierType: SESSION_MATCHED_IDENTIFIER_TYPE.sessionId,
+      matchedIdentifierValue: session.sessionId,
+      score: 50_000_000,
+      evidenceJson: {
+        attachedManuallyAt: new Date().toISOString(),
+        candidateSessionId: session.sessionId,
+      },
+    },
+  });
+
+  return buildConversationSessionContext({
+    match,
+    session,
+    eventLimit: input.eventLimit,
+    shouldAttachToAnalysis: true,
+  });
 }
 
 export async function resolveConversationIdentity(input: {
@@ -312,6 +378,20 @@ export async function resolveConversationIdentity(input: {
   };
 }
 
+const sessionRecordResponseSelect = {
+  id: true,
+  workspaceId: true,
+  sessionId: true,
+  userId: true,
+  userEmail: true,
+  userAgent: true,
+  release: true,
+  startedAt: true,
+  lastEventAt: true,
+  eventCount: true,
+  hasReplayData: true,
+} satisfies Prisma.SessionRecordSelect;
+
 async function findSessionCandidates(
   identity: ResolvedConversationIdentity
 ): Promise<SessionCandidate[]> {
@@ -333,19 +413,7 @@ async function findSessionCandidates(
       ],
     },
     orderBy: [{ lastEventAt: "desc" }],
-    select: {
-      id: true,
-      workspaceId: true,
-      sessionId: true,
-      userId: true,
-      userEmail: true,
-      userAgent: true,
-      release: true,
-      startedAt: true,
-      lastEventAt: true,
-      eventCount: true,
-      hasReplayData: true,
-    },
+    select: sessionRecordResponseSelect,
     take: 25,
   });
 
@@ -454,6 +522,46 @@ function resolveBaseMatch(input: {
   return null;
 }
 
+async function loadManualSessionContext(input: {
+  workspaceId: string;
+  conversationId: string;
+  eventLimit?: number;
+}): Promise<ConversationSessionContext | null> {
+  const persisted = await prisma.supportConversationSessionMatch.findFirst({
+    where: {
+      workspaceId: input.workspaceId,
+      conversationId: input.conversationId,
+      isPrimary: true,
+      matchSource: SESSION_REPLAY_MATCH_SOURCE.manual,
+    },
+    select: {
+      conversationId: true,
+      sessionRecordId: true,
+      matchSource: true,
+      matchConfidence: true,
+      matchedIdentifierType: true,
+      matchedIdentifierValue: true,
+      score: true,
+      isPrimary: true,
+      evidenceJson: true,
+      sessionRecord: {
+        select: sessionRecordResponseSelect,
+      },
+    },
+  });
+
+  if (!persisted || persisted.sessionRecord.workspaceId !== input.workspaceId) {
+    return null;
+  }
+
+  return buildConversationSessionContext({
+    match: toSessionConversationMatch(persisted),
+    session: persisted.sessionRecord,
+    eventLimit: input.eventLimit,
+    shouldAttachToAnalysis: true,
+  });
+}
+
 async function upsertPrimarySessionMatch(input: {
   workspaceId: string;
   conversationId: string;
@@ -511,17 +619,7 @@ async function upsertPrimarySessionMatch(input: {
           },
         });
 
-    return {
-      conversationId: persisted.conversationId,
-      sessionRecordId: persisted.sessionRecordId,
-      matchSource: persisted.matchSource as SessionReplayMatchSource,
-      matchConfidence: persisted.matchConfidence as SessionMatchConfidence,
-      matchedIdentifierType: persisted.matchedIdentifierType as SessionMatchedIdentifierType,
-      matchedIdentifierValue: persisted.matchedIdentifierValue,
-      score: persisted.score,
-      isPrimary: persisted.isPrimary,
-      evidenceJson: asRecord(persisted.evidenceJson),
-    };
+    return toSessionConversationMatch(persisted);
   });
 }
 
@@ -598,6 +696,28 @@ function buildSessionBrief(sessionDigest: SessionDigest): SessionBrief {
   };
 }
 
+async function buildConversationSessionContext(input: {
+  match: SessionConversationMatch;
+  session: SessionCandidate["record"];
+  eventLimit?: number;
+  shouldAttachToAnalysis: boolean;
+}): Promise<ConversationSessionContext> {
+  const events = await loadSessionEvents(input.session.id, input.eventLimit ?? MAX_TIMELINE_EVENTS);
+  const failurePointId = findFailurePointId(events);
+  const sessionDigest = compileDigest(input.session, events);
+  const sessionBrief = buildSessionBrief(sessionDigest);
+
+  return {
+    match: input.match,
+    session: toSessionRecordResponse(input.session),
+    sessionBrief,
+    events: events.map(toSessionTimelineEvent),
+    failurePointId,
+    sessionDigest,
+    shouldAttachToAnalysis: input.shouldAttachToAnalysis,
+  };
+}
+
 function toSessionTimelineEvent(event: SessionEventWithId): SessionTimelineEvent {
   return {
     id: event.id,
@@ -605,6 +725,30 @@ function toSessionTimelineEvent(event: SessionEventWithId): SessionTimelineEvent
     timestamp: event.timestamp.toISOString(),
     url: event.url,
     payload: asRecord(event.payload) ?? {},
+  };
+}
+
+function toSessionConversationMatch(match: {
+  conversationId: string;
+  sessionRecordId: string;
+  matchSource: string;
+  matchConfidence: string;
+  matchedIdentifierType: string;
+  matchedIdentifierValue: string;
+  score: number;
+  isPrimary: boolean;
+  evidenceJson: unknown;
+}): SessionConversationMatch {
+  return {
+    conversationId: match.conversationId,
+    sessionRecordId: match.sessionRecordId,
+    matchSource: match.matchSource as SessionReplayMatchSource,
+    matchConfidence: match.matchConfidence as SessionMatchConfidence,
+    matchedIdentifierType: match.matchedIdentifierType as SessionMatchedIdentifierType,
+    matchedIdentifierValue: match.matchedIdentifierValue,
+    score: match.score,
+    isPrimary: match.isPrimary,
+    evidenceJson: asRecord(match.evidenceJson),
   };
 }
 

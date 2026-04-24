@@ -1,6 +1,6 @@
 "use client";
 
-import { trpcQuery } from "@/lib/trpc-http";
+import { trpcMutation, trpcQuery } from "@/lib/trpc-http";
 import {
   type ReplayChunkResponse,
   SESSION_MATCH_CONFIDENCE,
@@ -27,7 +27,10 @@ export interface UseSessionReplayResult {
   totalReplayChunks: number;
   isLoadingReplayChunks: boolean;
   replayLoadError: string | null;
+  isAttachingSession: boolean;
+  attachSessionError: string | null;
   hasSessionData: boolean;
+  attachSession: (sessionRecordId: string) => Promise<void>;
   loadReplayChunks: () => void;
   retryReplayLoad: () => void;
 }
@@ -55,6 +58,17 @@ export function useSessionReplay(
   const [totalReplayChunks, setTotalReplayChunks] = useState(0);
   const [isLoadingReplayChunks, setIsLoadingReplayChunks] = useState(false);
   const [replayLoadError, setReplayLoadError] = useState<string | null>(null);
+  const [isAttachingSession, setIsAttachingSession] = useState(false);
+  const [attachSessionError, setAttachSessionError] = useState<string | null>(null);
+
+  const applySessionResult = useCallback((result: SessionForConversationResponse) => {
+    setMatch(result.match);
+    setSession(result.session);
+    setSessionBrief(result.sessionBrief);
+    setEvents(result.events);
+    setFailurePointId(result.failurePointId);
+    setMatchConfidence(result.match?.matchConfidence ?? SESSION_MATCH_CONFIDENCE.none);
+  }, []);
 
   // Resolve the primary conversation/session match on mount
   useEffect(() => {
@@ -76,6 +90,7 @@ export function useSessionReplay(
       setReplayChunks([]);
       setTotalReplayChunks(0);
       setReplayLoadError(null);
+      setAttachSessionError(null);
 
       try {
         const result = await trpcQuery<SessionForConversationResponse, { conversationId: string }>(
@@ -87,12 +102,7 @@ export function useSessionReplay(
 
         if (cancelled) return;
 
-        setMatch(result.match);
-        setSession(result.session);
-        setSessionBrief(result.sessionBrief);
-        setEvents(result.events);
-        setFailurePointId(result.failurePointId);
-        setMatchConfidence(result.match?.matchConfidence ?? SESSION_MATCH_CONFIDENCE.none);
+        applySessionResult(result);
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Session lookup failed");
@@ -110,7 +120,41 @@ export function useSessionReplay(
     return () => {
       cancelled = true;
     };
-  }, [conversationId]);
+  }, [applySessionResult, conversationId]);
+
+  const attachSession = useCallback(
+    async (sessionRecordId: string) => {
+      if (!conversationId) return;
+
+      setIsAttachingSession(true);
+      setAttachSessionError(null);
+      setReplayChunks([]);
+      setTotalReplayChunks(0);
+      setReplayLoadError(null);
+
+      try {
+        const result = await trpcMutation<
+          { conversationId: string; sessionRecordId: string },
+          SessionForConversationResponse
+        >(
+          "sessionReplay.attachToConversation",
+          {
+            conversationId,
+            sessionRecordId,
+          },
+          { withCsrf: true }
+        );
+
+        applySessionResult(result);
+      } catch (err) {
+        setAttachSessionError(err instanceof Error ? err.message : "Failed to attach session");
+        throw err;
+      } finally {
+        setIsAttachingSession(false);
+      }
+    },
+    [applySessionResult, conversationId]
+  );
 
   const loadReplayChunks = useCallback(() => {
     if (!session) return;
@@ -156,7 +200,10 @@ export function useSessionReplay(
     totalReplayChunks,
     isLoadingReplayChunks,
     replayLoadError,
+    isAttachingSession,
+    attachSessionError,
     hasSessionData: session !== null,
+    attachSession,
     loadReplayChunks,
     retryReplayLoad,
   };

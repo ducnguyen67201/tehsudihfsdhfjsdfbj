@@ -6,6 +6,7 @@ const mockSessionRecordFindMany = vi.fn();
 const mockSessionEventFindMany = vi.fn();
 const mockMatchUpdateMany = vi.fn();
 const mockMatchFindUnique = vi.fn();
+const mockMatchFindFirst = vi.fn();
 const mockMatchUpdate = vi.fn();
 const mockMatchCreate = vi.fn();
 
@@ -13,6 +14,7 @@ const mockTx = {
   supportConversationSessionMatch: {
     updateMany: mockMatchUpdateMany,
     findUnique: mockMatchFindUnique,
+    findFirst: mockMatchFindFirst,
     update: mockMatchUpdate,
     create: mockMatchCreate,
   },
@@ -32,6 +34,7 @@ vi.mock("@shared/database", () => ({
     },
     supportConversationSessionMatch: {
       updateMany: mockMatchUpdateMany,
+      findFirst: mockMatchFindFirst,
     },
     $transaction: async (callback: (tx: typeof mockTx) => Promise<unknown>) => callback(mockTx),
   },
@@ -50,6 +53,7 @@ describe("session thread matching", () => {
     vi.clearAllMocks();
     mockSupportConversationUpdate.mockResolvedValue(undefined);
     mockMatchUpdateMany.mockResolvedValue({ count: 1 });
+    mockMatchFindFirst.mockResolvedValue(null);
     mockMatchFindUnique.mockResolvedValue(null);
     mockSessionEventFindMany.mockResolvedValue([
       {
@@ -209,5 +213,43 @@ describe("session thread matching", () => {
         customerIdentitySource: "MESSAGE_REGEX",
       }),
     });
+  });
+
+  it("keeps a manually attached primary session authoritative", async () => {
+    mockMatchFindFirst.mockResolvedValue({
+      conversationId: "conv-manual",
+      sessionRecordId: "session-manual",
+      matchSource: "manual",
+      matchConfidence: "confirmed",
+      matchedIdentifierType: "session_id",
+      matchedIdentifierValue: "sess-manual",
+      score: 50_000_000,
+      evidenceJson: { attachedManuallyAt: "2026-04-18T10:06:00.000Z" },
+      isPrimary: true,
+      sessionRecord: {
+        id: "session-manual",
+        workspaceId: "ws-1",
+        sessionId: "sess-manual",
+        userId: null,
+        userEmail: "operator-picked@example.com",
+        userAgent: "Chrome",
+        release: "1.0.0",
+        startedAt: new Date("2026-04-18T09:59:00.000Z"),
+        lastEventAt: new Date("2026-04-18T10:03:00.000Z"),
+        eventCount: 12,
+        hasReplayData: true,
+      },
+    });
+
+    const result = await getConversationSessionContext({
+      workspaceId: "ws-1",
+      conversationId: "conv-manual",
+    });
+
+    expect(result.session?.id).toBe("session-manual");
+    expect(result.match?.matchSource).toBe("manual");
+    expect(result.shouldAttachToAnalysis).toBe(true);
+    expect(mockSupportConversationFindFirst).not.toHaveBeenCalled();
+    expect(mockSessionRecordFindMany).not.toHaveBeenCalled();
   });
 });
