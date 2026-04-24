@@ -10,6 +10,7 @@ import {
   SUMMARY_TRIGGER_REASON,
   SUPPORT_CONVERSATION_EVENT_SOURCE,
   SUPPORT_CONVERSATION_STATUS,
+  SUPPORT_CUSTOMER_IDENTITY_SOURCE,
   SUPPORT_INGRESS_PROCESSING_STATE,
   SUPPORT_REALTIME_REASON,
   type SupportConversationEventSource,
@@ -52,6 +53,17 @@ function summarizeMessage(text: string | null): string {
   }
 
   return text.length <= 140 ? text : `${text.slice(0, 137)}...`;
+}
+
+const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
+
+function extractMessageEmail(text: string | null): string | null {
+  if (!text) {
+    return null;
+  }
+
+  const match = text.match(EMAIL_REGEX);
+  return match?.[0]?.trim().toLowerCase() ?? null;
 }
 
 /**
@@ -266,6 +278,27 @@ export async function runSupportPipeline(
       resolvedThreadTs
     );
 
+    const regexEmail = isCustomer ? extractMessageEmail(normalized.text) : null;
+    const customerIdentitySource = isCustomer
+      ? regexEmail
+        ? SUPPORT_CUSTOMER_IDENTITY_SOURCE.messageRegex
+        : normalized.slackUserId
+          ? SUPPORT_CUSTOMER_IDENTITY_SOURCE.messagePayload
+          : null
+      : null;
+    const identityUpdate = isCustomer
+      ? {
+          ...(normalized.slackUserId ? { customerSlackUserId: normalized.slackUserId } : {}),
+          ...(regexEmail ? { customerEmail: regexEmail } : {}),
+          ...(customerIdentitySource
+            ? {
+                customerIdentitySource,
+                customerIdentityUpdatedAt: now,
+              }
+            : {}),
+        }
+      : {};
+
     // Ingress goes through the conversation FSM's `customerMessageReceived`
     // event. Per the FSM, that event lands UNREAD from any current state,
     // matching the pre-FSM behavior where a new customer message on a
@@ -279,6 +312,7 @@ export async function runSupportPipeline(
       teamId: normalized.teamId,
       channelId: normalized.channelId,
       threadTs: resolvedThreadTs,
+      ...identityUpdate,
       lastCustomerMessageAt: now,
       customerWaitingSince: now,
       lastActivityAt: now,

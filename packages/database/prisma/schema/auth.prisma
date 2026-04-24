@@ -41,6 +41,7 @@ model Workspace {
   agentTeamRuns            AgentTeamRun[]
   agentTeamRunEvents       AgentTeamRunEvent[]
   agentTeamMetrics         WorkspaceAgentMetrics[]
+  supportConversationSessionMatches SupportConversationSessionMatch[]
   draftDispatches          DraftDispatch[]
   supportAttachments       SupportMessageAttachment[]
   supportCustomerProfiles  SupportCustomerProfile[]
