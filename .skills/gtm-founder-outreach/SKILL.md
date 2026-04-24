@@ -2,10 +2,11 @@
 name: gtm-founder-outreach
 description: |
   Founder outreach workflow for TrustLoop's early GTM motion. Use when the task
-  is to find target companies, find the right founder, qualify whether they fit
-  the current ICP, score leads, draft founder-specific outreach DMs, or update
-  the outreach tracker. Good triggers include: "who should I DM", "find founders",
-  "find companies", "qualify leads", "score this lead", "what should I send",
+  is to find target companies, find the right founder or co-founder, qualify
+  whether they fit the current ICP, score leads, draft contact-specific
+  outreach DMs, or update the outreach tracker. Good triggers include:
+  "who should I DM", "find founders", "find co-founders", "find companies",
+  "qualify leads", "score this lead", "what should I send",
   "help with outreach", or "source founder prospects".
   Use this instead of ad-hoc outreach advice so sourcing, scoring, and messaging
   stay grounded in the repo's current GTM thesis.
@@ -36,9 +37,9 @@ Read these when relevant:
 Use this skill to help with four jobs:
 
 1. find candidate companies
-2. find the founder to contact
+2. find the founder or co-founder to contact
 3. score whether the lead is worth messaging
-4. draft a short, founder-specific DM
+4. draft a short, contact-specific DM
 
 The current wedge is narrow on purpose. Do not broaden it unless the repo docs
 have been updated.
@@ -66,18 +67,19 @@ When sourcing companies:
 - avoid consumer apps, agencies, generic marketplaces, and obviously too-large teams
 - only keep companies where you can form a pain hypothesis about founder-led support
 
-### 3. Find and Qualify the Founder
+### 3. Find and Qualify the Contact
 
 For each company, look for:
 
 - Founder
 - Co-Founder
+- Co-Founder & CEO
 - Founder & CEO
 - CEO
 
 Before accepting a lead, write one sentence answering:
 
-`Why does this founder plausibly feel the support-routing pain?`
+`Why does this founder or co-founder plausibly feel the support-routing pain?`
 
 If that sentence is weak, the lead is weak.
 
@@ -88,7 +90,8 @@ Use `business/gtm/lead-scoring-rubric.md`.
 Default output per lead:
 
 - company
-- founder
+- contact
+- role
 - one-line pain hypothesis
 - score out of `10`
 - short reason for the score
@@ -114,7 +117,7 @@ Rules:
 When drafting outreach, output:
 
 - the DM
-- one sentence explaining why it fits this founder
+- one sentence explaining why it fits this founder or co-founder
 
 ### 6. Update the Tracker or Prepare Rows
 
@@ -122,7 +125,8 @@ If the user provides a tracker destination, update it directly.
 
 If not, return rows that can be pasted into the tracker with these fields:
 
-- Founder Name
+- Contact Name
+- Contact Role
 - LinkedIn URL
 - Company
 - Company URL
@@ -148,7 +152,7 @@ Prioritize:
 ## Guardrails
 
 - Do not target multiple ICPs at once.
-- Do not call a founder a good lead without a concrete pain hypothesis.
+- Do not call a founder or co-founder a good lead without a concrete pain hypothesis.
 - Do not write long generic outreach.
 - Do not confuse curiosity with painful demand.
 - Ten sharp leads beat one hundred vague ones.
@@ -157,7 +161,7 @@ Prioritize:
 
 For sourcing tasks, return the best concise artifact for the user's request:
 
-- `Top leads`: table of `5-10` qualified founders with scores and pain hypotheses
+- `Top leads`: table of `5-10` qualified founders or co-founders with scores and pain hypotheses
 - `Lead review`: scored keep/skip recommendation
 - `Outreach draft`: `1-3` DMs and optional follow-up
 - `Tracker update`: rows written or ready to paste
