@@ -7,10 +7,7 @@
   "engines": {
     "node": ">=24.0.0"
   },
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
+  "workspaces": ["apps/*", "packages/*"],
   "scripts": {
     "build": "turbo run build",
     "dev": "npm run db:check-drift && turbo run dev --parallel",
