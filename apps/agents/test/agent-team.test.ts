@@ -2,6 +2,16 @@ import type { AgentTeamRoleTurnInput } from "@shared/types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockGenerate = vi.fn();
+const envState = {
+  OPENAI_API_KEY: "openai-test-key",
+  OPENROUTER_API_KEY: "",
+  APP_BASE_URL: "http://localhost:3000",
+  APP_PUBLIC_URL: undefined as string | undefined,
+};
+
+vi.mock("@shared/env", () => ({
+  env: envState,
+}));
 
 vi.mock("@mastra/core/agent", () => ({
   Agent: class MockAgent {
@@ -52,6 +62,10 @@ function buildRequest(): AgentTeamRoleTurnInput {
 describe("runTeamTurn", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    envState.OPENAI_API_KEY = "openai-test-key";
+    envState.OPENROUTER_API_KEY = "";
+    envState.APP_BASE_URL = "http://localhost:3000";
+    envState.APP_PUBLIC_URL = undefined;
   });
 
   it("converts compressed dialogue output and tool activity into addressed turn messages", async () => {
@@ -185,6 +199,7 @@ describe("runTeamTurn", () => {
 describe("/team-turn route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    envState.OPENAI_API_KEY = "openai-test-key";
   });
 
   it("validates and returns the team-turn payload", async () => {
