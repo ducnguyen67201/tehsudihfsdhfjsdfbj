@@ -81,4 +81,20 @@ describe("dispatchWorkflow", () => {
     expect(result.workflowId).toContain("support-analysis");
     expect(dispatcher.startSupportAnalysisWorkflow).toHaveBeenCalledTimes(1);
   });
+
+  it("routes support-summary payloads to summary dispatcher", async () => {
+    const dispatcher = createDispatcher();
+
+    const result = await dispatchWorkflow(dispatcher, {
+      type: "support-summary",
+      payload: {
+        workspaceId: "ws_1",
+        conversationId: "conv_1",
+        triggerReason: "INGRESS" as const,
+      },
+    });
+
+    expect(result.workflowId).toContain("support-summary");
+    expect(dispatcher.startSupportSummaryWorkflow).toHaveBeenCalledTimes(1);
+  });
 });

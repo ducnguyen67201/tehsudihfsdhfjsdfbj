@@ -2,8 +2,8 @@ import type * as summaryActivities from "@/domains/support/support-summary.activ
 import type { SupportSummaryWorkflowInput, SupportSummaryWorkflowResult } from "@shared/types";
 import { proxyActivities, sleep } from "@temporalio/workflow";
 
-// One activity, one LLM round-trip. Timeout is generous to absorb OpenAI
-// tail latency; retry once on transient failure and surrender if the second
+// One activity, one agents-service round-trip. Timeout is generous to absorb
+// provider tail latency; retry once on transient failure and surrender if the second
 // attempt fails — a stale card is better than a retry storm against the
 // agent service.
 const summaryActivitiesProxy = proxyActivities<typeof summaryActivities>({
@@ -26,7 +26,7 @@ const SUMMARY_CONTEXT_WINDOW_SECONDS = 60;
  * caches it on `SupportConversation.threadSummary`. Surfaced on inbox cards
  * in place of the raw last-message preview.
  *
- * Deterministic workflow ID (`support-summary::{conversationId}`) — the
+ * Deterministic workflow ID (`support-summary-${conversationId}`) — the
  * ingress path fires this eagerly per MESSAGE_RECEIVED+CUSTOMER event and
  * relies on Temporal's workflow-ID uniqueness to dedupe bursts.
  */

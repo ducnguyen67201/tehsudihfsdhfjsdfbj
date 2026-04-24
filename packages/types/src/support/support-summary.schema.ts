@@ -30,6 +30,22 @@ export const supportSummaryWorkflowResultSchema = z.object({
   sourceEventId: z.string().min(1).nullable(),
 });
 
+export const supportSummaryMessageSchema = z.object({
+  id: z.string().min(1),
+  text: z.string().trim().min(1),
+  at: z.iso.datetime(),
+});
+
+export const supportSummaryRequestSchema = z.object({
+  conversationId: z.string().min(1),
+  messages: z.array(supportSummaryMessageSchema).min(1),
+});
+
+export const supportSummaryResponseSchema = z.object({
+  summary: z.string().trim().min(1).max(THREAD_SUMMARY_MAX_CHARS),
+});
+
 export type SummaryTriggerReason = z.infer<typeof summaryTriggerReasonSchema>;
-export type SupportSummaryWorkflowInput = z.infer<typeof supportSummaryWorkflowInputSchema>;
-export type SupportSummaryWorkflowResult = z.infer<typeof supportSummaryWorkflowResultSchema>;
+export type SupportSummaryMessage = z.infer<typeof supportSummaryMessageSchema>;
+export type SupportSummaryRequest = z.infer<typeof supportSummaryRequestSchema>;
+export type SupportSummaryResponse = z.infer<typeof supportSummaryResponseSchema>;

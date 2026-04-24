@@ -462,15 +462,15 @@ export async function runSupportPipeline(
     mapAuthorRoleToEventSource(normalized.authorRoleBucket) ===
     SUPPORT_CONVERSATION_EVENT_SOURCE.customer
   ) {
-    try {
-      await temporalWorkflowDispatcher.startSupportSummaryWorkflow({
+    void temporalWorkflowDispatcher
+      .startSupportSummaryWorkflow({
         workspaceId: input.workspaceId,
         conversationId: txResult.conversation.id,
         triggerReason: SUMMARY_TRIGGER_REASON.ingress,
+      })
+      .catch((error) => {
+        console.warn("[support-summary] dispatch failed, continuing:", error);
       });
-    } catch (error) {
-      console.warn("[support-summary] dispatch failed, continuing:", error);
-    }
   }
 
   return {

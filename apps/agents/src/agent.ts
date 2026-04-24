@@ -1,17 +1,15 @@
 import { Agent } from "@mastra/core/agent";
 import {
-  AGENT_PROVIDER,
-  AGENT_PROVIDER_DEFAULTS,
   type AgentProviderConfig,
   type AnalyzeRequest,
   type AnalyzeResponse,
   type SessionDigest,
   type ToneConfig,
-  agentProviderConfigSchema,
   compressedAnalysisOutputSchema,
   reconstructAnalysisOutput,
 } from "@shared/types";
 
+import { getDefaultModel, resolveProviderConfig } from "./agent-config";
 import {
   SUPPORT_AGENT_SYSTEM_PROMPT,
   buildAnalysisPromptWithContext,
@@ -65,7 +63,7 @@ function createSupportAgent(
 export async function runAnalysis(request: AnalyzeRequest): Promise<AnalyzeResponse> {
   const startTime = Date.now();
   const maxSteps = request.config?.maxSteps ?? DEFAULT_MAX_STEPS;
-  const providerConfig = resolveProviderConfig(request);
+  const providerConfig = resolveProviderConfig(request.config);
   const modelName = providerConfig.model ?? getDefaultModel(providerConfig.provider);
 
   console.log("[agents] Starting analysis", {
@@ -108,15 +106,6 @@ export async function runAnalysis(request: AnalyzeRequest): Promise<AnalyzeRespo
   };
 }
 
-// ── Private Helpers ─────────────────────────────────────────────────
-
-function resolveProviderConfig(request: AnalyzeRequest): AgentProviderConfig {
-  return agentProviderConfigSchema.parse({
-    provider: request.config?.provider ?? AGENT_PROVIDER.openai,
-    model: request.config?.model,
-  });
-}
-
 function parseAgentOutput(rawOutput: string | undefined) {
   if (!rawOutput) {
     throw new Error("Agent produced no output after completing the loop");
@@ -151,8 +140,4 @@ function extractToolCalls(result: unknown) {
       typeof tc.result === "string" ? tc.result : JSON.stringify(tc.result ?? tc.output ?? ""),
     durationMs: 0,
   }));
-}
-
-function getDefaultModel(provider: string): string {
-  return AGENT_PROVIDER_DEFAULTS[provider]?.model ?? "gpt-4o";
 }

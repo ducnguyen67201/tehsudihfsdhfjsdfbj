@@ -106,6 +106,16 @@ type ProfileSummary = {
   avatarUrl: string | null;
 };
 
+type CustomerProfileRecord = {
+  installationId: string;
+  externalUserId: string;
+  displayName: string | null;
+  realName: string | null;
+  avatarUrl: string | null;
+  isBot: boolean;
+  isExternal: boolean;
+};
+
 /**
  * Fetch customer profiles referenced by the latest MESSAGE_RECEIVED event on
  * each conversation in a single round trip. Keyed by `installationId:userId`
@@ -132,7 +142,27 @@ async function buildLastMessageProfileLookup(
     return new Map();
   }
 
-  const profiles = await prisma.supportCustomerProfile.findMany({
+  const profiles = await loadCustomerProfilesByInstallation(pairsByInstallation);
+
+  const map = new Map<string, ProfileSummary>();
+  for (const profile of profiles) {
+    map.set(`${profile.installationId}:${profile.externalUserId}`, {
+      displayName: profile.displayName,
+      realName: profile.realName,
+      avatarUrl: profile.avatarUrl,
+    });
+  }
+  return map;
+}
+
+async function loadCustomerProfilesByInstallation(
+  pairsByInstallation: Map<string, Set<string>>
+): Promise<CustomerProfileRecord[]> {
+  if (pairsByInstallation.size === 0) {
+    return [];
+  }
+
+  return prisma.supportCustomerProfile.findMany({
     where: {
       OR: [...pairsByInstallation.entries()].map(([installationId, userIds]) => ({
         installationId,
@@ -146,18 +176,10 @@ async function buildLastMessageProfileLookup(
       displayName: true,
       realName: true,
       avatarUrl: true,
+      isBot: true,
+      isExternal: true,
     },
   });
-
-  const map = new Map<string, ProfileSummary>();
-  for (const profile of profiles) {
-    map.set(`${profile.installationId}:${profile.externalUserId}`, {
-      displayName: profile.displayName,
-      realName: profile.realName,
-      avatarUrl: profile.avatarUrl,
-    });
-  }
-  return map;
 }
 
 function extractSlackUserId(detailsJson: unknown): string | null {
@@ -313,16 +335,11 @@ export async function getConversationTimeline(
       })),
       createdAt: event.createdAt.toISOString(),
     })),
-    customerProfiles: await buildCustomerProfileMap(
-      workspaceId,
-      conversation.installationId,
-      events
-    ),
+    customerProfiles: await buildCustomerProfileMap(conversation.installationId, events),
   });
 }
 
 async function buildCustomerProfileMap(
-  workspaceId: string,
   installationId: string,
   events: Array<{ detailsJson: unknown }>
 ): Promise<
@@ -352,23 +369,9 @@ async function buildCustomerProfileMap(
     return {};
   }
 
-  const profiles = await prisma.supportCustomerProfile.findMany({
-    where: {
-      installationId,
-      externalUserId: { in: [...userIds] },
-      deletedAt: null,
-    },
-    select: {
-      externalUserId: true,
-      displayName: true,
-      realName: true,
-      avatarUrl: true,
-      isBot: true,
-      isExternal: true,
-    },
-  });
+  const profiles = await loadCustomerProfilesByInstallation(new Map([[installationId, userIds]]));
 
-  const map: Record<string, (typeof profiles)[number]> = {};
+  const map: Record<string, CustomerProfileRecord> = {};
   for (const profile of profiles) {
     map[profile.externalUserId] = profile;
   }
