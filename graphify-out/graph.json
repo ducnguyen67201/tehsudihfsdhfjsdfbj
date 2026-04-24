@@ -16767,8 +16767,8 @@
       "source_file": "packages/rest/src/services/support/session-thread-match-service.ts",
       "source_location": "L997",
       "weight": 1.0,
-      "_src": "session_thread_match_service_normalizeemailornull",
-      "_tgt": "user_service_normalizeemail",
+      "_src": "user_service_normalizeemail",
+      "_tgt": "session_thread_match_service_normalizeemailornull",
       "source": "user_service_normalizeemail",
       "target": "session_thread_match_service_normalizeemailornull"
     },
@@ -19179,8 +19179,8 @@
       "source_file": "apps/queue/src/domains/support/support-analysis.activity.ts",
       "source_location": "L109",
       "weight": 1.0,
-      "_src": "support_analysis_activity_getbesteffortsessioncontext",
-      "_tgt": "session_thread_match_service_getconversationsessioncontext",
+      "_src": "session_thread_match_service_getconversationsessioncontext",
+      "_tgt": "support_analysis_activity_getbesteffortsessioncontext",
       "source": "session_thread_match_service_getconversationsessioncontext",
       "target": "support_analysis_activity_getbesteffortsessioncontext"
     },
@@ -19671,8 +19671,8 @@
       "source_file": "apps/queue/src/domains/support/support-analysis.activity.ts",
       "source_location": "L112",
       "weight": 1.0,
-      "_src": "support_analysis_activity_getbesteffortsessioncontext",
-      "_tgt": "session_thread_match_service_emptyconversationsessioncontext",
+      "_src": "session_thread_match_service_emptyconversationsessioncontext",
+      "_tgt": "support_analysis_activity_getbesteffortsessioncontext",
       "source": "session_thread_match_service_emptyconversationsessioncontext",
       "target": "support_analysis_activity_getbesteffortsessioncontext"
     },
