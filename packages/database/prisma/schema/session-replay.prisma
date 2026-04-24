@@ -83,7 +83,7 @@ model SupportConversationSessionMatch {
   createdAt              DateTime            @default(now())
   updatedAt              DateTime            @updatedAt
 
-  @@unique([conversationId, sessionRecordId])
-  @@index([workspaceId, conversationId, isPrimary])
-  @@index([sessionRecordId, isPrimary])
+  @@unique([conversationId, sessionRecordId], map: "SupportConvSessionMatch_conversation_session_key")
+  @@index([workspaceId, conversationId, isPrimary], map: "SupportConvSessionMatch_workspace_conversation_primary_idx")
+  @@index([sessionRecordId, isPrimary], map: "SupportConvSessionMatch_session_primary_idx")
 }

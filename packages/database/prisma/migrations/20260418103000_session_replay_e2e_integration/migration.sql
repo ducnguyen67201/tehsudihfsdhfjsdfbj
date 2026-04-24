@@ -18,10 +18,10 @@ CREATE TABLE "SupportConversationSessionMatch" (
   "evidenceJson" JSONB,
   "isPrimary" BOOLEAN NOT NULL DEFAULT false,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
 
   CONSTRAINT "SupportConversationSessionMatch_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "SupportConversationSessionMatch_conversationId_sessionRecordId_key"
+  CONSTRAINT "SupportConvSessionMatch_conversation_session_key"
     UNIQUE ("conversationId", "sessionRecordId"),
   CONSTRAINT "SupportConversationSessionMatch_workspaceId_fkey"
     FOREIGN KEY ("workspaceId") REFERENCES "Workspace"("id") ON DELETE CASCADE ON UPDATE CASCADE,
@@ -31,12 +31,12 @@ CREATE TABLE "SupportConversationSessionMatch" (
     FOREIGN KEY ("sessionRecordId") REFERENCES "SessionRecord"("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-CREATE INDEX "SupportConversationSessionMatch_workspaceId_conversationId_isPrimary_idx"
+CREATE INDEX "SupportConvSessionMatch_workspace_conversation_primary_idx"
   ON "SupportConversationSessionMatch"("workspaceId", "conversationId", "isPrimary");
 
-CREATE INDEX "SupportConversationSessionMatch_sessionRecordId_isPrimary_idx"
+CREATE INDEX "SupportConvSessionMatch_session_primary_idx"
   ON "SupportConversationSessionMatch"("sessionRecordId", "isPrimary");
 
-CREATE UNIQUE INDEX "SupportConversationSessionMatch_one_primary_per_conversation_idx"
+CREATE UNIQUE INDEX "SupportConvSessionMatch_one_primary_conversation_idx"
   ON "SupportConversationSessionMatch"("conversationId")
   WHERE "isPrimary" = true;
