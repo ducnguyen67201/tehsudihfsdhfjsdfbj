@@ -36,16 +36,5 @@ export const supportSummaryMessageSchema = z.object({
   at: z.iso.datetime(),
 });
 
-export const supportSummaryRequestSchema = z.object({
-  conversationId: z.string().min(1),
-  messages: z.array(supportSummaryMessageSchema).min(1),
-});
-
-export const supportSummaryResponseSchema = z.object({
-  summary: z.string().trim().min(1).max(THREAD_SUMMARY_MAX_CHARS),
-});
-
 export type SummaryTriggerReason = z.infer<typeof summaryTriggerReasonSchema>;
 export type SupportSummaryMessage = z.infer<typeof supportSummaryMessageSchema>;
-export type SupportSummaryRequest = z.infer<typeof supportSummaryRequestSchema>;
-export type SupportSummaryResponse = z.infer<typeof supportSummaryResponseSchema>;
