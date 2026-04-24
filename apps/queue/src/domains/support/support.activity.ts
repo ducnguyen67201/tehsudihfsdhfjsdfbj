@@ -278,22 +278,26 @@ export async function runSupportPipeline(
       resolvedThreadTs
     );
 
-    const regexEmail = extractMessageEmail(normalized.text);
-    const customerIdentitySource = regexEmail
-      ? SUPPORT_CUSTOMER_IDENTITY_SOURCE.messageRegex
-      : normalized.slackUserId
-        ? SUPPORT_CUSTOMER_IDENTITY_SOURCE.messagePayload
-        : null;
-    const identityUpdate = {
-      ...(normalized.slackUserId ? { customerSlackUserId: normalized.slackUserId } : {}),
-      ...(regexEmail ? { customerEmail: regexEmail } : {}),
-      ...(customerIdentitySource
-        ? {
-            customerIdentitySource,
-            customerIdentityUpdatedAt: now,
-          }
-        : {}),
-    };
+    const regexEmail = isCustomer ? extractMessageEmail(normalized.text) : null;
+    const customerIdentitySource = isCustomer
+      ? regexEmail
+        ? SUPPORT_CUSTOMER_IDENTITY_SOURCE.messageRegex
+        : normalized.slackUserId
+          ? SUPPORT_CUSTOMER_IDENTITY_SOURCE.messagePayload
+          : null
+      : null;
+    const identityUpdate = isCustomer
+      ? {
+          ...(normalized.slackUserId ? { customerSlackUserId: normalized.slackUserId } : {}),
+          ...(regexEmail ? { customerEmail: regexEmail } : {}),
+          ...(customerIdentitySource
+            ? {
+                customerIdentitySource,
+                customerIdentityUpdatedAt: now,
+              }
+            : {}),
+        }
+      : {};
 
     // Ingress goes through the conversation FSM's `customerMessageReceived`
     // event. Per the FSM, that event lands UNREAD from any current state,

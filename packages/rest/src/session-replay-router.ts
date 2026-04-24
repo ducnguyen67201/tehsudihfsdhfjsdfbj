@@ -1,11 +1,13 @@
 import { prisma } from "@shared/database";
 import * as sessionThreadMatch from "@shared/rest/services/support/session-thread-match-service";
-import { router, workspaceProcedure } from "@shared/rest/trpc";
-import { SESSION_MATCH_CONFIDENCE } from "@shared/types";
+import { router, workspaceRoleProcedure } from "@shared/rest/trpc";
+import { SESSION_MATCH_CONFIDENCE, WORKSPACE_ROLE } from "@shared/types";
 import { z } from "zod";
 
+const operatorProcedure = workspaceRoleProcedure(WORKSPACE_ROLE.MEMBER);
+
 export const sessionReplayRouter = router({
-  list: workspaceProcedure
+  list: operatorProcedure
     .input(
       z
         .object({
@@ -46,7 +48,7 @@ export const sessionReplayRouter = router({
       };
     }),
 
-  getEvents: workspaceProcedure
+  getEvents: operatorProcedure
     .input(
       z.object({
         sessionRecordId: z.string().min(1),
@@ -76,7 +78,7 @@ export const sessionReplayRouter = router({
       return { events, failurePointId };
     }),
 
-  correlate: workspaceProcedure
+  correlate: operatorProcedure
     .input(
       z.object({
         conversationId: z.string().min(1).optional(),
@@ -139,7 +141,7 @@ export const sessionReplayRouter = router({
       return { session: sessionThreadMatch.toSessionRecordResponse(session), matchConfidence };
     }),
 
-  getSession: workspaceProcedure
+  getSession: operatorProcedure
     .input(z.object({ sessionRecordId: z.string().min(1) }))
     .query(async ({ ctx, input }) => {
       const session = await prisma.sessionRecord.findFirst({
@@ -153,7 +155,7 @@ export const sessionReplayRouter = router({
       return session ? sessionThreadMatch.toSessionRecordResponse(session) : null;
     }),
 
-  getForConversation: workspaceProcedure
+  getForConversation: operatorProcedure
     .input(
       z.object({
         conversationId: z.string().min(1),
@@ -174,7 +176,7 @@ export const sessionReplayRouter = router({
       };
     }),
 
-  getReplayChunks: workspaceProcedure
+  getReplayChunks: operatorProcedure
     .input(z.object({ sessionRecordId: z.string().min(1) }))
     .query(async ({ ctx, input }) => {
       const chunks = await prisma.sessionReplayChunk.findMany({
