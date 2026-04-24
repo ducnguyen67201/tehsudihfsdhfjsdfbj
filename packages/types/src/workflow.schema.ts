@@ -3,12 +3,17 @@ import {
   analysisResultStatusSchema,
   analysisTriggerTypeSchema,
 } from "@shared/types/support/support-analysis.schema";
+import {
+  supportSummaryWorkflowInputSchema,
+  type supportSummaryWorkflowResultSchema,
+} from "@shared/types/support/support-summary.schema";
 import { z } from "zod";
 
 export const workflowNames = {
   supportInbox: "supportInboxWorkflow",
   supportAnalysis: "supportAnalysisWorkflow",
-  fixPr: "fixPrWorkflow",
+  supportSummary: "supportSummaryWorkflow",
+  sendDraftToSlack: "sendDraftToSlackWorkflow",
   repositoryIndex: "repositoryIndexWorkflow",
 } as const;
 
@@ -46,18 +51,6 @@ export const supportWorkflowResultSchema = z.object({
   processedAt: z.iso.datetime(),
 });
 
-export const codexWorkflowInputSchema = z.object({
-  analysisId: z.string().min(1),
-  repositoryId: z.string().min(1),
-  pullRequestNumber: z.number().int().positive(),
-});
-
-export const codexWorkflowResultSchema = z.object({
-  analysisId: z.string(),
-  status: workflowProcessingStatusSchema,
-  queuedAt: z.iso.datetime(),
-});
-
 export const repositoryIndexWorkflowInputSchema = z.object({
   syncRequestId: z.string().min(1),
   workspaceId: z.string().min(1),
@@ -85,6 +78,18 @@ export const supportAnalysisWorkflowResultSchema = z.object({
   toolCallCount: z.number(),
 });
 
+export const sendDraftToSlackInputSchema = z.object({
+  draftId: z.string().min(1),
+  dispatchId: z.string().min(1),
+  workspaceId: z.string().min(1),
+});
+
+export const sendDraftToSlackResultSchema = z.object({
+  draftId: z.string().min(1),
+  slackMessageTs: z.string().nullable(),
+  status: z.enum(["SENT", "SEND_FAILED"]),
+});
+
 export const workflowDispatchSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("support"),
@@ -95,22 +100,29 @@ export const workflowDispatchSchema = z.discriminatedUnion("type", [
     payload: supportAnalysisWorkflowInputSchema,
   }),
   z.object({
-    type: z.literal("codex"),
-    payload: codexWorkflowInputSchema,
+    type: z.literal("support-summary"),
+    payload: supportSummaryWorkflowInputSchema,
   }),
   z.object({
     type: z.literal("repository-index"),
     payload: repositoryIndexWorkflowInputSchema,
   }),
+  z.object({
+    type: z.literal("send-draft-to-slack"),
+    payload: sendDraftToSlackInputSchema,
+  }),
 ]);
+
+export type SendDraftToSlackInput = z.infer<typeof sendDraftToSlackInputSchema>;
+export type SendDraftToSlackResult = z.infer<typeof sendDraftToSlackResultSchema>;
 
 export type WorkflowNames = typeof workflowNames;
 export type SupportWorkflowInput = z.infer<typeof supportWorkflowInputSchema>;
 export type SupportWorkflowResult = z.infer<typeof supportWorkflowResultSchema>;
 export type SupportAnalysisWorkflowInput = z.infer<typeof supportAnalysisWorkflowInputSchema>;
 export type SupportAnalysisWorkflowResult = z.infer<typeof supportAnalysisWorkflowResultSchema>;
-export type CodexWorkflowInput = z.infer<typeof codexWorkflowInputSchema>;
-export type CodexWorkflowResult = z.infer<typeof codexWorkflowResultSchema>;
+export type SupportSummaryWorkflowInput = z.infer<typeof supportSummaryWorkflowInputSchema>;
+export type SupportSummaryWorkflowResult = z.infer<typeof supportSummaryWorkflowResultSchema>;
 export type RepositoryIndexWorkflowInput = z.infer<typeof repositoryIndexWorkflowInputSchema>;
 export type RepositoryIndexWorkflowResult = z.infer<typeof repositoryIndexWorkflowResultSchema>;
 export type WorkflowDispatchRequest = z.infer<typeof workflowDispatchSchema>;

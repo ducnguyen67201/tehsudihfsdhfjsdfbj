@@ -59,6 +59,57 @@ export const supportCustomerIdentitySourceValues = [
 
 export const supportCustomerIdentitySourceSchema = z.enum(supportCustomerIdentitySourceValues);
 
+export const SUPPORT_GROUPING_CORRECTION_KIND = {
+  merge: "MERGE",
+  reassignEvent: "REASSIGN_EVENT",
+} as const;
+
+export const supportGroupingCorrectionKindValues = [
+  SUPPORT_GROUPING_CORRECTION_KIND.merge,
+  SUPPORT_GROUPING_CORRECTION_KIND.reassignEvent,
+] as const;
+
+export const supportGroupingCorrectionKindSchema = z.enum(supportGroupingCorrectionKindValues);
+
+export type SupportGroupingCorrectionKind = z.infer<typeof supportGroupingCorrectionKindSchema>;
+
+// Input schemas for the tRPC procedures in support-grouping-correction-service.ts.
+export const supportMergeConversationsRequestSchema = z.object({
+  workspaceId: z.string().min(1),
+  primaryConversationId: z.string().min(1),
+  secondaryConversationIds: z.array(z.string().min(1)).min(1).max(10),
+  idempotencyKey: z.string().min(1).max(128),
+});
+
+export const supportReassignEventRequestSchema = z.object({
+  workspaceId: z.string().min(1),
+  eventId: z.string().min(1),
+  targetConversationId: z.string().min(1),
+  idempotencyKey: z.string().min(1).max(128),
+});
+
+export const supportUndoCorrectionRequestSchema = z.object({
+  workspaceId: z.string().min(1),
+  correctionId: z.string().min(1),
+});
+
+export type SupportMergeConversationsRequest = z.infer<
+  typeof supportMergeConversationsRequestSchema
+>;
+export type SupportReassignEventRequest = z.infer<typeof supportReassignEventRequestSchema>;
+export type SupportUndoCorrectionRequest = z.infer<typeof supportUndoCorrectionRequestSchema>;
+
+export const supportConversationLastMessageSchema = z.object({
+  preview: z.string(),
+  senderExternalUserId: z.string().nullable(),
+  senderDisplayName: z.string().nullable(),
+  senderRealName: z.string().nullable(),
+  senderAvatarUrl: z.string().nullable(),
+  createdAt: z.iso.datetime(),
+});
+
+export type SupportConversationLastMessage = z.infer<typeof supportConversationLastMessageSchema>;
+
 export const supportConversationSchema = z.object({
   id: z.string().min(1),
   workspaceId: z.string().min(1),
@@ -77,6 +128,18 @@ export const supportConversationSchema = z.object({
   staleAt: z.iso.datetime().nullable(),
   retryCount: z.number().int().nonnegative(),
   lastActivityAt: z.iso.datetime(),
+  /**
+   * Preview of the most recent customer-authored message plus the sender's
+   * resolved profile, for inbox cards. Null when the conversation has no
+   * customer-authored events yet (rare — grouping correction edge case).
+   */
+  lastCustomerMessage: supportConversationLastMessageSchema.nullable(),
+  /**
+   * LLM-generated one-liner describing what the thread is about. Populated
+   * asynchronously by the summarization workflow. Null until the first
+   * summary lands — inbox cards fall back to `lastCustomerMessage.preview`.
+   */
+  threadSummary: z.string().min(1).nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });

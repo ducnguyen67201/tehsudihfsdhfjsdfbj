@@ -19,10 +19,15 @@ function createDispatcher(): WorkflowDispatcher {
       runId: "run_analysis_1",
       queue: "support-general",
     })),
-    startCodexWorkflow: vi.fn(async () => ({
-      workflowId: "fix-pr-analysis_1",
-      runId: "run_codex_1",
-      queue: "codex-intensive",
+    startSupportSummaryWorkflow: vi.fn(async () => ({
+      workflowId: "support-summary-conv_1",
+      runId: "run_summary_1",
+      queue: "support-general",
+    })),
+    startSendDraftToSlackWorkflow: vi.fn(async () => ({
+      workflowId: "send-draft-draft_1",
+      runId: "run_send_draft_1",
+      queue: "support-general",
     })),
   };
 }
@@ -43,22 +48,6 @@ describe("dispatchWorkflow", () => {
 
     expect(result.workflowId).toContain("support-pipeline");
     expect(dispatcher.startSupportWorkflow).toHaveBeenCalledTimes(1);
-  });
-
-  it("routes codex payloads to codex dispatcher", async () => {
-    const dispatcher = createDispatcher();
-
-    const result = await dispatchWorkflow(dispatcher, {
-      type: "codex",
-      payload: {
-        analysisId: "analysis_1",
-        repositoryId: "repo_1",
-        pullRequestNumber: 42,
-      },
-    });
-
-    expect(result.workflowId).toContain("fix-pr");
-    expect(dispatcher.startCodexWorkflow).toHaveBeenCalledTimes(1);
   });
 
   it("routes repository index payloads to the codex indexing dispatcher", async () => {
@@ -91,5 +80,21 @@ describe("dispatchWorkflow", () => {
 
     expect(result.workflowId).toContain("support-analysis");
     expect(dispatcher.startSupportAnalysisWorkflow).toHaveBeenCalledTimes(1);
+  });
+
+  it("routes support-summary payloads to summary dispatcher", async () => {
+    const dispatcher = createDispatcher();
+
+    const result = await dispatchWorkflow(dispatcher, {
+      type: "support-summary",
+      payload: {
+        workspaceId: "ws_1",
+        conversationId: "conv_1",
+        triggerReason: "INGRESS" as const,
+      },
+    });
+
+    expect(result.workflowId).toContain("support-summary");
+    expect(dispatcher.startSupportSummaryWorkflow).toHaveBeenCalledTimes(1);
   });
 });

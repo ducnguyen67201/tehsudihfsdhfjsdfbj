@@ -1,6 +1,10 @@
 import { sessionDigestSchema } from "@shared/types/session-replay/session-digest.schema";
+import {
+  supportConversationEventSourceSchema,
+  supportConversationStatusSchema,
+} from "@shared/types/support/support-conversation.schema";
 import { z } from "zod";
-import { sentryContextSchema } from "./sentry.schema";
+import { agentProviderSchema } from "./agent-provider.schema";
 import { toneConfigSchema } from "./tone-config.schema";
 
 export const ANALYSIS_STATUS = {
@@ -71,7 +75,10 @@ export const DRAFT_STATUS = {
   generating: "GENERATING",
   awaitingApproval: "AWAITING_APPROVAL",
   approved: "APPROVED",
+  sending: "SENDING",
   sent: "SENT",
+  sendFailed: "SEND_FAILED",
+  deliveryUnknown: "DELIVERY_UNKNOWN",
   dismissed: "DISMISSED",
   failed: "FAILED",
 } as const;
@@ -80,7 +87,10 @@ export const draftStatusValues = [
   DRAFT_STATUS.generating,
   DRAFT_STATUS.awaitingApproval,
   DRAFT_STATUS.approved,
+  DRAFT_STATUS.sending,
   DRAFT_STATUS.sent,
+  DRAFT_STATUS.sendFailed,
+  DRAFT_STATUS.deliveryUnknown,
   DRAFT_STATUS.dismissed,
   DRAFT_STATUS.failed,
 ] as const;
@@ -88,6 +98,26 @@ export const draftStatusValues = [
 export const MAX_ANALYSIS_RETRIES = 3;
 
 export const draftStatusSchema = z.enum(draftStatusValues);
+
+export const DRAFT_DISPATCH_KIND = {
+  sendToSlack: "SEND_TO_SLACK",
+} as const;
+
+export const DRAFT_DISPATCH_STATUS = {
+  pending: "PENDING",
+  dispatched: "DISPATCHED",
+  failed: "FAILED",
+} as const;
+
+export const draftDispatchStatusValues = [
+  DRAFT_DISPATCH_STATUS.pending,
+  DRAFT_DISPATCH_STATUS.dispatched,
+  DRAFT_DISPATCH_STATUS.failed,
+] as const;
+
+export const draftDispatchStatusSchema = z.enum(draftDispatchStatusValues);
+
+export type DraftDispatchStatus = z.infer<typeof draftDispatchStatusSchema>;
 
 export const EVIDENCE_SOURCE_TYPE = {
   codeChunk: "CODE_CHUNK",
@@ -141,7 +171,6 @@ export const supportAnalysisSchema = z.object({
   llmModel: z.string().nullable(),
   llmLatencyMs: z.number().nullable(),
   errorMessage: z.string().nullable(),
-  sentryContext: sentryContextSchema.nullable().optional(),
   createdAt: z.string(),
 });
 
@@ -164,18 +193,56 @@ export const supportDraftSchema = z.object({
   createdAt: z.string(),
 });
 
+// ── Thread Snapshot (structured payload to the agent) ───────────────
+
+// Recursive JSON-safe value. Matches Prisma.InputJsonValue structurally so a typed
+// ThreadSnapshot can be persisted to a Postgres JSON column without a defensive clone.
+const jsonValueSchema: z.ZodType<unknown> = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.null(),
+    z.array(jsonValueSchema),
+    z.record(z.string(), jsonValueSchema),
+  ])
+);
+
+export const threadSnapshotEventSchema = z
+  .object({
+    type: z.string().min(1),
+    source: supportConversationEventSourceSchema,
+    summary: z.string().nullable(),
+    details: z.record(z.string(), jsonValueSchema).nullable(),
+    at: z.iso.datetime(),
+  })
+  .strict();
+
+export const threadSnapshotSchema = z
+  .object({
+    conversationId: z.string().min(1),
+    channelId: z.string().min(1),
+    threadTs: z.string().min(1),
+    status: supportConversationStatusSchema,
+    customer: z.object({ email: z.string().nullable() }).strict(),
+    events: z.array(threadSnapshotEventSchema),
+  })
+  .strict();
+
+export type ThreadSnapshot = z.infer<typeof threadSnapshotSchema>;
+
 // ── Agent Service Contract ──────────────────────────────────────────
 // Shared between web (sends config), queue (passes through), agents (executes).
 
 export const analyzeRequestSchema = z.object({
   workspaceId: z.string().min(1),
   conversationId: z.string().min(1),
-  threadSnapshot: z.string().min(1),
+  threadSnapshot: threadSnapshotSchema,
   sessionDigest: sessionDigestSchema.optional(),
   config: z
     .object({
       maxSteps: z.number().int().positive().optional(),
-      provider: z.string().optional(),
+      provider: agentProviderSchema.optional(),
       model: z.string().optional(),
       toneConfig: toneConfigSchema.optional(),
     })
@@ -194,7 +261,7 @@ export const analyzeResponseSchema = z.object({
   draft: draftResultSchema.nullable(),
   toolCalls: z.array(toolCallRecordSchema),
   meta: z.object({
-    provider: z.string(),
+    provider: agentProviderSchema,
     model: z.string(),
     totalDurationMs: z.number(),
     turnCount: z.number(),

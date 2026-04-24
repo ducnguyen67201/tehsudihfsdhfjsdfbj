@@ -19,9 +19,13 @@ export async function dispatchWorkflow(
     return dispatcher.startSupportAnalysisWorkflow(parsed.payload);
   }
 
+  if (parsed.type === "support-summary") {
+    return dispatcher.startSupportSummaryWorkflow(parsed.payload);
+  }
+
   if (parsed.type === "repository-index") {
     return dispatcher.startRepositoryIndexWorkflow(parsed.payload);
   }
 
-  return dispatcher.startCodexWorkflow(parsed.payload);
+  return dispatcher.startSendDraftToSlackWorkflow(parsed.payload);
 }
