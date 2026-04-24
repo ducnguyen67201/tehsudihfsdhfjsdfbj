@@ -27,5 +27,14 @@ export async function dispatchWorkflow(
     return dispatcher.startRepositoryIndexWorkflow(parsed.payload);
   }
 
-  return dispatcher.startSendDraftToSlackWorkflow(parsed.payload);
+  if (parsed.type === "agent-team-run") {
+    return dispatcher.startAgentTeamRunWorkflow(parsed.payload);
+  }
+
+  if (parsed.type === "send-draft-to-slack") {
+    return dispatcher.startSendDraftToSlackWorkflow(parsed.payload);
+  }
+
+  const exhaustiveCheck: never = parsed;
+  throw new Error(`Unsupported workflow dispatch request: ${JSON.stringify(exhaustiveCheck)}`);
 }
