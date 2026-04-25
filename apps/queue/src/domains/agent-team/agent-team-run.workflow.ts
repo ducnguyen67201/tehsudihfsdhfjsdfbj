@@ -64,6 +64,10 @@ export async function agentTeamRunWorkflow(
         workspaceId: input.workspaceId,
         conversationId: input.conversationId,
         runId: input.runId,
+        // Pass the workflow's turn counter so the agent derives deterministic
+        // question ids in resolution output: same compressed input + same
+        // (runId, turnIndex) = same ids across activity retries.
+        turnIndex: turnCount,
         teamRoles: input.teamSnapshot.roles,
         role,
         requestSummary: input.threadSnapshot,

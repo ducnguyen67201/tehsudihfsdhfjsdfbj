@@ -199,7 +199,10 @@ export async function runTeamTurn(
   });
 
   const result = await agent.generate(userMessage, { maxSteps, toolChoice: "auto" });
-  const output = parseTeamTurnOutput(result.text);
+  const output = parseTeamTurnOutput(result.text, {
+    runId: request.runId,
+    turnIndex: request.turnIndex,
+  });
   const toolCalls = extractToolCalls(result);
   logToolUsage("[agents:debug] Team turn tool usage", {
     endpoint: "/team-turn",
@@ -233,7 +236,14 @@ export async function runTeamTurn(
     messages: output.messages.length,
     proposedFacts: output.proposedFacts.length,
     done: output.done,
-    blocked: Boolean(output.blockedReason),
+    // A role is "blocked" when its resolution status is needs_input (it has
+    // questions external to itself) or no_action_needed (the conversation is
+    // closing). status=complete or null resolution = not blocked. This replaced
+    // the legacy `Boolean(output.blockedReason)` derivation.
+    blocked:
+      output.resolution !== null &&
+      output.resolution !== undefined &&
+      output.resolution.status !== "complete",
   });
 
   return agentTeamRoleTurnOutputSchema.parse({
@@ -254,14 +264,20 @@ function parseAgentOutput(rawOutput: string | undefined) {
   return reconstructAnalysisOutput(compressed);
 }
 
-function parseTeamTurnOutput(rawOutput: string | undefined) {
+function parseTeamTurnOutput(
+  rawOutput: string | undefined,
+  context: { runId: string; turnIndex: number }
+) {
   if (!rawOutput) {
     throw new Error("Agent team role produced no output after completing the loop");
   }
 
   const parsed = parseJsonModelOutput(rawOutput, "Agent team role returned non-JSON response");
   const compressed = compressedAgentTeamTurnOutputSchema.parse(parsed);
-  const reconstructed = reconstructAgentTeamTurnOutput(compressed);
+  // Reconstruction assigns deterministic question ids using runId + turnIndex.
+  // Same compressed input + same context = same ids (idempotent across activity
+  // retries). LLM-supplied ids are explicitly NOT accepted (Issue 3A).
+  const reconstructed = reconstructAgentTeamTurnOutput(compressed, context);
 
   return {
     messages: reconstructed.messages.map((message) =>
@@ -278,7 +294,7 @@ function parseTeamTurnOutput(rawOutput: string | undefined) {
     resolvedQuestionIds: reconstructed.resolvedQuestionIds,
     nextSuggestedRoleKeys: reconstructed.nextSuggestedRoleKeys,
     done: reconstructed.done,
-    blockedReason: reconstructed.blockedReason,
+    resolution: reconstructed.resolution,
   };
 }
 

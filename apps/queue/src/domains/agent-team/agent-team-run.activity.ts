@@ -479,13 +479,25 @@ export async function persistRoleTurnResult(
       });
     }
 
-    // Self-role terminal state. done → role_completed, blockedReason →
-    // role_blocked. "idle" is the normal between-turn state; no event.
+    // Self-role terminal state. done → role_completed, resolution.status !=
+    // complete → role_blocked. "idle" is the normal between-turn state; no
+    // event. This logic was previously keyed off `result.blockedReason`; it
+    // now derives from `result.resolution.status` per the agentic resolution
+    // schema rollout (PR 1, atomic with `b → r` schema change).
+    const isResolutionBlocked =
+      input.result.resolution !== null &&
+      input.result.resolution !== undefined &&
+      input.result.resolution.status !== "complete";
     const selfState = input.result.done
       ? AGENT_TEAM_ROLE_INBOX_STATE.done
-      : input.result.blockedReason
+      : isResolutionBlocked
         ? AGENT_TEAM_ROLE_INBOX_STATE.blocked
         : AGENT_TEAM_ROLE_INBOX_STATE.idle;
+
+    // Wake reason replaces the legacy freeform blockedReason string with the
+    // architect's structured `whyStuck` text. Same human-readable column;
+    // structured payload now lives on `question_dispatched` events instead.
+    const wakeReasonText = input.result.resolution?.whyStuck ?? null;
 
     await tx.agentTeamRoleInbox.update({
       where: {
@@ -498,7 +510,7 @@ export async function persistRoleTurnResult(
         state: selfState,
         lastReadMessageId: createdMessages.at(-1)?.id ?? null,
         unreadCount: 0,
-        wakeReason: input.result.blockedReason ?? null,
+        wakeReason: wakeReasonText,
       },
     });
 
@@ -518,7 +530,7 @@ export async function persistRoleTurnResult(
         actor: input.role.roleKey,
         payload: {
           roleKey: input.role.roleKey,
-          wakeReason: input.result.blockedReason ?? null,
+          wakeReason: wakeReasonText,
         },
       });
     }
@@ -696,7 +708,17 @@ function normalizeTurnMessages(
     (message) => message.kind === AGENT_TEAM_MESSAGE_KIND.blocked
   );
 
-  if (result.blockedReason && !alreadyBlocked) {
+  // Synthesize a `kind=blocked` transcript message when the architect emits
+  // a non-complete resolution and didn't already include an explicit blocked
+  // message. The body uses `resolution.whyStuck` (replaces the legacy freeform
+  // blockedReason). Structured questions live on `question_dispatched` events
+  // and on AgentTeamMessage.metadata, NOT on this synthetic message.
+  const isResolutionBlocked =
+    result.resolution !== null &&
+    result.resolution !== undefined &&
+    result.resolution.status !== "complete";
+  if (isResolutionBlocked && !alreadyBlocked) {
+    const whyStuck = result.resolution?.whyStuck ?? "Agent stopped without a stated reason";
     messages.push({
       toRoleKey:
         role.slug === AGENT_TEAM_ROLE_SLUG.architect
@@ -705,7 +727,7 @@ function normalizeTurnMessages(
             AGENT_TEAM_TARGET.orchestrator),
       kind: AGENT_TEAM_MESSAGE_KIND.blocked,
       subject: `${role.label} blocked`,
-      content: result.blockedReason,
+      content: whyStuck,
       refs: [],
     });
   }
