@@ -3,7 +3,7 @@ import { proxyActivities } from "@temporalio/workflow";
 
 // Partition archive runs nightly. Single activity, bounded by its internal
 // batch size; Temporal retries on transient DB failures but the activity is
-// idempotent (it checks partition existence before drop/create).
+// idempotent because it only drops partitions after checking the catalog.
 const activities = proxyActivities<typeof archiveActivities>({
   startToCloseTimeout: "15 minutes",
   heartbeatTimeout: "60 seconds",
@@ -16,7 +16,6 @@ export interface AgentTeamArchiveWorkflowInput {
 
 export interface AgentTeamArchiveWorkflowResult {
   partitionsDropped: number;
-  partitionsCreated: number;
   rowsArchived: number;
   retentionDays: number;
 }
@@ -29,7 +28,6 @@ export async function agentTeamArchiveWorkflow(
   });
   return {
     partitionsDropped: result.partitionsDropped,
-    partitionsCreated: result.partitionsCreated,
     rowsArchived: result.rowsArchived,
     retentionDays: result.retentionDays,
   };

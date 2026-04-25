@@ -244,7 +244,7 @@ Two Temporal schedules auto-register on worker startup, both on `TASK_QUEUES.COD
 | Schedule ID | Cron | Purpose |
 |---|---|---|
 | `agent-team-metrics-rollup` | `0 1 * * *` (01:00 UTC daily) | Aggregate yesterday's events into `WorkspaceAgentMetrics` |
-| `agent-team-event-archive` | `0 4 * * *` (04:00 UTC daily) | Drop partitions older than retention; pre-create future partitions |
+| `agent-team-event-archive` | `0 4 * * *` (04:00 UTC daily) | Drop partitions older than retention |
 
 Metrics run **3 hours before** archive by design — archive refuses to drop any partition whose days haven't been rolled up yet, so this ordering lets the rollup watermark catch up before partitions disappear.
 
@@ -255,10 +255,10 @@ Metrics run **3 hours before** archive by design — archive refuses to drop any
 - Computed via SQL percentile aggregates over the event rows
 - Not wired to UI today — exposed to SQL / downstream dashboards
 
-### Archive + partition rotation
+### Archive
 
 - `apps/queue/src/domains/agent-team/agent-team-archive.activity.ts`
-- Keeps `FUTURE_PARTITIONS_TO_KEEP = 6` months of forward margin so inserts never hit a missing range even after a multi-month scheduler outage
+- Runtime archive code only drops existing partitions after safety checks; migrations/DB ops provision future partitions so workers do not create schema at startup/runtime
 - **Two safety gates before any `DROP PARTITION`:**
   - `env.AGENT_ARCHIVE_MODE` must permit drops. `keep` (default) never drops. `unsafe-stdout-only` drops **after** streaming rows to stdout as JSONL, and is only safe when a durable log sink is capturing stdout.
   - Metrics rollup must have processed every UTC day the partition covers. Incomplete rollup → skip the drop and log the reason.
@@ -306,7 +306,7 @@ Metrics run **3 hours before** archive by design — archive refuses to drop any
 - **The event log is the source of truth.** Every projection (`AgentTeamMessage`, `AgentTeamFact`, `AgentTeamOpenQuestion`, `AgentTeamRoleInbox`) is written in the same `$transaction` as the events that produced it. The parity test enforces this for messages — extend it when adding new projections.
 - **Runs carry `teamSnapshot`.** Historical runs are reproducible even if the team is edited or deleted later. Never re-resolve a role from the live team at execution time.
 - **`roleKey` is the runtime address; `slug` is the behavior preset.** Duplicating a role type is safe because delivery, inboxes, and open-question ownership run on `roleKey`, while prompt lookup and routing-policy checks still use `slug`.
-- **Partitioned events table is managed by migration, not Prisma.** `db:push` on `AgentTeamRunEvent` recreates it without partitions — use `db:migrate`.
+- **Partitioned events table is managed by migration/DB ops, not Prisma or queue workers.** `db:push` on `AgentTeamRunEvent` recreates it without partitions — use `db:migrate`.
 - **Archive drops are double-gated** on `AGENT_ARCHIVE_MODE` AND rollup-watermark completeness. Loosening either is a data-loss risk.
 - **`TASK_QUEUES.CODEX` is where the run workflow lives.** Not SUPPORT. The queue worker registers both sets of workflows/activities.
 - **Turn budgets are enforced by the workflow, not the agent.** A buggy agent that emits infinite messages hits `MAX_AGENT_TEAM_MESSAGES = 40` inside `persistRoleTurnResult` and the whole run fails fast.

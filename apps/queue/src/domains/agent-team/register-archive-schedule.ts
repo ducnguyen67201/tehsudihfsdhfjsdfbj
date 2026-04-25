@@ -13,10 +13,10 @@ const DEFAULT_RETENTION_DAYS = 30;
 
 /**
  * Idempotently register (or update) the Temporal schedule for the agent-team
- * event archive + partition rotation. Safe to call repeatedly — used from
- * worker startup so operators don't have to run a separate script before the
- * first archival cycle. Returns whether the schedule already existed so the
- * caller can log accordingly.
+ * event archive. Safe to call repeatedly — used from worker startup so
+ * operators don't have to run a separate script before the first archival
+ * cycle. Returns whether the schedule already existed so the caller can log
+ * accordingly.
  */
 export async function registerAgentTeamArchiveSchedule(
   client: Client
