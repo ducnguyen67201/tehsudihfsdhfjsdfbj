@@ -3,24 +3,17 @@ import { prisma } from "@shared/database";
 import { env } from "@shared/env";
 import { heartbeat } from "@temporalio/activity";
 
-// How many months of future partitions to keep warm. Nightly rotation creates
-// future partitions proactively so inserts never hit a missing range. Six
-// months of forward margin tolerates a multi-month scheduler outage before
-// insert failures start. We intentionally do not also add a DEFAULT
-// partition — having rows in a default partition later makes CREATE TABLE …
-// PARTITION OF … FOR VALUES FROM … fail on any overlapping range, which
-// turns a recoverable situation into a manual-intervention one.
-const FUTURE_PARTITIONS_TO_KEEP = 6;
-
 // Parent table whose partitions we manage. Partition naming pattern:
 // "AgentTeamRunEvent_YYYYMM". Partition boundaries are first-of-month UTC.
+// Runtime code only archives/drops existing partitions; migrations provision
+// future partitions so app workers do not create schema at startup/runtime.
 const PARENT_TABLE = "AgentTeamRunEvent";
 const PARTITION_PREFIX = "AgentTeamRunEvent_";
 
 // Defense-in-depth: every identifier spliced into raw DDL must match this
 // shape. Even though names are catalog-derived or built from Date math, a
-// future refactor that pipes user/config input through partitionName() must
-// not be able to emit arbitrary SQL.
+// future refactor that pipes user/config input through this path must not be
+// able to emit arbitrary SQL.
 const PARTITION_NAME_PATTERN = /^AgentTeamRunEvent_\d{6}$/;
 
 // Batch size for streaming archived rows to stdout. Partition size will vary;
@@ -29,7 +22,6 @@ const ARCHIVE_BATCH_ROWS = 1000;
 
 export interface ArchiveResult {
   partitionsDropped: number;
-  partitionsCreated: number;
   partitionsSkipped: number;
   rowsArchived: number;
   retentionDays: number;
@@ -51,7 +43,7 @@ export interface PartitionInfo {
 }
 
 /**
- * Nightly partition rotation + archive for AgentTeamRunEvent.
+ * Nightly archive for AgentTeamRunEvent partitions.
  *
  * 1. List every existing monthly partition attached to the parent table.
  * 2. For any partition whose upperExclusive boundary is at or before
@@ -66,8 +58,6 @@ export interface PartitionInfo {
  *          the only way to let a future rollup backfill succeed.
  *    Partitions that fail either gate are kept (no DROP) and counted as
  *    `partitionsSkipped` with a log line explaining the reason.
- * 3. Ensure the next FUTURE_PARTITIONS_TO_KEEP months have partitions
- *    so that inserts never hit a missing range.
  */
 export async function archiveAgentTeamEvents(input?: {
   retentionDays?: number;
@@ -99,22 +89,8 @@ export async function archiveAgentTeamEvents(input?: {
     heartbeat();
   }
 
-  // Maintain the forward buffer. `monthBoundary(now, 0)` is the start of the
-  // current month. Create up to FUTURE_PARTITIONS_TO_KEEP ahead.
-  let partitionsCreated = 0;
-  const existingNames = new Set(partitions.map((p) => p.tableName));
-  for (let i = 0; i <= FUTURE_PARTITIONS_TO_KEEP; i += 1) {
-    const lo = monthBoundary(now, i);
-    const hi = monthBoundary(now, i + 1);
-    const name = partitionName(lo);
-    if (existingNames.has(name)) continue;
-    await createPartition(name, lo, hi);
-    partitionsCreated += 1;
-  }
-
   return {
     partitionsDropped,
-    partitionsCreated,
     partitionsSkipped: skipped.length,
     rowsArchived,
     retentionDays,
@@ -324,14 +300,6 @@ async function readPartitionBatch(
   );
 }
 
-async function createPartition(name: string, lo: Date, hi: Date): Promise<void> {
-  assertSafePartitionName(name);
-  await prisma.$executeRawUnsafe(
-    `CREATE TABLE IF NOT EXISTS "${name}" PARTITION OF "${PARENT_TABLE}"
-     FOR VALUES FROM ('${toDateOnly(lo)}') TO ('${toDateOnly(hi)}')`
-  );
-}
-
 /**
  * Validate that an identifier is one of our own managed partition names
  * before interpolating it into raw DDL. This is defense-in-depth — callers
@@ -364,27 +332,7 @@ export function parsePartitionBound(expr: string): { lo: Date; hi: Date } | null
   return { lo, hi };
 }
 
-/**
- * Start of a month `offset` months away from `now` (UTC). offset=0 is start
- * of the current month, offset=1 is start of next month, etc. Normalizes to
- * midnight so partition boundaries are comparable by getTime().
- */
-export function monthBoundary(now: Date, offset: number): Date {
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1));
-}
-
 /** Cutoff for "archive everything strictly before this instant". */
 export function cutoffDate(now: Date, retentionDays: number): Date {
   return new Date(now.getTime() - retentionDays * 24 * 60 * 60 * 1000);
-}
-
-/** Partition table name for a given lower boundary (first-of-month). */
-export function partitionName(lo: Date): string {
-  const yyyy = lo.getUTCFullYear();
-  const mm = String(lo.getUTCMonth() + 1).padStart(2, "0");
-  return `${PARTITION_PREFIX}${yyyy}${mm}`;
-}
-
-function toDateOnly(d: Date): string {
-  return d.toISOString().slice(0, 10);
 }
