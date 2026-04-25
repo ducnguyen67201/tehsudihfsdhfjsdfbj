@@ -39,6 +39,26 @@ export function AgentTeamRunView({
 }: AgentTeamRunViewProps) {
   const [showAbs, setShowAbs] = useState(false);
 
+  const messages = run?.messages ?? [];
+  const messageCount = messages.length;
+  const factCount = run?.facts?.length ?? 0;
+  const openQuestionCount =
+    run?.openQuestions?.filter(
+      (question) => question.status === AGENT_TEAM_OPEN_QUESTION_STATUS.open
+    ).length ?? 0;
+  const inboxCount = run?.roleInboxes?.length ?? 0;
+
+  const startMs = messages[0]?.createdAt ? new Date(messages[0].createdAt).getTime() : null;
+  const lastMs = messages.at(-1)?.createdAt
+    ? new Date(messages.at(-1)?.createdAt ?? "").getTime()
+    : null;
+  const durationMs = startMs && lastMs ? Math.max(0, lastMs - startMs) : 0;
+
+  const perRole = useMemo(() => computePerRoleRollup(messages), [messages]);
+  const roleLabels = useMemo(() => buildRoleLabelMap(run), [run]);
+  const activeRoleKey = isStreaming ? findActiveRoleKey(run?.roleInboxes ?? []) : null;
+  const rawTranscript = useMemo(() => buildRawTranscript(messages), [messages]);
+
   if (!run && isLoading) {
     return <p className="text-sm text-muted-foreground">Loading latest run…</p>;
   }
@@ -57,26 +77,6 @@ export function AgentTeamRunView({
       </div>
     );
   }
-
-  const messages = run.messages ?? [];
-  const messageCount = messages.length;
-  const factCount = run.facts?.length ?? 0;
-  const openQuestionCount =
-    run.openQuestions?.filter(
-      (question) => question.status === AGENT_TEAM_OPEN_QUESTION_STATUS.open
-    ).length ?? 0;
-  const inboxCount = run.roleInboxes?.length ?? 0;
-
-  const startMs = messages[0]?.createdAt ? new Date(messages[0].createdAt).getTime() : null;
-  const lastMs = messages.at(-1)?.createdAt
-    ? new Date(messages.at(-1)?.createdAt ?? "").getTime()
-    : null;
-  const durationMs = startMs && lastMs ? Math.max(0, lastMs - startMs) : 0;
-
-  const perRole = useMemo(() => computePerRoleRollup(messages), [messages]);
-  const roleLabels = useMemo(() => buildRoleLabelMap(run), [run]);
-  const activeRoleKey = isStreaming ? findActiveRoleKey(run.roleInboxes ?? []) : null;
-  const rawTranscript = useMemo(() => buildRawTranscript(messages), [messages]);
 
   return (
     <div className="space-y-3 font-mono text-sm" data-testid="agent-team-run-panel">
@@ -465,7 +465,8 @@ function buildRawTranscript(messages: AgentTeamDialogueMessage[]): string {
     .join("\n\n");
 }
 
-function buildRoleLabelMap(run: AgentTeamRunSummary): Map<string, string> {
+function buildRoleLabelMap(run: AgentTeamRunSummary | null): Map<string, string> {
+  if (!run) return new Map();
   return new Map(run.teamSnapshot.roles.map((role) => [role.roleKey, role.label]));
 }
 

@@ -135,6 +135,7 @@ function mapKindCodeToKind(
 
 export const POSITIONAL_AGENT_TEAM_TURN_FORMAT_INSTRUCTIONS = `
 Return ONLY compressed JSON using this format:
+Do not wrap the JSON in Markdown, code fences, prose, or comments.
   m = messages array
   f = proposed facts array
   q = resolved question ids

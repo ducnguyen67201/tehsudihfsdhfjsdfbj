@@ -10,18 +10,52 @@ export const llmProviderValues = [LLM_PROVIDER.openai, LLM_PROVIDER.openrouter] 
 
 export const llmProviderSchema = z.enum(llmProviderValues);
 
-export const LLM_USE_CASE = {
+// ─────────────────────────────────────────────────────────────────────────────
+// Queue / REST Model Declarations
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const QUEUE_LLM_USE_CASE = {
   supportAnalysis: "support-analysis",
   supportSummary: "support-summary",
   codexRerank: "codex-rerank",
   codexEmbedding: "codex-embedding",
 } as const;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Agent Service Model Declarations
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const AGENT_SERVICE_LLM_USE_CASE = {
+  agentTeamArchitect: "agent-team-architect",
+  agentTeamReviewer: "agent-team-reviewer",
+  agentTeamCodeReader: "agent-team-code-reader",
+  agentTeamPrCreator: "agent-team-pr-creator",
+  agentTeamRcaAnalyst: "agent-team-rca-analyst",
+} as const;
+
+export const LLM_USE_CASE = {
+  ...QUEUE_LLM_USE_CASE,
+  ...AGENT_SERVICE_LLM_USE_CASE,
+} as const;
+
+export const queueLlmUseCaseValues = [
+  QUEUE_LLM_USE_CASE.supportAnalysis,
+  QUEUE_LLM_USE_CASE.supportSummary,
+  QUEUE_LLM_USE_CASE.codexRerank,
+  QUEUE_LLM_USE_CASE.codexEmbedding,
+] as const;
+
+export const agentServiceLlmUseCaseValues = [
+  AGENT_SERVICE_LLM_USE_CASE.agentTeamArchitect,
+  AGENT_SERVICE_LLM_USE_CASE.agentTeamReviewer,
+  AGENT_SERVICE_LLM_USE_CASE.agentTeamCodeReader,
+  AGENT_SERVICE_LLM_USE_CASE.agentTeamPrCreator,
+  AGENT_SERVICE_LLM_USE_CASE.agentTeamRcaAnalyst,
+] as const;
+
 export const llmUseCaseValues = [
-  LLM_USE_CASE.supportAnalysis,
-  LLM_USE_CASE.supportSummary,
-  LLM_USE_CASE.codexRerank,
-  LLM_USE_CASE.codexEmbedding,
+  ...queueLlmUseCaseValues,
+  ...agentServiceLlmUseCaseValues,
 ] as const;
 
 export const llmUseCaseSchema = z.enum(llmUseCaseValues);
@@ -56,6 +90,7 @@ export const LLM_USE_CASE_DEFAULTS: Record<
     fallbackProviders: readonly LlmProvider[];
   }
 > = {
+  // Queue / REST model defaults.
   [LLM_USE_CASE.supportAnalysis]: {
     model: MODEL_CONFIG.agent,
     primaryProvider: LLM_PROVIDER.openai,
@@ -78,5 +113,32 @@ export const LLM_USE_CASE_DEFAULTS: Record<
     model: MODEL_CONFIG.embedding,
     primaryProvider: LLM_PROVIDER.openai,
     fallbackProviders: [],
+  },
+
+  // Agent service model defaults.
+  [LLM_USE_CASE.agentTeamArchitect]: {
+    model: MODEL_CONFIG.agent,
+    primaryProvider: LLM_PROVIDER.openai,
+    fallbackProviders: [LLM_PROVIDER.openrouter],
+  },
+  [LLM_USE_CASE.agentTeamReviewer]: {
+    model: MODEL_CONFIG.agent,
+    primaryProvider: LLM_PROVIDER.openai,
+    fallbackProviders: [LLM_PROVIDER.openrouter],
+  },
+  [LLM_USE_CASE.agentTeamCodeReader]: {
+    model: MODEL_CONFIG.agent,
+    primaryProvider: LLM_PROVIDER.openai,
+    fallbackProviders: [LLM_PROVIDER.openrouter],
+  },
+  [LLM_USE_CASE.agentTeamPrCreator]: {
+    model: MODEL_CONFIG.agent,
+    primaryProvider: LLM_PROVIDER.openai,
+    fallbackProviders: [LLM_PROVIDER.openrouter],
+  },
+  [LLM_USE_CASE.agentTeamRcaAnalyst]: {
+    model: MODEL_CONFIG.agent,
+    primaryProvider: LLM_PROVIDER.openai,
+    fallbackProviders: [LLM_PROVIDER.openrouter],
   },
 };

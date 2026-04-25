@@ -143,6 +143,22 @@ describe("runTeamTurn", () => {
     expect(result.meta.turnCount).toBe(2);
   });
 
+  it("accepts compressed dialogue output wrapped in a JSON code fence", async () => {
+    mockGenerate.mockResolvedValue({
+      text: `\`\`\`json
+{"m":[{"k":0,"t":"rca_analyst","s":"Clarification needed","b":"Can you confirm which customer-visible failure should be investigated?","p":null,"r":[]}],"f":[],"q":[],"n":["rca_analyst"],"d":0,"b":null}
+\`\`\``,
+      steps: [{ id: "step_1" }],
+      toolResults: [],
+    });
+
+    const result = await runTeamTurn(buildRequest());
+
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]?.toRoleKey).toBe("rca_analyst");
+    expect(result.messages[0]?.subject).toBe("Clarification needed");
+  });
+
   it("attaches a structured tool result on a successful create_pull_request return", async () => {
     mockGenerate.mockResolvedValue({
       text: JSON.stringify({
