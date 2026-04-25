@@ -479,15 +479,20 @@ export async function persistRoleTurnResult(
       });
     }
 
-    // Self-role terminal state. done → role_completed, resolution.status !=
-    // complete → role_blocked. "idle" is the normal between-turn state; no
-    // event. This logic was previously keyed off `result.blockedReason`; it
-    // now derives from `result.resolution.status` per the agentic resolution
-    // schema rollout (PR 1, atomic with `b → r` schema change).
+    // Self-role terminal state.
+    //   done                              → role_completed
+    //   resolution.status == needs_input  → role_blocked (waiting for input)
+    //   resolution.status == no_action_needed OR complete OR null → idle
+    //
+    // `no_action_needed` is semantically "conversation should close," NOT
+    // "waiting for input" — treating it as blocked would strand
+    // acknowledgement cases indefinitely (Codex finding #3 from /ship
+    // adversarial review). The conversation closure happens via the
+    // operator's Close-as-no-action button (PR 2).
     const isResolutionBlocked =
       input.result.resolution !== null &&
       input.result.resolution !== undefined &&
-      input.result.resolution.status !== "complete";
+      input.result.resolution.status === "needs_input";
     const selfState = input.result.done
       ? AGENT_TEAM_ROLE_INBOX_STATE.done
       : isResolutionBlocked
@@ -533,6 +538,41 @@ export async function persistRoleTurnResult(
           wakeReason: wakeReasonText,
         },
       });
+    }
+
+    // Resolution-question dispatch. For each question in the architect's
+    // resolution output, emit a `question_dispatched` event with the
+    // deterministic question id (assigned at parse time) plus target/status/
+    // text. PR 2's resume helper consumes these events to address questions
+    // by id when the operator submits an answer or sends a customer reply.
+    // Closes Codex finding #2 from /ship adversarial review (resolution
+    // questions were reconstructed but never persisted).
+    //
+    // Idempotent at the event-store level: persistRoleTurnResult runs inside
+    // a transaction, and activity retries replay this entire block — a
+    // duplicate question id from the same compressed turn output produces
+    // the same deterministic id, which the event log accepts as a re-emit.
+    // PR 2's dispatcher will check for an existing question_dispatched event
+    // before enqueuing role inbox messages, so retries are safe.
+    if (input.result.resolution && input.result.resolution.questionsToResolve.length > 0) {
+      const resolutionStatus = input.result.resolution.status;
+      for (const question of input.result.resolution.questionsToResolve) {
+        eventDrafts.push({
+          kind: AGENT_TEAM_EVENT_KIND.questionDispatched,
+          runId: input.runId,
+          workspaceId: run.workspaceId,
+          actor: input.role.roleKey,
+          target: question.target,
+          payload: {
+            questionId: question.id,
+            target: question.target,
+            status: resolutionStatus,
+            question: question.question,
+            suggestedReply: question.suggestedReply ?? null,
+            assignedRole: question.assignedRole ?? null,
+          },
+        });
+      }
     }
 
     // Flush accumulated event drafts inside the same transaction. Projections
