@@ -2,6 +2,32 @@
 
 All notable changes to TrustLoop will be documented in this file.
 
+## [0.2.12.0] - 2026-04-25
+
+### Changed
+- Architect role now emits structured "questions to resolve" output instead of
+  freeform blocked-reason strings. Each blocked turn lists the specific
+  questions the architect needs answered, with explicit targets (customer,
+  operator, or another internal role) and a deterministic question id of the
+  form `{runId}-{turnIndex}-{questionIndex}`. Sets up the operator-facing
+  resolution panel (UI lands in a follow-up PR).
+- Agent-team event log gains three new kinds: `question_dispatched`,
+  `question_answered`, `question_superseded`. Each dispatched question is now
+  persisted to the event log with target/status payload so dashboards and
+  resume flows can address questions by id.
+
+### Added
+- `parentRunId` column on `AgentTeamRun` for resume chains. Operator-resume
+  flows in a follow-up PR set this to chain a resumed run to its parent.
+- New positional-format compressed schemas (`compressedTurnResolutionSchema`,
+  `compressedQuestionToResolveSchema`) with target / status / recommended-close
+  code maps.
+
+### Fixed
+- `no_action_needed` resolution status no longer marks the role as blocked.
+  Would have stranded acknowledgement-only conversations indefinitely; only
+  `needs_input` blocks the role's inbox now.
+
 ## [0.2.11.0] - 2026-04-25
 
 ### Added

@@ -236,14 +236,15 @@ export async function runTeamTurn(
     messages: output.messages.length,
     proposedFacts: output.proposedFacts.length,
     done: output.done,
-    // A role is "blocked" when its resolution status is needs_input (it has
-    // questions external to itself) or no_action_needed (the conversation is
-    // closing). status=complete or null resolution = not blocked. This replaced
-    // the legacy `Boolean(output.blockedReason)` derivation.
+    // A role is "blocked" only when its resolution status is needs_input (it
+    // has unresolved questions external to itself). `no_action_needed` is
+    // semantically a close-recommendation, NOT a blocked state — treating it
+    // as blocked would strand acknowledgement cases indefinitely (Codex
+    // finding #3 from the /ship adversarial review).
     blocked:
       output.resolution !== null &&
       output.resolution !== undefined &&
-      output.resolution.status !== "complete",
+      output.resolution.status === "needs_input",
   });
 
   return agentTeamRoleTurnOutputSchema.parse({

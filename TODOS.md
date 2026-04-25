@@ -1,5 +1,19 @@
 # TODOS
 
+## Testing Infrastructure
+
+### Pre-existing test failures: agent-team-archive + agent-team-metrics-rollup (env validation)
+
+**What:** Two test files in `apps/queue/test/` fail at import time with "Invalid environment variables" from `packages/env/src/server.ts:8`. The failure happens before any test runs because `createEnv` throws on missing vars in the test process. Fix the env config for tests (e.g. `.env.test` with required keys, or test setup that mocks the env), or refactor the t3-env schema to allow an env-specific path.
+
+**Why:** Both tests are blocking `npm run test` from passing cleanly across the monorepo. Surfaces during every /ship run and forces the operator to choose "skip" each time. Quietly hiding real coverage gaps (the tests themselves probably exercise real paths once env loads).
+
+**Context:** Surfaced during /ship on `feat/agent-team-resolution-schema` (2026-04-25). Confirmed pre-existing by checking out `main` and re-running — same failure on both branches. Not caused by the resolution-schema PR. Likely fix is either (a) a `vitest.config.ts` that loads `.env.test` with safe defaults, or (b) refactoring `packages/env/src/server.ts` to allow a test-mode that returns nullable schemas. Solo repo, Duc owns it.
+
+**Effort:** S (human: ~30 min / CC: ~10 min once the fix shape is decided).
+**Priority:** P0
+**Depends on:** Nothing — independent of any in-flight feature work.
+
 ## Doc Philosophy Enforcement
 
 ### Scoped `AGENTS.md` per subtree
