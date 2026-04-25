@@ -2,6 +2,7 @@ import { Agent } from "@mastra/core/agent";
 import * as llmManager from "@shared/rest/services/llm-manager-service";
 import {
   AGENT_TEAM_MESSAGE_KIND,
+  AGENT_TEAM_ROLE_SLUG,
   AGENT_TEAM_TARGET,
   type AgentProviderConfig,
   type AgentTeamDialogueMessageDraft,
@@ -12,6 +13,7 @@ import {
   type AnalyzeRequest,
   type AnalyzeResponse,
   LLM_USE_CASE,
+  type LlmUseCase,
   type SessionDigest,
   TOOL_STRUCTURED_RESULT_KIND,
   TOOL_STRUCTURED_RESULT_METADATA_KEY,
@@ -153,7 +155,7 @@ export async function runTeamTurn(
     provider: request.role.provider,
     model: request.role.model ?? undefined,
   });
-  const route = llmManager.requireRoute(LLM_USE_CASE.supportAnalysis, providerConfig);
+  const route = llmManager.requireRoute(resolveAgentTeamRoleUseCase(request.role), providerConfig);
   const target = route.targets[0];
   const maxSteps = getRoleMaxSteps(request.role) ?? DEFAULT_TEAM_MAX_STEPS;
 
@@ -182,13 +184,7 @@ function parseAgentOutput(rawOutput: string | undefined) {
     throw new Error("Agent produced no output after completing the loop");
   }
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(rawOutput);
-  } catch {
-    throw new Error(`Agent returned non-JSON response: ${rawOutput.slice(0, 200)}`);
-  }
-
+  const parsed = parseJsonModelOutput(rawOutput, "Agent returned non-JSON response");
   const compressed = compressedAnalysisOutputSchema.parse(parsed);
   return reconstructAnalysisOutput(compressed);
 }
@@ -198,13 +194,7 @@ function parseTeamTurnOutput(rawOutput: string | undefined) {
     throw new Error("Agent team role produced no output after completing the loop");
   }
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(rawOutput);
-  } catch {
-    throw new Error(`Agent team role returned non-JSON response: ${rawOutput.slice(0, 200)}`);
-  }
-
+  const parsed = parseJsonModelOutput(rawOutput, "Agent team role returned non-JSON response");
   const compressed = compressedAgentTeamTurnOutputSchema.parse(parsed);
   const reconstructed = reconstructAgentTeamTurnOutput(compressed);
 
@@ -225,6 +215,49 @@ function parseTeamTurnOutput(rawOutput: string | undefined) {
     done: reconstructed.done,
     blockedReason: reconstructed.blockedReason,
   };
+}
+
+function parseJsonModelOutput(rawOutput: string, errorPrefix: string): unknown {
+  const jsonText = normalizeJsonModelOutput(rawOutput);
+  try {
+    return JSON.parse(jsonText);
+  } catch {
+    throw new Error(`${errorPrefix}: ${rawOutput.slice(0, 200)}`);
+  }
+}
+
+function normalizeJsonModelOutput(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed.startsWith("```")) {
+    return trimmed;
+  }
+
+  const payloadStart = trimmed.indexOf("\n");
+  if (payloadStart === -1) {
+    return trimmed;
+  }
+
+  const closingFence = trimmed.indexOf("```", payloadStart + 1);
+  if (closingFence === -1) {
+    return trimmed;
+  }
+
+  return trimmed.slice(payloadStart + 1, closingFence).trim();
+}
+
+function resolveAgentTeamRoleUseCase(role: AgentTeamRole): LlmUseCase {
+  switch (role.slug) {
+    case AGENT_TEAM_ROLE_SLUG.architect:
+      return LLM_USE_CASE.agentTeamArchitect;
+    case AGENT_TEAM_ROLE_SLUG.reviewer:
+      return LLM_USE_CASE.agentTeamReviewer;
+    case AGENT_TEAM_ROLE_SLUG.codeReader:
+      return LLM_USE_CASE.agentTeamCodeReader;
+    case AGENT_TEAM_ROLE_SLUG.prCreator:
+      return LLM_USE_CASE.agentTeamPrCreator;
+    case AGENT_TEAM_ROLE_SLUG.rcaAnalyst:
+      return LLM_USE_CASE.agentTeamRcaAnalyst;
+  }
 }
 
 interface RawToolResult {

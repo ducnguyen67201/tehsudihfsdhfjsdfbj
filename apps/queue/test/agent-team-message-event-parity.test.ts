@@ -10,6 +10,9 @@ import { beforeAll, describe, expect, it } from "vitest";
 let buildMessageSentDraft: typeof import(
   "../src/domains/agent-team/agent-team-run.activity"
 ).buildMessageSentDraft;
+let clearUnknownParentMessageIds: typeof import(
+  "../src/domains/agent-team/agent-team-run.activity"
+).clearUnknownParentMessageIds;
 
 beforeAll(async () => {
   process.env.APP_BASE_URL ??= "http://localhost:3000";
@@ -22,7 +25,9 @@ beforeAll(async () => {
   process.env.TEMPORAL_ADDRESS ??= "localhost:7233";
   process.env.TEMPORAL_NAMESPACE ??= "default";
 
-  ({ buildMessageSentDraft } = await import("../src/domains/agent-team/agent-team-run.activity"));
+  ({ buildMessageSentDraft, clearUnknownParentMessageIds } = await import(
+    "../src/domains/agent-team/agent-team-run.activity"
+  ));
 });
 
 describe("buildMessageSentDraft — event-projection parity", () => {
@@ -132,5 +137,31 @@ describe("buildMessageSentDraft — event-projection parity", () => {
       },
     });
     expect(draft.target).toBe(AGENT_TEAM_TARGET.broadcast);
+  });
+
+  it("clears parentMessageId values that do not belong to known run messages", () => {
+    const messages: AgentTeamDialogueMessageDraft[] = [
+      {
+        toRoleKey: "reviewer",
+        kind: AGENT_TEAM_MESSAGE_KIND.answer,
+        subject: "known reply",
+        content: "This reply is threaded to an existing message.",
+        parentMessageId: "msg_existing",
+        refs: [],
+      },
+      {
+        toRoleKey: "reviewer",
+        kind: AGENT_TEAM_MESSAGE_KIND.answer,
+        subject: "unknown reply",
+        content: "This reply references a model-invented parent id.",
+        parentMessageId: "msg_missing",
+        refs: [],
+      },
+    ];
+
+    const sanitized = clearUnknownParentMessageIds(messages, new Set(["msg_existing"]));
+
+    expect(sanitized[0]?.parentMessageId).toBe("msg_existing");
+    expect(sanitized[1]?.parentMessageId).toBeNull();
   });
 });

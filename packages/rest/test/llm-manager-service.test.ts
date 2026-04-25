@@ -35,6 +35,26 @@ describe("llm-manager-service", () => {
     expect(route.targets[1]?.apiModel).toBe("openai/gpt-4o");
   });
 
+  it("routes each agent team role as its own configurable use case", () => {
+    const roleUseCases = [
+      LLM_USE_CASE.agentTeamArchitect,
+      LLM_USE_CASE.agentTeamReviewer,
+      LLM_USE_CASE.agentTeamCodeReader,
+      LLM_USE_CASE.agentTeamPrCreator,
+      LLM_USE_CASE.agentTeamRcaAnalyst,
+    ];
+
+    for (const useCase of roleUseCases) {
+      const route = requireRoute(useCase);
+
+      expect(route.useCase).toBe(useCase);
+      expect(route.targets[0].provider).toBe(LLM_PROVIDER.openai);
+      expect(route.targets[0].model).toBe("gpt-4o");
+      expect(route.targets[1]?.provider).toBe(LLM_PROVIDER.openrouter);
+      expect(route.targets[1]?.apiModel).toBe("openai/gpt-4o");
+    }
+  });
+
   it("promotes OpenRouter when OpenAI is unavailable", () => {
     envState.OPENAI_API_KEY = "";
 

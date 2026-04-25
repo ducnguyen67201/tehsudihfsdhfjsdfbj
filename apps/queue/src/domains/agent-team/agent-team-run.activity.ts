@@ -280,11 +280,28 @@ export async function persistRoleTurnResult(
       where: { id: input.runId },
       select: { workspaceId: true },
     });
+    const parentMessageIds = normalizedMessages.flatMap((message) =>
+      message.parentMessageId ? [message.parentMessageId] : []
+    );
+    const existingParentMessageRows =
+      parentMessageIds.length === 0
+        ? []
+        : await tx.agentTeamMessage.findMany({
+            where: {
+              runId: input.runId,
+              id: { in: parentMessageIds },
+            },
+            select: { id: true },
+          });
+    const persistableMessages = clearUnknownParentMessageIds(
+      normalizedMessages,
+      new Set(existingParentMessageRows.map((message) => message.id))
+    );
 
     const messageCount = await tx.agentTeamMessage.count({
       where: { runId: input.runId },
     });
-    if (messageCount + normalizedMessages.length > MAX_AGENT_TEAM_MESSAGES) {
+    if (messageCount + persistableMessages.length > MAX_AGENT_TEAM_MESSAGES) {
       throw new Error(
         `Agent team run exceeded the ${MAX_AGENT_TEAM_MESSAGES} message budget for run ${input.runId}`
       );
@@ -295,7 +312,7 @@ export async function persistRoleTurnResult(
     const eventDrafts: AgentTeamRunEventDraft[] = [];
 
     const createdMessages: AgentTeamDialogueMessage[] = [];
-    for (const message of normalizedMessages) {
+    for (const message of persistableMessages) {
       const created = await tx.agentTeamMessage.create({
         data: {
           runId: input.runId,
@@ -425,13 +442,13 @@ export async function persistRoleTurnResult(
     const queueTargets = collectQueuedTargets({
       senderRole: input.role,
       teamRoles: input.teamRoles,
-      messages: normalizedMessages,
+      messages: persistableMessages,
       nextSuggestedRoleKeys: input.result.nextSuggestedRoleKeys,
       hasReviewerApproval,
     });
 
     for (const roleKey of queueTargets) {
-      const wakeReason = buildWakeReason(input.role.roleKey, normalizedMessages);
+      const wakeReason = buildWakeReason(input.role.roleKey, persistableMessages);
       await tx.agentTeamRoleInbox.upsert({
         where: {
           runId_roleKey: {
@@ -654,6 +671,19 @@ export function buildMessageSentDraft(input: {
       contentPreview: input.message.content.slice(0, 280),
     },
   };
+}
+
+export function clearUnknownParentMessageIds(
+  messages: AgentTeamDialogueMessageDraft[],
+  knownParentMessageIds: ReadonlySet<string>
+): AgentTeamDialogueMessageDraft[] {
+  return messages.map((message) => {
+    if (!message.parentMessageId || knownParentMessageIds.has(message.parentMessageId)) {
+      return message;
+    }
+
+    return { ...message, parentMessageId: null };
+  });
 }
 
 function normalizeTurnMessages(
