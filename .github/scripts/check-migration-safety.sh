@@ -33,7 +33,7 @@ while IFS= read -r file; do
     continue
   fi
 
-  if grep -Eiq '(^|[[:space:];])(DROP[[:space:]]+TABLE|DROP[[:space:]]+COLUMN|TRUNCATE[[:space:]]+TABLE|ALTER[[:space:]]+TABLE[^;]+ALTER[[:space:]]+COLUMN[^;]+SET[[:space:]]+NOT[[:space:]]+NULL|ALTER[[:space:]]+TABLE[^;]+ALTER[[:space:]]+COLUMN[^;]+TYPE)' "$file"; then
+  if perl -0ne 'exit(/(^|[\s;])(DROP\s+TABLE|DROP\s+COLUMN|TRUNCATE\s+TABLE|ALTER\s+TABLE\b[^;]*\bALTER\s+COLUMN\b[^;]*\bSET\s+NOT\s+NULL|ALTER\s+TABLE\b[^;]*\bALTER\s+COLUMN\b[^;]*\bTYPE\b)/is ? 0 : 1)' "$file"; then
     echo "::error file=$file::Potentially destructive migration statement found. Add '-- trustloop-migration: reviewed-destructive-change <reason>' after explicit review."
     failed=1
   fi
@@ -49,4 +49,3 @@ if [ "$failed" -ne 0 ]; then
 fi
 
 echo "Migration safety scan passed."
-

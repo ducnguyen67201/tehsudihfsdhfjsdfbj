@@ -7,6 +7,7 @@ All notable changes to TrustLoop will be documented in this file.
 ### Added
 - **Staging and production migrations now have dedicated release gates.** `Run Migrations Staging` and `Run Migrations Production` wait for CI on their matching deployment branch, serialize runs per environment, verify Doppler database access, generate Prisma, apply committed migrations with transient retry, and require a clean post-migration Prisma status before services are deployed.
 - **Migration PRs now get a destructive-SQL safety scan.** Changed `migration.sql` files fail CI when they include table/column drops, truncates, broad deletes, or risky column rewrites unless they carry an explicit reviewed destructive-change marker.
+- **The migration safety scanner now catches Prisma's multiline `ALTER TABLE ... ALTER COLUMN ... SET NOT NULL` output.** A CI self-test covers the exact statement shape so the guard cannot drift back to line-only matching.
 
 ### Changed
 - **The old migration workflow is manual recovery only.** Automatic release migrations no longer share one branch-switching workflow; manual reruns still use the same hardened migration script for staging or production.

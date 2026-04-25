@@ -15,12 +15,14 @@ on:
       - 'packages/database/**'
       - '.github/workflows/migrate-check.yml'
       - '.github/scripts/check-migration-safety.sh'
+      - '.github/scripts/test-check-migration-safety.sh'
   push:
     branches: [main, production]
     paths:
       - 'packages/database/**'
       - '.github/workflows/migrate-check.yml'
       - '.github/scripts/check-migration-safety.sh'
+      - '.github/scripts/test-check-migration-safety.sh'
 
 jobs:
   check:
@@ -68,6 +70,9 @@ jobs:
           sudo apt-get install -y postgresql-client > /dev/null
 
       - run: npm install --no-audit --no-fund
+
+      - name: Self-test migration safety scanner
+        run: .github/scripts/test-check-migration-safety.sh
 
       - name: Scan changed migrations for unsafe SQL
         env:
