@@ -86,8 +86,10 @@ export function SupportInbox() {
         params.set("thread", conversationId);
       } else {
         params.delete("thread");
+        params.delete("tab");
       }
-      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+      const query = params.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
     },
     [pathname, router, searchParams]
   );
@@ -118,10 +120,13 @@ export function SupportInbox() {
     return base;
   }, [inbox.listData]);
 
-  function handleSelectConversation(conversationId: string) {
-    inbox.setSelectedConversationId(conversationId);
-    updateThreadParam(conversationId);
-  }
+  const handleSelectConversation = useCallback(
+    (conversationId: string) => {
+      inbox.setSelectedConversationId(conversationId);
+      updateThreadParam(conversationId);
+    },
+    [inbox.setSelectedConversationId, updateThreadParam]
+  );
 
   function handleDrop(conversationId: string, targetStatus: SupportConversationStatus) {
     const conversation = inbox.listData?.conversations.find((c) => c.id === conversationId);
@@ -154,13 +159,17 @@ export function SupportInbox() {
     }
   }
 
-  const boardColumns = KANBAN_COLUMNS.map((column) => ({
-    ...column,
-    conversations:
-      inbox.listData?.conversations.filter(
-        (conversation) => conversation.status === column.status
-      ) ?? [],
-  }));
+  const boardColumns = useMemo(
+    () =>
+      KANBAN_COLUMNS.map((column) => ({
+        ...column,
+        conversations:
+          inbox.listData?.conversations.filter(
+            (conversation) => conversation.status === column.status
+          ) ?? [],
+      })),
+    [inbox.listData]
+  );
 
   const refreshSelectedConversation = useCallback(() => {
     setSelectedConversationRefreshNonce((current) => current + 1);
@@ -316,6 +325,7 @@ export function SupportInbox() {
         <SheetContent
           side="right"
           showCloseButton={false}
+          onInteractOutside={(event) => event.preventDefault()}
           className="flex w-full flex-col gap-0 overflow-hidden p-0 data-[side=right]:sm:max-w-6xl"
         >
           <SheetHeader className="sr-only">

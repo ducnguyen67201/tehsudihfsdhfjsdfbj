@@ -20,5 +20,8 @@ export default defineConfig({
   },
   test: {
     environment: "happy-dom",
+    // Playwright e2e specs live in `e2e/` and use `@playwright/test` which is
+    // executed by playwright, not vitest. Keep them out of the unit suite.
+    exclude: ["**/node_modules/**", "**/dist/**", "**/.next/**", "e2e/**"],
   },
 });

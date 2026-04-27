@@ -9,6 +9,10 @@ export const NODE_ENV = {
 
 export type NodeEnv = (typeof NODE_ENV)[keyof typeof NODE_ENV];
 
+export function checkEnv(nodeEnv: NodeEnv, ...allowed: NodeEnv[]): boolean {
+  return allowed.includes(nodeEnv);
+}
+
 /** Treat staging like production for secure cookies, silent DB logs, etc. */
 export function isProductionLike(nodeEnv: NodeEnv): boolean {
   return nodeEnv === NODE_ENV.PRODUCTION || nodeEnv === NODE_ENV.STAGING;
@@ -68,6 +72,21 @@ export const serverSchemas = {
   GOOGLE_OAUTH_CLIENT_ID: z.string().min(1).optional(),
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().min(1).optional(),
   GOOGLE_OAUTH_REDIRECT_PATH: z.string().min(1).optional().default("/api/auth/google/callback"),
+
+  // S3 bucket for archived agent-team event JSONL. Currently reserved for the
+  // forthcoming direct-to-S3 upload path; unused by AGENT_ARCHIVE_MODE="keep"
+  // and "unsafe-stdout-only". Leaving it set with an unsupported mode is a
+  // no-op — the mode decides whether drops happen, the bucket only names the
+  // sink once the S3 mode is wired.
+  AWS_AGENT_ARCHIVE_BUCKET: z.string().min(1).optional(),
+
+  // Agent-team event partition retention strategy. Default "keep" never drops
+  // partitions — safe for any environment where archival is not yet wired.
+  // "unsafe-stdout-only" drops after streaming rows to stdout as JSONL, which
+  // only protects data if the operator has verified that a durable log sink
+  // captures stdout (k8s/docker log aggregator, etc). Pick "unsafe-stdout-only"
+  // consciously — losing stdout means losing the event row forever.
+  AGENT_ARCHIVE_MODE: z.enum(["keep", "unsafe-stdout-only"]).optional().default("keep"),
 
   // Debug
   TRUSTLOOP_DEBUG_TRPC: z.enum(["0", "1"]).optional().default("0"),

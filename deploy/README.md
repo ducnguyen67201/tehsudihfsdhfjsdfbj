@@ -143,7 +143,8 @@ For each of `web`, `queue`, `agents` in both `staging` and `production`:
 4. **Settings → Networking**: enable private networking so
    `RAILWAY_PRIVATE_DOMAIN` resolves.
 5. Configure env vars: Tier 1 → Tier 2 → Tier 3 in that order.
-6. First deploy: click **Deploy** in Deployments tab. `@shared/env` will
+6. First deploy: click **Deploy** in Deployments tab after the matching
+   migration gate succeeds. `@shared/env` will
    crash at import if any required var is missing — crash-loop + clear
    log is the intended fail-fast behavior.
 
@@ -151,15 +152,44 @@ For each of `web`, `queue`, `agents` in both `staging` and `production`:
 toggle is UI-only (per-service setting), so it must be set explicitly on
 each one.
 
-### Manual deploy workflow
+### Release workflow
 
-1. Merge PR to `staging` for a staging release, or merge PR to `production` for a production release.
-2. Railway notices the branch update but does not build.
-3. Click **Deploy** in the service's Deployments tab (or `railway up`)
-   when ready. Railway checks out that environment's branch, builds, and rolls out.
+**Staging**
 
-This branch mapping must stay aligned with `.github/workflows/migrate.yml`:
-- push to `staging` => auto-apply staging DB migrations
-- push to `production` => auto-apply production DB migrations
+1. Merge PRs to `main`.
+2. GitHub Actions runs `CI` on `main`.
+3. On success, `.github/workflows/deploy-staging.yml` merges that validated
+   commit into the `staging` branch.
+4. The push to `staging` triggers `CI` on `staging`.
+5. After staging CI succeeds, `.github/workflows/run-migrations-staging.yml`
+   applies staging DB migrations against Doppler config `stg`. The workflow
+   is also the no-op gate for commits with no pending migrations.
+6. Deploy `web`, `queue`, and `agents` manually from Railway only after
+   `Run Migrations Staging` succeeds for the staging commit.
 
-Do this per-service per-environment. There is no "deploy everything" button.
+Required secrets:
+- Repo secret `STAGING_PUSH_TOKEN` for the branch-promotion workflow. This
+  must be a PAT or GitHub App token, because pushes made with `GITHUB_TOKEN`
+  do not trigger downstream `push` workflows.
+- GitHub Environment (`staging`) secret `DOPPLER_TOKEN` for staging DB access.
+
+**Production**
+
+1. Merge PRs to `production`.
+2. GitHub Actions runs `CI` on `production`.
+3. On success, `.github/workflows/run-migrations-production.yml` applies
+   production DB migrations against Doppler config `prd`. Configure required
+   reviewers on the GitHub `production` environment so production migrations
+   wait for human approval before touching the database.
+4. Deploy production services manually from Railway only after
+   `Run Migrations Production` succeeds for the production commit.
+
+This branch mapping must stay aligned with the workflows:
+- push to `main` => run CI on `main`, promote that commit to `staging`, run CI on `staging`, run `Run Migrations Staging`, then manually deploy staging services
+- push to `production` => run CI on `production`, run `Run Migrations Production`, then manually deploy production services
+
+Manual recovery:
+- `.github/workflows/migrate.yml` is manual-only. Use it to re-run idempotent
+  migrations for `staging` or `production` without pushing a new commit.
+- Never deploy services for a commit whose matching migration gate failed or
+  has not run yet.

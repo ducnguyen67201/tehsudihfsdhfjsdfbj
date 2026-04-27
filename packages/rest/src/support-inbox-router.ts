@@ -2,11 +2,12 @@ import * as supportCommand from "@shared/rest/services/support/support-command";
 import * as groupingCorrection from "@shared/rest/services/support/support-grouping-correction-service";
 import * as supportProjection from "@shared/rest/services/support/support-projection-service";
 import * as supportReaction from "@shared/rest/services/support/support-reaction-service";
-import { router, workspaceProcedure, workspaceRoleProcedure } from "@shared/rest/trpc";
+import { router, workspaceRoleProcedure } from "@shared/rest/trpc";
 import {
   SUPPORT_COMMAND_TYPE,
   WORKSPACE_ROLE,
   supportAssignCommandSchema,
+  supportCloseAsNoActionCommandSchema,
   supportConversationStatusSchema,
   supportMarkDoneWithOverrideCommandSchema,
   supportMergeConversationsRequestSchema,
@@ -33,7 +34,7 @@ const supportConversationTimelineInputSchema = z.object({
 });
 
 export const supportInboxRouter = router({
-  listConversations: workspaceProcedure
+  listConversations: operatorProcedure
     .input(supportConversationListInputSchema.optional())
     .query(({ ctx, input }) =>
       supportProjection.listConversations({
@@ -44,7 +45,7 @@ export const supportInboxRouter = router({
         cursor: input?.cursor,
       })
     ),
-  getConversationTimeline: workspaceProcedure
+  getConversationTimeline: operatorProcedure
     .input(supportConversationTimelineInputSchema)
     .query(({ ctx, input }) =>
       supportProjection.getConversationTimeline(ctx.workspaceId, input.conversationId)
@@ -89,6 +90,22 @@ export const supportInboxRouter = router({
       supportCommand.markDoneWithOverride({
         ...input,
         commandType: SUPPORT_COMMAND_TYPE.markDoneWithOverride,
+        workspaceId: ctx.workspaceId,
+        actorUserId: ctx.user.id,
+      })
+    ),
+  closeConversationAsNoAction: operatorProcedure
+    .input(
+      supportCloseAsNoActionCommandSchema.omit({
+        workspaceId: true,
+        actorUserId: true,
+        commandType: true,
+      })
+    )
+    .mutation(({ ctx, input }) =>
+      supportCommand.closeAsNoAction({
+        ...input,
+        commandType: SUPPORT_COMMAND_TYPE.closeAsNoAction,
         workspaceId: ctx.workspaceId,
         actorUserId: ctx.user.id,
       })

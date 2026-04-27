@@ -1,15 +1,17 @@
+import type { WorkflowDispatcher } from "@shared/rest/temporal-dispatcher";
 import { router, workspaceRoleProcedure } from "@shared/rest/trpc";
-import { WORKSPACE_ROLE } from "@shared/types";
+import { TASK_QUEUES, WORKSPACE_ROLE } from "@shared/types";
 import type { TRPCError } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
-// Regression coverage for the operator-command authorization boundary.
+// Regression coverage for the operator authorization boundary.
 // Issue: before this fix, every supportInbox mutation rode workspaceProcedure,
 // which accepts either a user session OR a workspace API key (tlk_*). Role was
 // only populated on the session path, so any valid API key could drive
-// operator mutations (send reply, mark done, assign). The fix routes those
-// mutations through workspaceRoleProcedure(MEMBER), and the middleware now
-// rejects non-session actors explicitly.
+// operator mutations (send reply, mark done, assign). The same boundary also
+// protects support read endpoints that expose operator/private data. The fix
+// routes those procedures through workspaceRoleProcedure(MEMBER), and the
+// middleware now rejects non-session actors explicitly.
 
 const buildRouter = () =>
   router({
@@ -33,6 +35,30 @@ function buildCtx(overrides: {
     apiKeyAuth: overrides.apiKeyAuth ?? null,
   };
 }
+
+const noopDispatcher = {
+  async startSupportWorkflow() {
+    return { workflowId: "wf", runId: "run", queue: TASK_QUEUES.SUPPORT };
+  },
+  async startSupportAnalysisWorkflow() {
+    return { workflowId: "wf", runId: "run", queue: TASK_QUEUES.SUPPORT };
+  },
+  async startAgentTeamRunWorkflow() {
+    return { workflowId: "wf", runId: "run", queue: TASK_QUEUES.SUPPORT };
+  },
+  async startAgentTeamRunResumeWorkflow() {
+    return { workflowId: "wf", runId: "run", queue: TASK_QUEUES.SUPPORT };
+  },
+  async startSupportSummaryWorkflow() {
+    return { workflowId: "wf", runId: "run", queue: TASK_QUEUES.SUPPORT };
+  },
+  async startRepositoryIndexWorkflow() {
+    return { workflowId: "wf", runId: "run", queue: TASK_QUEUES.CODEX };
+  },
+  async startSendDraftToSlackWorkflow() {
+    return { workflowId: "wf", runId: "run", queue: TASK_QUEUES.SUPPORT };
+  },
+} satisfies WorkflowDispatcher;
 
 describe("workspaceRoleProcedure", () => {
   it("rejects workspace API key actors with UNAUTHORIZED", async () => {
@@ -113,6 +139,52 @@ describe("supportInboxRouter operator mutations — API-key actor rejection", ()
   });
 });
 
+describe("support read endpoints — API-key actor rejection", () => {
+  it("listConversations rejects an api-key-only actor before reading inbox data", async () => {
+    const { supportInboxRouter } = await import("@shared/rest/support-inbox-router");
+
+    const caller = supportInboxRouter.createCaller(
+      buildCtx({
+        apiKeyAuth: { keyId: "tlk_test_key_id", workspaceId: "ws_test" },
+        activeWorkspaceId: "ws_test",
+      })
+    );
+
+    await expect(caller.listConversations({ limit: 1 })).rejects.toMatchObject({
+      code: "UNAUTHORIZED",
+    } satisfies Partial<TRPCError>);
+  });
+
+  it("getConversationTimeline rejects an api-key-only actor before reading timeline data", async () => {
+    const { supportInboxRouter } = await import("@shared/rest/support-inbox-router");
+
+    const caller = supportInboxRouter.createCaller(
+      buildCtx({
+        apiKeyAuth: { keyId: "tlk_test_key_id", workspaceId: "ws_test" },
+        activeWorkspaceId: "ws_test",
+      })
+    );
+
+    await expect(caller.getConversationTimeline({ conversationId: "c1" })).rejects.toMatchObject({
+      code: "UNAUTHORIZED",
+    } satisfies Partial<TRPCError>);
+  });
+
+  it("getLatestAnalysis rejects an api-key-only actor before reading analysis data", async () => {
+    const { createSupportAnalysisRouter } = await import("@shared/rest/support-analysis-router");
+
+    const caller = createSupportAnalysisRouter(noopDispatcher).createCaller(
+      buildCtx({
+        apiKeyAuth: { keyId: "tlk_test_key_id", workspaceId: "ws_test" },
+        activeWorkspaceId: "ws_test",
+      })
+    );
+
+    await expect(caller.getLatestAnalysis({ conversationId: "c1" })).rejects.toMatchObject({
+      code: "UNAUTHORIZED",
+    } satisfies Partial<TRPCError>);
+  });
+});
 describe("sessionReplayRouter operator reads — API-key actor rejection", () => {
   it("getForConversation rejects an api-key-only actor before reading replay data", async () => {
     const { sessionReplayRouter } = await import("@shared/rest/session-replay-router");

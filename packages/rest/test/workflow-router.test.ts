@@ -24,6 +24,16 @@ function createDispatcher(): WorkflowDispatcher {
       runId: "run_summary_1",
       queue: "support-general",
     })),
+    startAgentTeamRunWorkflow: vi.fn(async () => ({
+      workflowId: "agent-team-run-run_1",
+      runId: "run_agent_team_1",
+      queue: "codex-intensive",
+    })),
+    startAgentTeamRunResumeWorkflow: vi.fn(async () => ({
+      workflowId: "agent-team-run-run_1-resume-1",
+      runId: "run_agent_team_resume_1",
+      queue: "codex-intensive",
+    })),
     startSendDraftToSlackWorkflow: vi.fn(async () => ({
       workflowId: "send-draft-draft_1",
       runId: "run_send_draft_1",
@@ -80,6 +90,39 @@ describe("dispatchWorkflow", () => {
 
     expect(result.workflowId).toContain("support-analysis");
     expect(dispatcher.startSupportAnalysisWorkflow).toHaveBeenCalledTimes(1);
+  });
+
+  it("routes agent-team-run payloads to the dedicated dispatcher", async () => {
+    const dispatcher = createDispatcher();
+
+    const result = await dispatchWorkflow(dispatcher, {
+      type: "agent-team-run",
+      payload: {
+        workspaceId: "ws_1",
+        runId: "run_1",
+        teamId: "team_1",
+        threadSnapshot: "thread snapshot",
+        teamSnapshot: {
+          roles: [
+            {
+              id: "role_1",
+              teamId: "team_1",
+              roleKey: "architect",
+              slug: "architect",
+              label: "Architect",
+              provider: "openai",
+              toolIds: ["searchCode"],
+              maxSteps: 6,
+              sortOrder: 0,
+            },
+          ],
+          edges: [],
+        },
+      },
+    });
+
+    expect(result.workflowId).toContain("agent-team-run");
+    expect(dispatcher.startAgentTeamRunWorkflow).toHaveBeenCalledTimes(1);
   });
 
   it("routes support-summary payloads to summary dispatcher", async () => {

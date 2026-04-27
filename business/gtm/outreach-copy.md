@@ -3,38 +3,58 @@
 These are starting points, not fixed scripts. Every message should feel
 specific to the founder you are contacting.
 
-## Cold LinkedIn DM
-
-```text
-Hey [Name] — I’m talking to founders at small B2B SaaS companies who still run a lot of support in Slack.
-
-It seems like at that stage the founder often becomes the manual router for customer questions, bugs, and follow-up.
-
-Is that at all true for you right now, or am I off?
-```
-
-## Slightly More Direct Variant
+## First-Touch LinkedIn DM
 
 ```text
 Hey [Name] — quick question.
 
-I’m researching how early B2B SaaS founders handle support when it still mostly lives in Slack. A pattern I keep hearing is that the founder becomes the routing layer and loses a lot of focus.
+At [Company], do customer issues still end up getting routed through you in Slack?
 
-Curious if that sounds familiar at all for [Company].
+Or do you already have that pretty under control?
 ```
 
-## Follow-Up
+## Personalized Variant
+
+```text
+Hey [Name] — I was looking at [specific company/product detail], and had a quick question.
+
+For teams at your stage, a pattern I keep hearing is that support still lives in Slack and the founder becomes the fallback router for bugs, questions, and follow-up.
+
+Is that at all true for you, or am I off?
+```
+
+## Follow-Up Bump
 
 ```text
 Wanted to bump this in case it is relevant.
 
-I’m not selling a support platform right now — I’m trying to understand how founders handle support before they have a real support team.
+I’m trying to understand how small B2B SaaS founders handle support before they have a real support team, especially when it mostly lives in Slack.
 ```
 
-## Call Ask
+## Positive Reply Response
 
 ```text
-That’s helpful. Would you be open to a short 15-minute chat this week? I’d love to understand how support comes in today, what gets messy, and where things get dropped.
+That makes sense.
+
+I’m hearing a similar pattern from a few founders: support comes in fast, context gets scattered, and someone has to play router.
+
+Would you be open to a short 15-minute chat this week so I can learn how you are handling it today?
+```
+
+## If They Ask What You Are Building
+
+```text
+I’m working on something for small B2B SaaS teams that are still running support in Slack before they are ready for a full support stack.
+
+Still early, mostly trying to understand where the workflow breaks first.
+```
+
+## Optional Proof After Interest
+
+```text
+We have been looking closely at the handoff problem between customer messages, internal Slack threads, and follow-up.
+
+If helpful, I can send a very short example of the workflow I mean.
 ```
 
 ## Rules
@@ -44,3 +64,5 @@ That’s helpful. Would you be open to a short 15-minute chat this week? I’d l
 - Do not ask for a demo call
 - Do not use jargon
 - Personalize the first line when possible
+- Ask one easy question at the end
+- Only get more specific about the product after they engage

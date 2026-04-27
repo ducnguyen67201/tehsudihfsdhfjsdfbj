@@ -1,5 +1,19 @@
 # TODOS
 
+## Testing Infrastructure
+
+### Pre-existing test failures: agent-team-archive + agent-team-metrics-rollup (env validation)
+
+**What:** Two test files in `apps/queue/test/` fail at import time with "Invalid environment variables" from `packages/env/src/server.ts:8`. The failure happens before any test runs because `createEnv` throws on missing vars in the test process. Fix the env config for tests (e.g. `.env.test` with required keys, or test setup that mocks the env), or refactor the t3-env schema to allow an env-specific path.
+
+**Why:** Both tests are blocking `npm run test` from passing cleanly across the monorepo. Surfaces during every /ship run and forces the operator to choose "skip" each time. Quietly hiding real coverage gaps (the tests themselves probably exercise real paths once env loads).
+
+**Context:** Surfaced during /ship on `feat/agent-team-resolution-schema` (2026-04-25). Confirmed pre-existing by checking out `main` and re-running — same failure on both branches. Not caused by the resolution-schema PR. Likely fix is either (a) a `vitest.config.ts` that loads `.env.test` with safe defaults, or (b) refactoring `packages/env/src/server.ts` to allow a test-mode that returns nullable schemas. Solo repo, Duc owns it.
+
+**Effort:** S (human: ~30 min / CC: ~10 min once the fix shape is decided).
+**Priority:** P0
+**Depends on:** Nothing — independent of any in-flight feature work.
+
 ## Doc Philosophy Enforcement
 
 ### Scoped `AGENTS.md` per subtree
@@ -51,6 +65,32 @@
 **Effort:** M
 **Priority:** P2
 **Depends on:** Sentry removal (done in chore/remove-sentry-integration).
+
+## Agent Team
+
+### Architect prompt eval suite (Phase 1 PR 4)
+
+**What:** Smoke eval suite for the architect's structured resolution output. New directory `apps/agents/test/evals/` with 4 fixture conversations (`greeting`, `acknowledgement`, `bug-with-context`, `bug-missing-data`) plus a runner that calls the real architect via `runTeamTurn` and asserts: (1) the compressed JSON parses through `compressedAgentTeamTurnOutputSchema`, (2) `resolution.status` matches the fixture's expected status, (3) question IDs follow the deterministic `{runId}-{turnIndex}-{N}` pattern, (4) target routing is correct (operator vs customer vs internal). Skipped by default in CI; runs only with `RUN_LLM_EVALS=1` because each invocation costs real OpenAI tokens.
+
+**Why:** Phase 1 of the agentic resolution flow shipped four PRs (1, 2, 2.1, 3 + 3.1) that all guarded the *consumer* side of the structured resolution — Zod schemas, reconstruction, UI panel, FSM tests. Every existing test mocks `mockGenerate` and feeds canned LLM output, so the *prompt* itself has zero regression coverage. Prompt drift (someone tweaks the architect system prompt) would not be caught until production. Greeting → no-action and bug-missing-data → operator-target are the two failure modes that would most directly hurt operators if they regressed; both are cheap to pin with a smoke eval. Quality judgment (LLM-as-judge scoring question text) is intentionally out of scope — defer until there's signal that quality is actually drifting.
+
+**Context:** Deferred from the Phase 1 sequence shipped 2026-04-25. PRs #100 (resolution schema), #101 (closeAsNoAction), #102 (resume mechanism), #103 (resolution panel), #104 (Copy reply optimistic feedback) all landed without this. Architect prompt lives at `apps/agents/src/roles/architect.prompt.ts`; the agent itself at `apps/agents/src/agent.ts` (`runTeamTurn`). Existing `apps/agents/test/agent-team.test.ts` is the consumer-side reference — eval runner should match its conventions but skip the `vi.mock("@mastra/core/agent")` hook so a real LLM call goes through.
+
+**Effort:** S (human: ~2-3 hr / CC: ~45 min)
+**Priority:** P2 — useful guard, not blocking. Land before any non-trivial prompt edit.
+**Depends on:** Nothing — builds on already-shipped infrastructure (agent service, resolution schema, role registry).
+
+### Agent-team failed-run recovery for human-resolution routing failures
+
+**What:** Add an operator/admin recovery path for failed agent-team runs whose last failure was a persistence/routing contract bug, such as `Role architect cannot address unknown target operator`. The path should let an operator reprocess the last turn result or resume the run after the queue-side bug is fixed, without manually editing DB rows.
+
+**Why:** The queue now bridges `operator`/`customer` dialogue messages into `question_dispatched` events, but runs that failed before this fix remain failed. A recovery path prevents transient queue bugs from permanently stranding useful agent work.
+
+**Context:** Added after PR #105 fixed future human-resolution target handling in `persistRoleTurnResult`. Keep this narrow: recover failed runs only when the stored events/messages prove the failure is from a known safe persistence bug, not arbitrary model output.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** PR #105 landing.
 
 ## Auth & Onboarding
 
@@ -107,20 +147,6 @@ When you pick this up: add a `hostedDomain String?` field to `Workspace`, pass i
 **Depends on:** Billing/metering work shipping (Deliverable D in the MVP plan).
 
 ## Auth
-
-### Lock read-side of support routers against workspace API keys
-
-**What:** `supportInboxRouter.listConversations`, `supportInboxRouter.getConversationTimeline`, `supportAnalysisRouter.getLatestAnalysis`, and the `sessionReplayRouter` queries (`list`, `getEvents`, `correlate`, `getSession`, `getReplayChunks`) all ride `workspaceProcedure`, which still accepts workspace API keys (`tlk_*`). After the operator-mutation role gate, mutations are safe — but reads still expose conversation timelines (operator reply bodies, draft content), analysis output (override reasons, suggested drafts), and session replay events (user email, click streams) to any holder of a valid workspace API key.
-
-**Why:** Workspace API keys are intended for customer-facing ingest endpoints (SDK ingestion, webhook inbound). They are not meant to read operator-private data. A leaked key today means the attacker can tail every customer support conversation.
-
-**Context:** Flagged by both Claude + Codex adversarial reviewers during `/ship` on 2026-04-19 (commit locking operator mutations). The mutation fix was landed; reads were scoped to a follow-up at user direction. Cited files: `packages/rest/src/support-inbox-router.ts:31,43`, `packages/rest/src/support-analysis-router.ts:41`, `packages/rest/src/session-replay-router.ts:7,48,78,141,155`.
-
-When you pick this up: the mechanical fix is to route the listed queries through `workspaceRoleProcedure(WORKSPACE_ROLE.MEMBER)` (same pattern used by the mutations). The larger design question is whether to split `workspaceProcedure` into two explicit variants (`workspaceSessionProcedure` for user-UI reads, `workspaceApiKeyProcedure` for SDK/ingest endpoints with a scope check) so the "API keys can't read operator data" invariant is enforced structurally rather than procedure-by-procedure.
-
-**Effort:** S (human: ~2 hr / CC: ~20 min)
-**Priority:** P1 — actively exposed read path in a pre-product auth model.
-**Depends on:** None.
 
 ### Stale role cache after workspace membership demotion
 
@@ -286,6 +312,18 @@ When you pick this up: wrap the `tx.sessionRecord.create(...)` in a try/catch on
 
 ## Design System
 
+### Keyboard-accessible connection fallback for agent-team graph
+
+**What:** Keep a keyboard-accessible fallback for creating agent-team connections after drag-to-connect becomes the primary interaction in the React Flow graph.
+
+**Why:** Prevent the new graph editor from regressing accessibility for users who cannot rely on pointer-driven drag interactions.
+
+**Context:** The reduced React Flow migration plan for `duc/agent-team-builder` replaces the custom SVG graph with direct connect/delete interactions on the settings page. That makes the UI easier for mouse users, but it risks removing the current modal-based connection path (`AddEdgeDialog`) before keyboard-only graph editing is verified. When you pick this up: either retain `AddEdgeDialog` as a fallback path or add an equivalent keyboard-first connection flow before fully removing the dialog from the page.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** Constrained React Flow migration landing on the agent-team settings page.
+
 ### Create Canonical DESIGN.md for TrustLoop
 
 **What:** Run design-system definition and publish a repo-wide `DESIGN.md` that supersedes per-feature local token appendices.
@@ -362,6 +400,22 @@ When you pick this up: wrap the `tx.sessionRecord.create(...)` in a try/catch on
 **Priority:** P2
 **Depends on:** File attachment feature stable in production. Trigger: DB size growth from attachments becomes noticeable.
 
+## Agent Team Observability
+
+### Payload S3 offload for large tool results
+
+**What:** When an `AgentTeamRunEvent.payload` exceeds the 64KB truncation cap, store the full payload in S3 and put a pointer in the event row (`{ s3Key, truncated: true }`).
+
+**Why:** Truncation-with-flag is fine for v1, but once operators start regularly debugging runs where a `tool_returned` event got cut (large code-search results, diff blobs), they'll want the full payload. S3 is the right tier — cheap, durable, already in the stack if archival ships.
+
+**Context:** Added from `/plan-eng-review` of agent-team observability on 2026-04-14. Rejected inline in the design doc because no operator has asked for it yet and it's premature optimization. Revisit when a specific operator says "I needed the full tool output and only had the truncation flag."
+
+When you pick this up: the `AgentTeamRunEvent` table already supports JSONB payload. Add an optional `payloadS3Key String?` column, update `recordEvent` to offload when `JSON.stringify(payload).length > 65536`, and add a resolver helper `loadFullPayload(event)` for consumers. Depends on: S3 credentials in `@shared/env` (already set up if archival workflow ships in the same PR).
+
+**Effort:** S (human) / XS (CC)
+**Priority:** P3
+**Depends on:** `AgentTeamRunEvent` table shipped, S3 credentials configured.
+
 ## Completed
 
 ### Promote `threadSnapshot` from pre-rendered string to typed prompt context
@@ -389,6 +443,16 @@ When you pick this up: wrap the `tx.sessionRecord.create(...)` in a try/catch on
 **Tests:** 178 tests in rest package still pass. Full monorepo type-check clean.
 
 **Completed:** 2026-04-19. Mutation hole flagged by Codex during /autoplan eng review of the SupportConversation FSM plan; `dispatchWorkflow` hole flagged by Codex during /ship adversarial pass (on the same day, scope expanded by user at the /ship gate).
+
+### Lock support read endpoints against workspace API keys
+
+**What:** `supportInboxRouter.listConversations`, `supportInboxRouter.getConversationTimeline`, and `supportAnalysisRouter.getLatestAnalysis` now use `workspaceRoleProcedure(WORKSPACE_ROLE.MEMBER)` through the existing `operatorProcedure` alias. Workspace API keys (`tlk_*`) can no longer read support inbox timelines or latest analysis output through these tRPC procedures.
+
+**Implementation:** `packages/rest/src/support-inbox-router.ts` — moved both read queries from `workspaceProcedure` to `operatorProcedure`. `packages/rest/src/support-analysis-router.ts` — moved `getLatestAnalysis` from `workspaceProcedure` to `operatorProcedure`. `packages/rest/test/procedure-auth.test.ts` — added API-key-only rejection tests for all three read endpoints. `sessionReplayRouter` was already protected by `operatorProcedure`.
+
+**Tests:** `npm --workspace @shared/rest exec vitest run test/procedure-auth.test.ts`, `npm --workspace @shared/rest run type-check`, and `npm --workspace @shared/rest run lint` pass.
+
+**Completed:** 2026-04-25. Follow-up to the 2026-04-19 operator mutation auth fix; closes the P1 read-side support data exposure called out during /ship review.
 
 ### Tighten bot-message filter to installation.botUserId
 

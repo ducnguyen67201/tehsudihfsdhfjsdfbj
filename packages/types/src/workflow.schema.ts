@@ -1,3 +1,7 @@
+import {
+  agentTeamRunWorkflowInputSchema,
+  agentTeamRunWorkflowResultSchema,
+} from "@shared/types/agent-team/agent-team.schema";
 import { workflowProcessingStatusSchema } from "@shared/types/status/workflow-status";
 import {
   analysisResultStatusSchema,
@@ -13,6 +17,7 @@ export const workflowNames = {
   supportInbox: "supportInboxWorkflow",
   supportAnalysis: "supportAnalysisWorkflow",
   supportSummary: "supportSummaryWorkflow",
+  agentTeamRun: "agentTeamRunWorkflow",
   sendDraftToSlack: "sendDraftToSlackWorkflow",
   repositoryIndex: "repositoryIndexWorkflow",
 } as const;
@@ -106,6 +111,10 @@ export const workflowDispatchSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("repository-index"),
     payload: repositoryIndexWorkflowInputSchema,
+  }),
+  z.object({
+    type: z.literal("agent-team-run"),
+    payload: agentTeamRunWorkflowInputSchema,
   }),
   z.object({
     type: z.literal("send-draft-to-slack"),

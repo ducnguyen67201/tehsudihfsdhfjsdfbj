@@ -1,3 +1,4 @@
+import { createAgentTeamRouter } from "@shared/rest/agent-team-router";
 import { authRouter } from "@shared/rest/auth-router";
 import { sessionReplayRouter } from "@shared/rest/session-replay-router";
 import { createSupportAnalysisRouter } from "@shared/rest/support-analysis-router";
@@ -23,6 +24,7 @@ import { healthResponseSchema } from "@shared/types";
 export function createAppRouter(dispatcher: WorkflowDispatcher = temporalWorkflowDispatcher) {
   return router({
     auth: authRouter,
+    agentTeam: createAgentTeamRouter(dispatcher),
     supportAnalysis: createSupportAnalysisRouter(dispatcher),
     sessionReplay: sessionReplayRouter,
     supportInbox: supportInboxRouter,

@@ -2,6 +2,107 @@
 
 All notable changes to TrustLoop will be documented in this file.
 
+## [0.2.15.1] - 2026-04-25
+
+### Fixed
+- **Copy reply button now confirms the click even when the browser blocks
+  the Clipboard API.** Surfaced by /qa: in restricted-clipboard
+  environments (corporate policy, headless contexts, sandboxed iframes)
+  the button silently failed and the operator had no idea whether their
+  click registered. The label now flips to "Copied" optimistically before
+  the async write so the click always feels responsive; if the underlying
+  Clipboard API rejects, the visible draft text is still selectable as a
+  manual fallback.
+
+## [0.2.15.0] - 2026-04-25
+
+### Added
+- **Operators can now answer the architect's questions and resume an agent-team
+  run from the inbox.** A new "Resolve" tab on the agent-team panel lights up
+  the moment a run exits to `waiting`. It groups the architect's open questions
+  by who can answer them: operator-target questions get an inline textarea that
+  posts the answer back to the architect's inbox without restarting the
+  workflow; customer-target questions show the architect's draft reply with a
+  one-click copy so the operator can paste it into Slack; internal-target
+  questions are listed as informational so the operator can see what peer
+  roles still owe an answer. A single "Resume run" button at the bottom is the
+  one explicit gate that re-dispatches the workflow — every restart stays
+  operator-driven.
+- `agentTeam.getPendingResolutionQuestions` tRPC query: returns every
+  `question_dispatched` event without a matching `question_answered`,
+  carrying `target`, `question`, `suggestedReply`, `assignedRole`, and
+  `askedByRoleKey` so the panel renders without parsing the raw event log.
+
+## [0.2.14.0] - 2026-04-25
+
+### Added
+- Operator resume flow for agent-team runs that exited in `waiting`. Two new
+  tRPC mutations on `agentTeam`: `recordOperatorAnswer` writes the operator's
+  answer into the architect's inbox as a synthetic message, flips the role
+  inbox from `blocked` → `queued`, and emits a `question_answered` event
+  without restarting the workflow. `resumeRun` is the explicit follow-up
+  action: it dispatches a fresh Temporal execution of the same `runId` with
+  `isResume: true` and a unique `resumeNonce` suffix on the workflow id, so
+  Temporal accepts the restart without colliding with the completed
+  execution.
+- `agentTeamRunWorkflowInputSchema` gains optional `isResume` + `resumeNonce`
+  fields. The workflow skips `initializeRunState` when `isResume === true`,
+  preserving the architect's queued role-inbox + `wakeReason: "operator-answer"`
+  that `recordOperatorAnswer` wrote before dispatch.
+- `WorkflowDispatcher.startAgentTeamRunResumeWorkflow` — dedicated dispatcher
+  method so the resume-only workflowId convention
+  (`agent-team-run-{runId}-resume-{nonce}`) is enforced in one place.
+
+## [0.2.13.0] - 2026-04-25
+
+### Added
+- **Operators can now close a conversation as "no action needed."** When the
+  agent team produces a blocked turn for a greeting, acknowledgement, or
+  off-topic customer message, the operator can mark the conversation done
+  without sending a reply. The action is rejected with a 409 conflict if the
+  customer sent a follow-up after the agent run finished, so an operator
+  can't accidentally close a conversation while the customer's actual reply
+  is sitting in the queue.
+
+## [0.2.12.0] - 2026-04-25
+
+### Changed
+- Architect role now emits structured "questions to resolve" output instead of
+  freeform blocked-reason strings. Each blocked turn lists the specific
+  questions the architect needs answered, with explicit targets (customer,
+  operator, or another internal role) and a deterministic question id of the
+  form `{runId}-{turnIndex}-{questionIndex}`. Sets up the operator-facing
+  resolution panel (UI lands in a follow-up PR).
+- Agent-team event log gains three new kinds: `question_dispatched`,
+  `question_answered`, `question_superseded`. Each dispatched question is now
+  persisted to the event log with target/status payload so dashboards and
+  resume flows can address questions by id.
+
+### Added
+- `parentRunId` column on `AgentTeamRun` for resume chains. Operator-resume
+  flows in a follow-up PR set this to chain a resumed run to its parent.
+- New positional-format compressed schemas (`compressedTurnResolutionSchema`,
+  `compressedQuestionToResolveSchema`) with target / status / recommended-close
+  code maps.
+
+### Fixed
+- `no_action_needed` resolution status no longer marks the role as blocked.
+  Would have stranded acknowledgement-only conversations indefinitely; only
+  `needs_input` blocks the role's inbox now.
+
+## [0.2.11.0] - 2026-04-25
+
+### Added
+- **Staging and production migrations now have dedicated release gates.** `Run Migrations Staging` and `Run Migrations Production` wait for CI on their matching deployment branch, serialize runs per environment, verify Doppler database access, generate Prisma, apply committed migrations with transient retry, and require a clean post-migration Prisma status before services are deployed.
+- **Migration PRs now get a destructive-SQL safety scan.** Changed `migration.sql` files fail CI when they include table/column drops, truncates, broad deletes, or risky column rewrites unless they carry an explicit reviewed destructive-change marker.
+- **The migration safety scanner now catches Prisma's multiline `ALTER TABLE ... ALTER COLUMN ... SET NOT NULL` output.** A CI self-test covers the exact statement shape so the guard cannot drift back to line-only matching.
+
+### Changed
+- **The old migration workflow is manual recovery only.** Automatic release migrations no longer share one branch-switching workflow; manual reruns still use the same hardened migration script for staging or production.
+- **Drift checks now assert raw SQL database objects before Prisma comparison.** CI verifies the pgvector HNSW index exists with the expected method and opclass before dropping it in the ephemeral database for Prisma's drift diff, so raw SQL coverage is checked instead of silently skipped.
+- **Migration drift detection now matches Prisma 7's supported command surface.** The check applies committed migrations from scratch, verifies the raw pgvector index, removes that known Prisma-unmodelable index in the ephemeral database, then runs the schema drift diff.
+- **Deployment docs now require the migration gate before Railway service deploys.** The staging and production runbooks describe CI, migration gates, required production environment approval, and the manual recovery path.
+
 ## [0.2.10.0] - 2026-04-23
 
 ### Changed

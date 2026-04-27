@@ -101,7 +101,7 @@ export function ConversationPropertiesSidebar({
       : "Unassigned";
 
   return (
-    <aside className="flex h-full w-[340px] shrink-0 flex-col overflow-y-auto border-l">
+    <div className="flex h-full min-h-0 flex-col overflow-y-auto">
       {/* PROPERTIES heading */}
       <div className="px-5 pt-5 pb-3">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -261,7 +261,7 @@ export function ConversationPropertiesSidebar({
       <div className="px-5 pb-5">
         <ActivityLog events={events} />
       </div>
-    </aside>
+    </div>
   );
 }
 
