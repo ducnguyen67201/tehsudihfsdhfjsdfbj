@@ -42,6 +42,42 @@
 
 ## AI Analysis
 
+### Session replay evidence capsule: standalone page convergence
+
+**What:** After the conversation-linked Support Evidence Capsule proves useful, audit `/[workspaceId]/sessions` and converge shared replay/evidence components so the standalone replay browser does not drift from the support workflow. For this TODO, "Support Evidence Capsule" means the conversation-linked session tab summary that shows match trust, primary failure, last user actions, sanitized evidence copy text, and a replay proof link.
+
+**Why:** `/autoplan` for the session replay UI intentionally made the support conversation the canonical first surface. The standalone sessions page can remain a replay browser for now, but duplicated event rendering, marker behavior, and decode states will become maintenance drag once the capsule lands.
+
+**Context:** Deferred from the 2026-04-26 Support Evidence Capsule autoplan to keep the first PR focused on support-thread evidence-to-action, not a full sessions product redesign.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** Conversation-linked Support Evidence Capsule shipping and showing operator value.
+
+### Session replay evidence insertion into support replies
+
+**What:** Add a first-class "insert evidence" path from the Support Evidence Capsule into the support reply composer once copy actions have proven the right evidence format. This must use a customer-safe evidence builder, separate from internal escalation text.
+
+**Why:** Copy repro and copy escalation are the smallest useful action. Direct insertion is higher leverage, but coupling the capsule to composer internals before the evidence format is validated would make the first PR too sticky. Customer-facing insertion must redact or omit query strings, hashes, emails, user identifiers, token-like values, raw console values, stack traces, and internal URLs unless an explicit allowlist permits them.
+
+**Context:** Deferred from the 2026-04-26 Support Evidence Capsule autoplan. The required v1 action is clipboard copy with sanitized text; composer insertion should reuse that same copy-safe evidence builder.
+
+**Effort:** S-M
+**Priority:** P2
+**Depends on:** Support Evidence Capsule copy actions shipping.
+
+### Full console and network capture for session replay
+
+**What:** Expand SDK capture and storage if customers need DevTools-style console logs or network waterfalls, including request grouping, headers/body policy, trace IDs, and retention/privacy controls. Current capture is narrower: failed `fetch` calls plus `console.error`/`console.warn` events. It does not capture XHR, successful requests, resource loads, headers, bodies, request grouping, `console.log`, `console.info`, or `console.debug`.
+
+**Why:** Current event schemas support console errors/warnings and failed fetches, not a full Console or Network panel. The capsule should label this honestly in v1 and only expand capture once there is clear product demand.
+
+**Context:** Deferred from the 2026-04-26 Support Evidence Capsule autoplan after CEO/design reviews flagged that broad "Console" and "Network" tabs would overpromise.
+
+**Effort:** L
+**Priority:** P3
+**Depends on:** Customer demand for deeper debug capture and a privacy policy decision.
+
 ### Per-workspace Sentry adapter (only if a paying customer asks)
 
 **What:** A per-workspace BYO-Sentry integration. OAuth or PAT, encrypted token in a new `sentryConnection` table, `getConfig(workspaceId)` lookup, gated `searchSentry` tool registration when a workspace has a connection. Mirrors the existing GitHub install pattern.
