@@ -2,6 +2,23 @@
 
 All notable changes to TrustLoop will be documented in this file.
 
+## [0.2.16.2] - 2026-05-03
+
+### Fixed
+- **Clicking "attach session" now feels acknowledged.** When the operator
+  picked a session from the picker, the capsule kept showing the old
+  "No browser session matched" copy until the mutation returned —
+  `isAttachingSession` set the spinner on the picker dialog but never
+  reached the capsule, so the click felt dropped. The capsule now
+  treats `isAttachingSession` the same as `isLoading` and shows the
+  skeleton with an `aria-live="polite"` "Attaching session" label, then
+  flips to the populated capsule when the mutation lands. Same for the
+  initial-load path: `aria-live` "Loading session evidence" so screen
+  readers get a status update.
+- Adds 6 capsule unit tests covering loading, attaching, no-match,
+  populated, error, and "loading wins over stale error" — the last is
+  a regression guard for retry-after-error flicker.
+
 ## [0.2.16.1] - 2026-05-02
 
 ### Security
