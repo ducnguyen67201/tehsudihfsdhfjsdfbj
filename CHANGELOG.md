@@ -2,6 +2,14 @@
 
 All notable changes to TrustLoop will be documented in this file.
 
+## [0.2.15.2] - 2026-04-26
+
+### Changed
+- Tracked the deferred session replay evidence follow-ups from the approved
+  Support Evidence Capsule plan, including standalone sessions-page
+  convergence, reply-composer evidence insertion, and future full
+  console/network capture.
+
 ## [0.2.15.1] - 2026-04-25
 
 ### Fixed
