@@ -1,4 +1,5 @@
 import { prisma } from "@shared/database";
+import { consumeSessionReplayReadAttempt } from "@shared/rest/security/session-replay-read-rate-limit";
 import * as sessionThreadMatch from "@shared/rest/services/support/session-thread-match-service";
 import { router, workspaceRoleProcedure } from "@shared/rest/trpc";
 import {
@@ -7,9 +8,25 @@ import {
   WORKSPACE_ROLE,
   buildSupportEvidence,
 } from "@shared/types";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 const operatorProcedure = workspaceRoleProcedure(WORKSPACE_ROLE.MEMBER);
+
+// Throws TOO_MANY_REQUESTS when the per-workspace read budget is exhausted.
+// Called at the top of every read query so a runaway client (broken polling
+// loop, accidental useEffect dependency, scripted scrape) can't cascade
+// through the replay storage path. Mutations stay unrate-limited — they're
+// operator-driven manual actions.
+function enforceReadRateLimit(workspaceId: string): void {
+  const result = consumeSessionReplayReadAttempt(workspaceId);
+  if (!result.allowed) {
+    throw new TRPCError({
+      code: "TOO_MANY_REQUESTS",
+      message: `Too many session-replay read requests. Retry in ${result.retryAfterSeconds}s.`,
+    });
+  }
+}
 
 export const sessionReplayRouter = router({
   list: operatorProcedure
@@ -22,6 +39,7 @@ export const sessionReplayRouter = router({
         .default({ limit: 50 })
     )
     .query(async ({ ctx, input }) => {
+      enforceReadRateLimit(ctx.workspaceId);
       const records = await prisma.sessionRecord.findMany({
         where: {
           workspaceId: ctx.workspaceId,
@@ -61,6 +79,7 @@ export const sessionReplayRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
+      enforceReadRateLimit(ctx.workspaceId);
       const events = await prisma.sessionEvent.findMany({
         where: {
           sessionRecordId: input.sessionRecordId,
@@ -104,6 +123,7 @@ export const sessionReplayRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
+      enforceReadRateLimit(ctx.workspaceId);
       // If conversationId provided, extract emails from conversation events
       let resolvedEmail = input.userEmail;
       const resolvedUserId = input.userId;
@@ -159,6 +179,7 @@ export const sessionReplayRouter = router({
   getSession: operatorProcedure
     .input(z.object({ sessionRecordId: z.string().min(1) }))
     .query(async ({ ctx, input }) => {
+      enforceReadRateLimit(ctx.workspaceId);
       const session = await prisma.sessionRecord.findFirst({
         where: {
           id: input.sessionRecordId,
@@ -177,6 +198,7 @@ export const sessionReplayRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
+      enforceReadRateLimit(ctx.workspaceId);
       const context = await sessionThreadMatch.getConversationSessionContext({
         workspaceId: ctx.workspaceId,
         conversationId: input.conversationId,
@@ -219,6 +241,7 @@ export const sessionReplayRouter = router({
   getReplayChunks: operatorProcedure
     .input(z.object({ sessionRecordId: z.string().min(1) }))
     .query(async ({ ctx, input }) => {
+      enforceReadRateLimit(ctx.workspaceId);
       const chunks = await prisma.sessionReplayChunk.findMany({
         where: {
           sessionRecordId: input.sessionRecordId,

@@ -2,6 +2,21 @@
 
 All notable changes to TrustLoop will be documented in this file.
 
+## [0.2.16.2] - 2026-05-02
+
+### Security
+- **Session-replay read endpoints are now rate-limited per workspace.**
+  `list`, `getEvents`, `correlate`, `getSession`, `getForConversation`,
+  and `getReplayChunks` were operator-authed but unbounded; a runaway
+  client (broken polling loop, scripted scrape, accidental useEffect
+  dependency) could chew through the replay storage path and starve
+  legitimate operators. Adds a 60s sliding-window limiter (120 req/min,
+  ~2/sec sustained — generous for ~40 conversation opens per minute)
+  in `packages/rest/src/security/session-replay-read-rate-limit.ts`,
+  enforced at the top of every read query. Returns
+  `TRPCError({ code: "TOO_MANY_REQUESTS" })` with retry-after on block.
+  Mutations stay unrate-limited (operator-driven manual actions).
+
 ## [0.2.16.0] - 2026-05-02
 
 ### Added
