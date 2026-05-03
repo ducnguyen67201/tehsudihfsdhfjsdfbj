@@ -80,11 +80,15 @@ export function SessionTab({
     />
   );
 
-  if (!isLoading && !error && !session) {
+  // Don't drop into the "no session, show SDK setup guide" branch while a
+  // manual attach is in flight — the operator already picked a session,
+  // surface the loading state instead so the click feels acknowledged.
+  if (!isLoading && !isAttachingSession && !error && !session) {
     return (
       <div className="space-y-3 p-4">
         <SupportEvidenceCapsule
           isLoading={isLoading}
+          isAttachingSession={isAttachingSession}
           error={error}
           match={match}
           session={session}
@@ -109,6 +113,7 @@ export function SessionTab({
     <div className="space-y-3">
       <SupportEvidenceCapsule
         isLoading={isLoading}
+        isAttachingSession={isAttachingSession}
         error={error}
         match={match}
         session={session}

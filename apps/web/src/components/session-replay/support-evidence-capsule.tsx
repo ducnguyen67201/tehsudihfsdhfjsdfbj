@@ -21,6 +21,13 @@ import { toast } from "sonner";
 
 interface SupportEvidenceCapsuleProps {
   isLoading: boolean;
+  // True while a manual attach mutation is in flight. Treated as a loading
+  // state so the capsule shows a skeleton instead of stale data while the
+  // operator's attach choice is being persisted. Without this, clicking
+  // "attach session" leaves the old "No browser session matched" card
+  // visible until the mutation returns — which feels like the click did
+  // nothing.
+  isAttachingSession?: boolean;
   error: string | null;
   match: SessionConversationMatch | null;
   session: SessionRecordResponse | null;
@@ -50,6 +57,7 @@ interface EvidenceLists {
 // Operator-first evidence summary for a matched browser session.
 export function SupportEvidenceCapsule({
   isLoading,
+  isAttachingSession = false,
   error,
   match,
   session,
@@ -85,9 +93,14 @@ export function SupportEvidenceCapsule({
     }
   }
 
-  if (isLoading) {
+  // isAttachingSession piggybacks on the loading skeleton so the operator
+  // doesn't see stale "no session" copy during an attach mutation. The
+  // aria-live label tells screen readers which kind of wait this is.
+  if (isLoading || isAttachingSession) {
+    const liveLabel = isAttachingSession ? "Attaching session" : "Loading session evidence";
     return (
-      <Card size="sm">
+      <Card size="sm" aria-busy="true" aria-live="polite" data-testid="capsule-loading">
+        <span className="sr-only">{liveLabel}</span>
         <CardHeader>
           <Skeleton className="h-4 w-40" />
           <Skeleton className="h-3 w-64" />
